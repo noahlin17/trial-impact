@@ -10,9 +10,6 @@ readout — alerts to Slack/email while surfacing everything on a dashboard.
 > **Not investment advice.** Output is an automated research signal for
 > informational purposes only. A disclaimer is attached to every assessment.
 
-> The directory is still named `devin-remediation-bot` for historical reasons; the
-> service inside it is the trial-impact service.
-
 ---
 
 ## Architecture
