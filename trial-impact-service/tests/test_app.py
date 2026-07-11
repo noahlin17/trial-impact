@@ -45,6 +45,19 @@ STRONG_WIN = {
     "confidence": 0.9,
 }
 
+# A full sim_result (with the fields pkpd_curve + the dashboard need).
+RICH_SIM = {
+    "target": "KRAS", "drug": "sotorasib", "tissue": "tumor", "dose_mg": 960.0,
+    "binding_affinity_kcal_mol": -8.585, "kd_nM": 892.54,
+    "cmax_ng_ml": 19259.45, "auc_ng_h_ml": 143963.8,
+    "target_occupancy_pct": 97.47, "tox_flag": True, "confidence": 0.9,
+    "provenance": {
+        "uniprot": "P01116", "structure_source": "RCSB", "pdb_id": "7VVB",
+        "smiles": "C[C@H]1CN(...)C(=O)C=C",
+        "descriptors": {"mw": 560.6, "logp": 5.3, "hbd": 1, "hba": 6, "tpsa": 102.2},
+    },
+}
+
 
 class FakeDevin:
     def __init__(self) -> None:
@@ -304,3 +317,54 @@ def test_market_model_handles_missing_sim():
     # No physics available — still directional, at reduced conviction.
     d = market_model.pos_delta(ev, None)
     assert 0 < d < market_model.pos_delta(ev, STRONG_WIN)
+
+
+# --- reasoning trace: breakdown must reduce exactly to the delta ------------- #
+def test_pos_breakdown_reduces_to_delta():
+    for outcome in ("met", "missed"):
+        ev = {"nct_id": "N", "endpoint_outcome": outcome, "target": "KRAS", "sponsor": "Amgen"}
+        for sim in (RICH_SIM, STRONG_WIN, {"error": "boom"}, None):
+            b = market_model.pos_breakdown(ev, sim)
+            # exact invariants on the raw components
+            assert abs(
+                b["outcome_base"] + b["binding_modifier"]
+                + b["occupancy_modifier"] + b["tox_penalty"] - b["subtotal"]
+            ) < 1e-12
+            assert abs(b["final"] - market_model.pos_delta(ev, sim)) < 1e-12
+            # display components sum to the final (within rounding)
+            assert abs(sum(c["value"] for c in b["components"]) - b["final"]) < 5e-3
+
+
+# --- PK/PD curve reconstruction (stdlib Bateman) ---------------------------- #
+def test_pkpd_curve_shape():
+    from app.simulation import pkpd_curve
+
+    c = pkpd_curve(RICH_SIM)
+    assert set(c) == {"t_h", "conc_ng_ml", "occupancy_pct"}
+    assert len(c["t_h"]) == 97
+    assert c["t_h"][0] == 0.0 and c["conc_ng_ml"][0] == 0.0  # nothing absorbed at t=0
+    assert all(0.0 <= o <= 100.0 for o in c["occupancy_pct"])
+    peak = c["conc_ng_ml"].index(max(c["conc_ng_ml"]))
+    assert 0 < peak < 96  # rise then decay, not monotonic to an endpoint
+    assert pkpd_curve({"kd_nM": 1}) is None  # missing dose / MW -> no curve
+
+
+# --- analysis payload + route ----------------------------------------------- #
+def test_analysis_payload_and_route(ctx):
+    client, devin, _alerter, _db = ctx
+    for nct in ("NCTA", "NCTB"):
+        _post(client, _payload(nct))
+    devin.script("devin-1", SessionStatus("finished", STATUS_COMPLETED, dict(RICH_SIM), None))
+    devin.script("devin-2", SessionStatus("finished", STATUS_COMPLETED, dict(RICH_SIM), None))
+    client.post("/poll")
+
+    payload = client.get("/analysis.json").get_json()
+    assert payload["summary"]["analyzed"] == 2
+    assert payload["summary"]["tox_rate"] == 1.0
+    assert len(payload["relationships"]["points"]) == 2
+    run = payload["runs"][0]
+    assert run["detail"]["pkpd_curve"] is not None
+    assert "components" in run["detail"]["pos_breakdown"]
+
+    html = client.get("/analysis", headers={"Accept": "text/html"}).data.decode()
+    assert "Results Analysis" in html and "detail-waterfall" in html

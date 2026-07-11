@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trial Impact — Results Analysis</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 2rem auto; max-width: 1200px; padding: 0 1rem; line-height: 1.45; }
+    h1 { margin-bottom: 0.25rem; }
+    h2 { font-size: 1.15rem; margin: 2rem 0 0.5rem; }
+    .sub { color: #666; margin-top: 0; }
+    .nav { margin: 0.5rem 0 1rem; font-size: 0.95rem; }
+    .cards { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 0.8rem 1.1rem; min-width: 120px; }
+    .card .num { font-size: 1.6rem; font-weight: 700; }
+    .card .lbl { color: #666; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+    .chart { border: 1px solid #eee; border-radius: 10px; padding: 0.5rem; }
+    .chart h3 { font-size: 0.85rem; margin: 0.2rem 0 0.2rem 0.4rem; color: #444; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; }
+    th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid #e5e5e5; font-size: 0.9rem; }
+    th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; color: #666; cursor: pointer; user-select: none; }
+    th:hover { color: #000; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #f6f9ff; }
+    tbody tr.selected { background: #eaf1ff; }
+    .up { color: #1c7a3e; font-weight: 700; } .down { color: #a11f1f; font-weight: 700; } .flat { color: #888; font-weight: 700; }
+    a { color: #2a6df4; text-decoration: none; } a:hover { text-decoration: underline; }
+    code { background: #f3f3f3; padding: 0.05rem 0.3rem; border-radius: 4px; }
+    .muted { color: #999; } .legend { font-size: 0.75rem; color: #888; }
+    button { font: inherit; padding: 0.35rem 0.8rem; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; cursor: pointer; }
+    #detail { border: 1px solid #ddd; border-radius: 12px; padding: 1rem 1.25rem; margin-top: 1rem; display: none; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .viewer3d { width: 100%; height: 300px; position: relative; border-radius: 8px; background: #fbfbfd; }
+    pre.commentary { white-space: pre-wrap; background: #f7f7f9; border-radius: 8px; padding: 0.75rem; font-size: 0.85rem; }
+    .disclaimer { color: #999; font-size: 0.8rem; margin-top: 2rem; }
+    @media (max-width: 780px) { .detail-grid { grid-template-columns: 1fr; } }
+  </style>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+  <h1>Results Analysis</h1>
+  <p class="sub">Inspect and learn from the corpus of completed simulations — how binding &amp; exposure map to the market call.</p>
+  <p class="nav"><a href="/status">← Status</a> · <strong>Results analysis</strong> · <button onclick="exportJSON()">Export JSON</button></p>
+
+  <div class="cards" id="cards"></div>
+
+  <h2>Physics → price relationships</h2>
+  <p class="legend">Each point is one run (hover for drug/target). Red = structural tox flag.</p>
+  <div class="charts">
+    <div class="chart"><h3>Binding ΔG vs PoS delta</h3><div id="c_dg_pos"></div></div>
+    <div class="chart"><h3>Kd (log) vs target occupancy</h3><div id="c_kd_occ"></div></div>
+    <div class="chart"><h3>Target occupancy vs PoS delta</h3><div id="c_occ_pos"></div></div>
+    <div class="chart"><h3>Distribution of PoS deltas</h3><div id="c_hist"></div></div>
+  </div>
+
+  <h2>Runs <span class="muted" style="font-weight:400;font-size:0.85rem">(click a row to inspect)</span></h2>
+  <table id="runs">
+    <thead>
+      <tr>
+        <th data-key="target">Target</th>
+        <th data-key="drug">Drug</th>
+        <th data-key="phase">Phase</th>
+        <th data-key="dg">ΔG</th>
+        <th data-key="kd">Kd (nM)</th>
+        <th data-key="occupancy">Occ %</th>
+        <th data-key="tox">Tox</th>
+        <th data-key="pos_delta">PoS Δ</th>
+        <th data-key="sponsor_ticker">Call</th>
+        <th data-key="pdb_id">Structure</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="detail"></div>
+
+  <p class="disclaimer">Automated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.</p>
+
+  {% include "_viewer3d.html" %}
+  <script>
+    const DATA = {{ payload | tojson }};
+    const RUNS = DATA.runs.slice();
+    let sortKey = "pos_delta", sortDir = -1, selected = null;
+
+    const num = (x, d = 2) => (x === null || x === undefined) ? "—" : (+x).toFixed(d);
+    const arrow = (dir) => ({ up: "▲", down: "▼", flat: "▬" }[dir] || "▬");
+
+    // ---- summary cards ----
+    function cards() {
+      const s = DATA.summary;
+      const items = [
+        ["Runs", s.analyzed], ["Mean ΔG", num(s.mean_dg, 2)],
+        ["Mean occ %", num(s.mean_occupancy, 1)], ["Tox rate", s.tox_rate === null ? "—" : num(s.tox_rate * 100, 0) + "%"],
+        ["Mean PoS Δ", s.mean_pos_delta === null ? "—" : (s.mean_pos_delta > 0 ? "+" : "") + num(s.mean_pos_delta, 2)],
+        ["Market-moving", s.market_moving],
+      ];
+      document.getElementById("cards").innerHTML = items.map(
+        ([l, v]) => `<div class="card"><div class="num">${v}</div><div class="lbl">${l}</div></div>`).join("");
+    }
+
+    // ---- scatter charts ----
+    function scatter(el, xs, ys, texts, colors, xt, yt, xlog) {
+      Plotly.newPlot(el, [{
+        x: xs, y: ys, text: texts, mode: "markers", type: "scatter",
+        hovertemplate: "%{text}<br>" + xt + ": %{x}<br>" + yt + ": %{y}<extra></extra>",
+        marker: { size: 13, color: colors, line: { width: 1, color: "#555" } }
+      }], {
+        margin: { t: 6, r: 10, b: 40, l: 50 }, height: 260,
+        xaxis: { title: xt, type: xlog ? "log" : "linear", zeroline: true },
+        yaxis: { title: yt, zeroline: true }
+      }, { displayModeBar: false, responsive: true });
+    }
+    function charts() {
+      const p = DATA.relationships.points;
+      if (!p.length) { document.querySelector(".charts").innerHTML = '<p class="muted">No completed runs yet.</p>'; return; }
+      const txt = p.map(d => `${d.target} × ${d.drug}`);
+      const col = p.map(d => d.tox ? "#a11f1f" : "#2a6df4");
+      scatter("c_dg_pos", p.map(d => d.dg), p.map(d => d.pos), txt, col, "ΔG (kcal/mol)", "PoS Δ", false);
+      scatter("c_kd_occ", p.map(d => d.kd), p.map(d => d.occ), txt, col, "Kd (nM)", "occupancy %", true);
+      scatter("c_occ_pos", p.map(d => d.occ), p.map(d => d.pos), txt, col, "occupancy %", "PoS Δ", false);
+      Plotly.newPlot("c_hist", [{ x: p.map(d => d.pos), type: "histogram", marker: { color: "#2a6df4" } }],
+        { margin: { t: 6, r: 10, b: 40, l: 50 }, height: 260, xaxis: { title: "PoS Δ" }, yaxis: { title: "count" } },
+        { displayModeBar: false, responsive: true });
+    }
+
+    // ---- table ----
+    function renderTable() {
+      RUNS.sort((a, b) => {
+        let x = a[sortKey], y = b[sortKey];
+        if (x === null || x === undefined) x = -Infinity;
+        if (y === null || y === undefined) y = -Infinity;
+        if (typeof x === "string") return sortDir * x.localeCompare(y);
+        return sortDir * (x - y);
+      });
+      const tb = document.querySelector("#runs tbody");
+      tb.innerHTML = RUNS.map((r, i) => `
+        <tr data-i="${i}" class="${selected === r.event_id ? "selected" : ""}">
+          <td><strong>${r.target ?? "—"}</strong></td><td>${r.drug ?? "—"}</td>
+          <td>${(r.phase || "—").replace("PHASE", "P")}</td>
+          <td>${num(r.dg, 2)}</td><td>${num(r.kd, 0)}</td><td>${num(r.occupancy, 1)}</td>
+          <td>${r.tox ? "⚠︎" : "·"}</td>
+          <td>${r.pos_delta > 0 ? "+" : ""}${num(r.pos_delta, 2)}</td>
+          <td class="${r.direction}">${arrow(r.direction)} ${r.sponsor_ticker ?? "—"}</td>
+          <td>${r.pdb_id ? `<code>${r.pdb_id}</code>` : "—"}</td>
+        </tr>`).join("");
+      tb.querySelectorAll("tr").forEach(tr =>
+        tr.addEventListener("click", () => openDetail(+tr.dataset.i)));
+    }
+    document.querySelectorAll("#runs th").forEach(th => th.addEventListener("click", () => {
+      const k = th.dataset.key;
+      sortDir = (sortKey === k) ? -sortDir : (typeof RUNS[0]?.[k] === "string" ? 1 : -1);
+      sortKey = k; renderTable();
+    }));
+
+    // ---- drill-down ----
+    function openDetail(i) {
+      const r = RUNS[i], d = r.detail, s = d.sim_result, prov = s.provenance || {};
+      selected = r.event_id; renderTable();
+      const el = document.getElementById("detail");
+      el.style.display = "block";
+      el.innerHTML = `
+        <h2 style="margin-top:0">${r.target} × ${r.drug} <span class="muted" style="font-weight:400">· ${r.nct_id} · ${r.sponsor} (${r.sponsor_ticker ?? "—"})</span></h2>
+        <div class="detail-grid">
+          <div>
+            <div class="legend">Docked structure — ${prov.pdb_id ?? "?"} (${prov.structure_source ?? "?"}); cartoon = protein, sticks = ligand.</div>
+            <div class="viewer3d" id="detail-viewer"></div>
+            <div class="legend" style="margin-top:.4rem">UniProt ${prov.uniprot ?? "—"} · SMILES <code style="font-size:.7rem">${(prov.smiles ?? "").slice(0, 42)}${(prov.smiles ?? "").length > 42 ? "…" : ""}</code></div>
+          </div>
+          <div>
+            <div class="legend">PK/PD exposure (Bateman model): tissue concentration &amp; target occupancy over 48 h.</div>
+            <div id="detail-pkpd" style="height:260px"></div>
+          </div>
+          <div>
+            <div class="legend">How the PoS delta was built (reasoning trace).</div>
+            <div id="detail-waterfall" style="height:280px"></div>
+          </div>
+          <div>
+            <div class="legend">Market commentary</div>
+            <pre class="commentary">${d.commentary ?? "—"}</pre>
+          </div>
+        </div>`;
+
+      const vw = document.getElementById("detail-viewer");
+      if (prov.pdb_id) window.renderStructure(vw, prov.structure_source, prov.pdb_id, prov.uniprot);
+      else vw.innerHTML = '<div class="legend" style="padding:1rem">no structure id</div>';
+
+      // PK/PD curve (twin axis)
+      const c = d.pkpd_curve;
+      const pk = document.getElementById("detail-pkpd");
+      if (c) {
+        Plotly.newPlot(pk, [
+          { x: c.t_h, y: c.conc_ng_ml, name: "Conc (ng/mL)", mode: "lines", line: { color: "#2a6df4" } },
+          { x: c.t_h, y: c.occupancy_pct, name: "Occupancy (%)", yaxis: "y2", mode: "lines", line: { color: "#1c7a3e" } }
+        ], {
+          margin: { t: 6, r: 50, b: 40, l: 50 }, height: 260, legend: { orientation: "h", y: 1.15 },
+          xaxis: { title: "time (h)" }, yaxis: { title: "conc (ng/mL)" },
+          yaxis2: { title: "occ %", overlaying: "y", side: "right", range: [0, 100] }
+        }, { displayModeBar: false, responsive: true });
+      } else { pk.innerHTML = '<div class="legend" style="padding:1rem">curve unavailable (missing dose/MW/Kd)</div>'; }
+
+      // PoS reasoning waterfall
+      const comps = d.pos_breakdown.components;
+      Plotly.newPlot("detail-waterfall", [{
+        type: "waterfall", orientation: "v",
+        x: comps.map(c => c.label).concat(["PoS Δ"]),
+        y: comps.map(c => c.value).concat([r.pos_delta]),
+        measure: comps.map(() => "relative").concat(["total"]),
+        connector: { line: { color: "#bbb" } },
+        increasing: { marker: { color: "#1c7a3e" } }, decreasing: { marker: { color: "#a11f1f" } },
+        totals: { marker: { color: "#333" } }
+      }], { margin: { t: 6, r: 10, b: 90, l: 50 }, height: 280, yaxis: { title: "PoS contribution" } },
+        { displayModeBar: false, responsive: true });
+
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function exportJSON() {
+      const blob = new Blob([JSON.stringify(DATA, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = "trial_impact_analysis.json"; a.click();
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      cards(); charts(); renderTable();
+    });
+  </script>
+</body>
+</html>

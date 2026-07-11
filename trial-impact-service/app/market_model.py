@@ -64,37 +64,89 @@ def pos_delta(event: dict[str, Any], sim: dict[str, Any] | None) -> float:
     tox flag discount it). The whole signal is scaled by the simulation's
     confidence when physics is available.
     """
+    return pos_breakdown(event, sim)["final"]
+
+
+def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str, Any]:
+    """Decompose the PoS delta into its contributions (the reasoning trace).
+
+    Returns the ordered pieces that make up ``pos_delta`` — clinical base, binding,
+    occupancy, tox, and the confidence scaling — plus a ``components`` list for
+    display. ``pos_delta`` is exactly ``breakdown["final"]``, so the headline number
+    and the trace shown on the analysis dashboard can never disagree.
+    """
     outcome = (event.get("endpoint_outcome") or "unknown").lower()
     base = {"met": 0.5, "missed": -0.5}.get(outcome, 0.0)
 
     if not sim or sim.get("error"):
         # No usable physics — rely on the readout alone at reduced conviction.
-        return _clamp(base * 0.6)
+        final = _clamp(base * 0.6)
+        return {
+            "outcome": outcome,
+            "sim_available": False,
+            "outcome_base": base,
+            "binding_modifier": 0.0,
+            "occupancy_modifier": 0.0,
+            "tox_penalty": 0.0,
+            "subtotal": base,
+            "confidence_scale": 0.6,
+            "final": final,
+            "components": [
+                {"label": f"Endpoint {outcome}", "value": round(base, 3)},
+                {"label": "No simulation (×0.6 conviction)", "value": round(final - base, 3)},
+            ],
+        }
 
-    modifier = 0.0
     direction = 1.0 if base >= 0 else -1.0
-
     kd = sim.get("kd_nM")
     dg = sim.get("binding_affinity_kcal_mol")
+
+    binding_raw = 0.0
     if dg is not None:
         if dg <= -9.0 or (kd is not None and kd <= 100):
-            modifier += 0.20  # potent binder corroborates efficacy
+            binding_raw = 0.20  # potent binder corroborates efficacy
         elif dg > -6.0:
-            modifier -= 0.10  # weak binding undercuts the story
+            binding_raw = -0.10  # weak binding undercuts the story
 
     occ = sim.get("target_occupancy_pct")
+    occ_raw = 0.0
     if occ is not None:
         if occ >= 70:
-            modifier += 0.15
+            occ_raw = 0.15
         elif occ < 30:
-            modifier -= 0.10
+            occ_raw = -0.10
 
-    if sim.get("tox_flag"):
-        modifier -= 0.15  # safety overhang caps upside / worsens downside
+    tox_raw = -0.15 if sim.get("tox_flag") else 0.0
 
-    # Modifiers push in the direction of the readout; scale by confidence.
+    # Modifiers push in the direction of the clinical readout, then the whole signal
+    # is scaled by the simulation's confidence.
+    binding = direction * binding_raw
+    occupancy = direction * occ_raw
+    tox = direction * tox_raw
+    subtotal = base + binding + occupancy + tox
+
     confidence = sim.get("confidence") or 0.7
-    return _clamp((base + direction * modifier) * (0.5 + 0.5 * confidence))
+    scale = 0.5 + 0.5 * confidence
+    final = _clamp(subtotal * scale)
+
+    return {
+        "outcome": outcome,
+        "sim_available": True,
+        "outcome_base": base,
+        "binding_modifier": binding,
+        "occupancy_modifier": occupancy,
+        "tox_penalty": tox,
+        "subtotal": subtotal,
+        "confidence_scale": scale,
+        "final": final,
+        "components": [
+            {"label": f"Endpoint {outcome}", "value": round(base, 3)},
+            {"label": "Binding (ΔG / Kd)", "value": round(binding, 3)},
+            {"label": "Target occupancy", "value": round(occupancy, 3)},
+            {"label": "Tox flag", "value": round(tox, 3)},
+            {"label": f"× confidence {round(scale, 2)}", "value": round(final - subtotal, 3)},
+        ],
+    }
 
 
 def assess(

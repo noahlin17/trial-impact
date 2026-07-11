@@ -1,0 +1,36 @@
+<!-- Shared 3Dmol structure viewer, used by both /status and /analysis.
+     Defines window.renderStructure(el, source, pdb, uniprot) — call it on demand
+     (analysis drill-down) or in a DOMContentLoaded loop (status dashboard). -->
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+<script>
+  window.renderStructure = function (el, source, pdb, uni) {
+    if (typeof $3Dmol === "undefined") return;
+    el.innerHTML = "";
+    var viewer = $3Dmol.createViewer(el, { backgroundColor: "white" });
+    function draw() {
+      viewer.setStyle({}, { cartoon: { color: "spectrum" } });
+      viewer.setStyle({ hetflag: true }, { stick: { colorscheme: "greenCarbon", radius: 0.2 } });
+      viewer.setStyle({ resn: "HOH" }, {});   // hide waters
+      viewer.zoomTo();
+      viewer.render();
+      viewer.spin("y", 0.4);
+    }
+    // Fetch coordinates ourselves so we can fall back pdb -> cif. Many modern
+    // cryo-EM structures (e.g. CFTR) are mmCIF-only and have no legacy .pdb.
+    function load(url, fmt, next) {
+      fetch(url)
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then(function (t) { viewer.addModel(t, fmt); draw(); })
+        .catch(function () {
+          if (next) { next(); }
+          else { el.innerHTML = '<div class="legend" style="padding:1rem">structure unavailable</div>'; }
+        });
+    }
+    if (source === "AlphaFold" && uni) {
+      load("https://alphafold.ebi.ac.uk/files/AF-" + uni + "-F1-model_v4.pdb", "pdb", null);
+    } else {
+      load("https://files.rcsb.org/download/" + pdb + ".pdb", "pdb",
+        function () { load("https://files.rcsb.org/download/" + pdb + ".cif", "cif", null); });
+    }
+  };
+</script>

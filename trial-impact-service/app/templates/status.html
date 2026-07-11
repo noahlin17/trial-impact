@@ -38,12 +38,13 @@
     .struct-head { font-size: 0.9rem; margin-bottom: 0.5rem; }
     .viewer3d { width: 100%; height: 320px; position: relative; border-radius: 8px; overflow: hidden; background: #fbfbfd; }
     .legend { font-size: 0.75rem; color: #888; margin-top: 0.45rem; }
+    .nav { margin: 0.5rem 0 0; font-size: 0.95rem; }
   </style>
-  <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
 </head>
 <body>
   <h1>Trial Impact</h1>
   <p class="sub">Clinical-trial readouts → biophysical simulation (Devin) → share-price commentary</p>
+  <p class="nav"><strong>Status</strong> · <a href="/analysis">Results analysis →</a></p>
 
   <div class="cards">
     <div class="card"><div class="num">{{ stats.total }}</div><div class="lbl">Events</div></div>
@@ -142,37 +143,11 @@
     metadata. NOT investment advice; for informational purposes only.
   </p>
 
+  {% include "_viewer3d.html" %}
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      if (typeof $3Dmol === "undefined") return;
       document.querySelectorAll(".viewer3d").forEach(function (el) {
-        var viewer = $3Dmol.createViewer(el, { backgroundColor: "white" });
-        function draw() {
-          viewer.setStyle({}, { cartoon: { color: "spectrum" } });
-          viewer.setStyle({ hetflag: true }, { stick: { colorscheme: "greenCarbon", radius: 0.2 } });
-          viewer.setStyle({ resn: "HOH" }, {});   // hide waters
-          viewer.zoomTo();
-          viewer.render();
-          viewer.spin("y", 0.4);
-        }
-        // Fetch coordinates ourselves so we can fall back pdb -> cif. Many modern
-        // cryo-EM structures (e.g. CFTR) are mmCIF-only and have no legacy .pdb.
-        function load(url, fmt, next) {
-          fetch(url)
-            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
-            .then(function (t) { viewer.addModel(t, fmt); draw(); })
-            .catch(function () {
-              if (next) { next(); }
-              else { el.innerHTML = '<div class="legend" style="padding:1rem">structure unavailable</div>'; }
-            });
-        }
-        var source = el.dataset.source, pdb = el.dataset.pdb, uni = el.dataset.uniprot;
-        if (source === "AlphaFold" && uni) {
-          load("https://alphafold.ebi.ac.uk/files/AF-" + uni + "-F1-model_v4.pdb", "pdb", null);
-        } else {
-          load("https://files.rcsb.org/download/" + pdb + ".pdb", "pdb",
-            function () { load("https://files.rcsb.org/download/" + pdb + ".cif", "cif", null); });
-        }
+        window.renderStructure(el, el.dataset.source, el.dataset.pdb, el.dataset.uniprot);
       });
     });
   </script>

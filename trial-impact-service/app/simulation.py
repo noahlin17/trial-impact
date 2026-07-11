@@ -284,53 +284,75 @@ def kd_from_dg(dg_kcal_mol: float) -> float:
 # --------------------------------------------------------------------------- #
 # Step 6 — PK/PD (one-compartment, first-order absorption) + occupancy
 # --------------------------------------------------------------------------- #
+# Physiologically plausible PK defaults for a small-molecule oral drug. Shared by
+# run_pkpd (scalar summary) and pkpd_curve (time series for the dashboard) so the two
+# can never disagree.
+_PK_KA = 1.0   # 1/h  first-order absorption
+_PK_VD = 50.0  # L    apparent volume of distribution
+_PK_CL = 10.0  # L/h  clearance
+
+
 def run_pkpd(
     *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str
 ) -> dict[str, float]:
-    """Solve a first-order-absorption 1-compartment ODE, then receptor occupancy.
+    """Summarise exposure + occupancy for a 1-compartment first-order-absorption model.
 
-    State: A_gut (mg), A_central (mg).
-        dA_gut/dt     = -ka·A_gut
-        dA_central/dt =  ka·A_gut − ke·A_central
-        C(t)          =  A_central / Vd            [mg/L ≡ µg/mL]
-
-    Occupancy uses the docked Kd:  occ(t) = C_nM / (C_nM + Kd).  A tissue-specific
-    partition coefficient (Kp) scales the effective concentration reaching the
-    target compartment.
+    The model has a closed-form (Bateman) solution, so no ODE solver is needed:
+        C(t) = F·Dose·ka / (Vd·(ka−ke)) · (e^{−ke·t} − e^{−ka·t})   [µg/mL]
+    A tissue partition coefficient Kp scales the concentration reaching the target,
+    and occupancy uses the docked Kd:  occ(t) = C_nM / (C_nM + Kd).
     """
-    import numpy as np  # lazy
-    from scipy.integrate import solve_ivp
-
-    # Physiologically plausible defaults for a small-molecule oral drug.
-    ka = 1.0  # 1/h absorption
-    vd = 50.0  # L apparent volume of distribution
-    cl = 10.0  # L/h clearance
-    ke = cl / vd
-    kp = _TISSUE_PARTITION.get(tissue.lower(), 1.0)  # tissue:plasma ratio
-
-    def rhs(_t, y):
-        a_gut, a_central = y
-        return [-ka * a_gut, ka * a_gut - ke * a_central]
-
-    t_end = 48.0  # hours
-    t_eval = np.linspace(0, t_end, 481)
-    sol = solve_ivp(rhs, (0, t_end), [dose_mg, 0.0], t_eval=t_eval, rtol=1e-6, atol=1e-9)
-
-    conc_ug_ml = sol.y[1] / vd  # µg/mL in plasma
-    tissue_conc_ug_ml = conc_ug_ml * kp
-    cmax_ug_ml = float(tissue_conc_ug_ml.max())
-    auc_ug_h_ml = float(np.trapz(tissue_conc_ug_ml, t_eval))
-
-    # Concentration → nM for the occupancy model (µg/mL → nM via MW).
-    conc_nM = (tissue_conc_ug_ml / mol_weight) * 1e6
-    occupancy = conc_nM / (conc_nM + kd_nM)
-    peak_occupancy_pct = float(occupancy.max() * 100.0)
-
+    s = _pkpd_series(dose_mg=dose_mg, mol_weight=mol_weight, kd_nM=kd_nM, tissue=tissue)
     return {
-        "cmax_ng_ml": cmax_ug_ml * 1000.0,  # µg/mL → ng/mL
-        "auc_ng_h_ml": auc_ug_h_ml * 1000.0,
-        "target_occupancy_pct": peak_occupancy_pct,
+        "cmax_ng_ml": max(s["conc_ng_ml"]),
+        "auc_ng_h_ml": _trapz(s["t_h"], s["conc_ng_ml"]),
+        "target_occupancy_pct": max(s["occupancy_pct"]),
     }
+
+
+def _pkpd_series(
+    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str,
+    t_end: float = 48.0, n: int = 97,
+) -> dict[str, list[float]]:
+    """Evaluate the Bateman exposure curve + occupancy on a time grid (stdlib only)."""
+    ka, vd, ke = _PK_KA, _PK_VD, _PK_CL / _PK_VD
+    kp = _TISSUE_PARTITION.get((tissue or "plasma").lower(), 1.0)  # tissue:plasma ratio
+    coef = dose_mg * ka / (vd * (ka - ke))  # µg/mL scale (ka != ke by construction)
+
+    t_h, conc_ng_ml, occ_pct = [], [], []
+    for i in range(n):
+        t = t_end * i / (n - 1)
+        c_plasma = coef * (math.exp(-ke * t) - math.exp(-ka * t))  # µg/mL
+        c_tissue = max(c_plasma, 0.0) * kp
+        c_nM = (c_tissue / mol_weight) * 1e6
+        t_h.append(round(t, 3))
+        conc_ng_ml.append(round(c_tissue * 1000.0, 4))  # µg/mL → ng/mL
+        occ_pct.append(round(100.0 * c_nM / (c_nM + kd_nM), 3))
+    return {"t_h": t_h, "conc_ng_ml": conc_ng_ml, "occupancy_pct": occ_pct}
+
+
+def _trapz(xs: list[float], ys: list[float]) -> float:
+    """Trapezoidal integral of ys over xs (stdlib)."""
+    return sum(
+        (xs[i + 1] - xs[i]) * (ys[i + 1] + ys[i]) / 2.0 for i in range(len(xs) - 1)
+    )
+
+
+def pkpd_curve(sim_result: dict[str, Any], t_end: float = 48.0, n: int = 97):
+    """Reconstruct the PK/PD exposure curve for a stored run (for the dashboard).
+
+    Pulls dose / MW / Kd / tissue out of a persisted ``sim_result`` and re-evaluates
+    the same Bateman model. Returns ``None`` when a required field is missing.
+    """
+    kd = sim_result.get("kd_nM")
+    dose = sim_result.get("dose_mg")
+    mw = ((sim_result.get("provenance") or {}).get("descriptors") or {}).get("mw")
+    if not kd or not dose or not mw:
+        return None
+    return _pkpd_series(
+        dose_mg=dose, mol_weight=mw, kd_nM=kd,
+        tissue=sim_result.get("tissue") or "plasma", t_end=t_end, n=n,
+    )
 
 
 # Rough tissue:plasma partition coefficients (Kp). Real QSP models fit these; the

@@ -62,6 +62,13 @@ The model correctly discriminates: sotorasib's tox flag falls out of its real
 descriptors (MW 560 + logP 5.3 = 2 Lipinski violations); ivacaftor (1 violation) is
 clean — so the two readouts get different probability-of-success deltas.
 
+A **results-analysis view** (`GET /analysis`, exported to
+[`results/analysis_dashboard.html`](results/analysis_dashboard.html)) lets you
+inspect the whole corpus and learn from it: cross-run charts (ΔG/Kd/occupancy vs the
+market call), a sortable comparison table, and a per-run drill-down with the 3D
+docked structure, the reconstructed PK/PD exposure curve, and a step-by-step
+**reasoning trace** of how each probability-of-success delta was built.
+
 ---
 
 ## Quick start

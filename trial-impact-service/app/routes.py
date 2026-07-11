@@ -151,6 +151,36 @@ def status() -> Any:
     return render_template("status.html", events=events, stats=stats)
 
 
+@bp.get("/analysis")
+def analysis_view() -> Any:
+    """Analytical read model: corpus aggregates, physics→price charts, drill-down.
+
+    HTML for browsers; JSON with ``?format=json`` (same payload as /analysis.json).
+    """
+    from . import analysis
+
+    db: db_module.Database = _ctx()["db"]
+    payload = analysis.build_payload(db.list_events())
+
+    wants_json = (
+        request.args.get("format") == "json"
+        or request.accept_mimetypes.best == "application/json"
+        or "text/html" not in request.accept_mimetypes
+    )
+    if wants_json:
+        return jsonify(payload)
+    return render_template("analysis.html", payload=payload)
+
+
+@bp.get("/analysis.json")
+def analysis_json() -> Any:
+    """Machine-readable analytics payload (drives the charts, export, offline view)."""
+    from . import analysis
+
+    db: db_module.Database = _ctx()["db"]
+    return jsonify(analysis.build_payload(db.list_events()))
+
+
 @bp.post("/poll")
 def poll() -> Any:
     """Poll in-progress sessions; score completed sims; alert on market-movers.

@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trial Impact — Results Analysis</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 2rem auto; max-width: 1200px; padding: 0 1rem; line-height: 1.45; }
+    h1 { margin-bottom: 0.25rem; }
+    h2 { font-size: 1.15rem; margin: 2rem 0 0.5rem; }
+    .sub { color: #666; margin-top: 0; }
+    .nav { margin: 0.5rem 0 1rem; font-size: 0.95rem; }
+    .cards { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 0.8rem 1.1rem; min-width: 120px; }
+    .card .num { font-size: 1.6rem; font-weight: 700; }
+    .card .lbl { color: #666; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+    .chart { border: 1px solid #eee; border-radius: 10px; padding: 0.5rem; }
+    .chart h3 { font-size: 0.85rem; margin: 0.2rem 0 0.2rem 0.4rem; color: #444; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; }
+    th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid #e5e5e5; font-size: 0.9rem; }
+    th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; color: #666; cursor: pointer; user-select: none; }
+    th:hover { color: #000; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #f6f9ff; }
+    tbody tr.selected { background: #eaf1ff; }
+    .up { color: #1c7a3e; font-weight: 700; } .down { color: #a11f1f; font-weight: 700; } .flat { color: #888; font-weight: 700; }
+    a { color: #2a6df4; text-decoration: none; } a:hover { text-decoration: underline; }
+    code { background: #f3f3f3; padding: 0.05rem 0.3rem; border-radius: 4px; }
+    .muted { color: #999; } .legend { font-size: 0.75rem; color: #888; }
+    button { font: inherit; padding: 0.35rem 0.8rem; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; cursor: pointer; }
+    #detail { border: 1px solid #ddd; border-radius: 12px; padding: 1rem 1.25rem; margin-top: 1rem; display: none; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .viewer3d { width: 100%; height: 300px; position: relative; border-radius: 8px; background: #fbfbfd; }
+    pre.commentary { white-space: pre-wrap; background: #f7f7f9; border-radius: 8px; padding: 0.75rem; font-size: 0.85rem; }
+    .disclaimer { color: #999; font-size: 0.8rem; margin-top: 2rem; }
+    @media (max-width: 780px) { .detail-grid { grid-template-columns: 1fr; } }
+  </style>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+  <h1>Results Analysis</h1>
+  <p class="sub">Inspect and learn from the corpus of completed simulations — how binding &amp; exposure map to the market call.</p>
+  <p class="nav"><a href="/status">← Status</a> · <strong>Results analysis</strong> · <button onclick="exportJSON()">Export JSON</button></p>
+
+  <div class="cards" id="cards"></div>
+
+  <h2>Physics → price relationships</h2>
+  <p class="legend">Each point is one run (hover for drug/target). Red = structural tox flag.</p>
+  <div class="charts">
+    <div class="chart"><h3>Binding ΔG vs PoS delta</h3><div id="c_dg_pos"></div></div>
+    <div class="chart"><h3>Kd (log) vs target occupancy</h3><div id="c_kd_occ"></div></div>
+    <div class="chart"><h3>Target occupancy vs PoS delta</h3><div id="c_occ_pos"></div></div>
+    <div class="chart"><h3>Distribution of PoS deltas</h3><div id="c_hist"></div></div>
+  </div>
+
+  <h2>Runs <span class="muted" style="font-weight:400;font-size:0.85rem">(click a row to inspect)</span></h2>
+  <table id="runs">
+    <thead>
+      <tr>
+        <th data-key="target">Target</th>
+        <th data-key="drug">Drug</th>
+        <th data-key="phase">Phase</th>
+        <th data-key="dg">ΔG</th>
+        <th data-key="kd">Kd (nM)</th>
+        <th data-key="occupancy">Occ %</th>
+        <th data-key="tox">Tox</th>
+        <th data-key="pos_delta">PoS Δ</th>
+        <th data-key="sponsor_ticker">Call</th>
+        <th data-key="pdb_id">Structure</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="detail"></div>
+
+  <p class="disclaimer">Automated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.</p>
+
+  <!-- Shared 3Dmol structure viewer, used by both /status and /analysis.
+     Defines window.renderStructure(el, source, pdb, uniprot) — call it on demand
+     (analysis drill-down) or in a DOMContentLoaded loop (status dashboard). -->
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+<script>
+  window.renderStructure = function (el, source, pdb, uni) {
+    if (typeof $3Dmol === "undefined") return;
+    el.innerHTML = "";
+    var viewer = $3Dmol.createViewer(el, { backgroundColor: "white" });
+    function draw() {
+      viewer.setStyle({}, { cartoon: { color: "spectrum" } });
+      viewer.setStyle({ hetflag: true }, { stick: { colorscheme: "greenCarbon", radius: 0.2 } });
+      viewer.setStyle({ resn: "HOH" }, {});   // hide waters
+      viewer.zoomTo();
+      viewer.render();
+      viewer.spin("y", 0.4);
+    }
+    // Fetch coordinates ourselves so we can fall back pdb -> cif. Many modern
+    // cryo-EM structures (e.g. CFTR) are mmCIF-only and have no legacy .pdb.
+    function load(url, fmt, next) {
+      fetch(url)
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then(function (t) { viewer.addModel(t, fmt); draw(); })
+        .catch(function () {
+          if (next) { next(); }
+          else { el.innerHTML = '<div class="legend" style="padding:1rem">structure unavailable</div>'; }
+        });
+    }
+    if (source === "AlphaFold" && uni) {
+      load("https://alphafold.ebi.ac.uk/files/AF-" + uni + "-F1-model_v4.pdb", "pdb", null);
+    } else {
+      load("https://files.rcsb.org/download/" + pdb + ".pdb", "pdb",
+        function () { load("https://files.rcsb.org/download/" + pdb + ".cif", "cif", null); });
+    }
+  };
+</script>
+  <script>
+    const DATA = {"relationships": {"points": [{"dg": -7.997, "drug": "ivacaftor", "kd": 2317.174, "nct_id": "NCT-VERIFY-002", "occ": 84.65, "pos": 0.617, "target": "CFTR", "tox": false}, {"dg": -8.585, "drug": "sotorasib", "kd": 892.54, "nct_id": "NCT-REAL-0001", "occ": 97.47, "pos": 0.475, "target": "KRAS", "tox": true}]}, "runs": [{"detail": {"commentary": "Trial NCT-VERIFY-002 \u2014 Vertex Pharmaceuticals (ivacaftor / CFTR): endpoint met.\nModelled probability-of-success delta: +0.62.\n  \u25b2 VRTX (Vertex Pharmaceuticals, sponsor): up / strong\n  \u25bc CRSP (CRISPR Therapeutics, competitor): down / moderate\n  \u25bc BLUE (bluebird bio, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.", "drug": "ivacaftor", "endpoint_outcome": "met", "event_id": "NCT-VERIFY-002:results_posted", "nct_id": "NCT-VERIFY-002", "phase": "PHASE3", "pkpd_curve": {"conc_ng_ml": [0.0, 2796.6259, 4226.731, 4853.3256, 5015.4822, 4916.6781, 4678.3553, 4372.3868, 4040.7499, 3707.4437, 3385.7015, 3082.3529, 2800.4574, 2540.8908, 2303.2976, 2086.6601, 1889.6349, 1710.7505, 1548.5201, 1401.5041, 1268.3427, 1147.7709, 1038.623, 939.8317, 850.4232, 769.5119, 696.2936, 630.0388, 570.0865, 515.838, 466.7509, 422.3345, 382.1446, 345.7791, 312.874, 283.1002, 256.1598, 231.783, 209.7259, 189.7679, 171.7091, 155.3688, 140.5835, 127.2052, 115.1001, 104.1468, 94.236, 85.2682, 77.1539, 69.8117, 63.1683, 57.157, 51.7178, 46.7962, 42.3429, 38.3135, 34.6675, 31.3684, 28.3833, 25.6823, 23.2383, 21.0269, 19.0259, 17.2154, 15.5771, 14.0947, 12.7535, 11.5398, 10.4416, 9.448, 8.5489, 7.7354, 6.9992, 6.3332, 5.7305, 5.1852, 4.6917, 4.2453, 3.8413, 3.4757, 3.145, 2.8457, 2.5749, 2.3298, 2.1081, 1.9075, 1.726, 1.5617, 1.4131, 1.2786, 1.157, 1.0469, 0.9472, 0.8571, 0.7755, 0.7017, 0.635], "occupancy_pct": [0.0, 75.46, 82.293, 84.218, 84.65, 84.39, 83.724, 82.781, 81.627, 80.301, 78.825, 77.216, 75.485, 73.641, 71.692, 69.645, 67.508, 65.29, 62.999, 60.645, 58.239, 55.791, 53.314, 50.82, 48.322, 45.832, 43.362, 40.924, 38.53, 36.191, 33.915, 31.711, 29.586, 27.546, 25.596, 23.738, 21.976, 20.309, 18.739, 17.263, 15.881, 14.591, 13.388, 12.27, 11.234, 10.275, 9.389, 8.572, 7.82, 7.129, 6.494, 5.913, 5.381, 4.894, 4.449, 4.042, 3.672, 3.334, 3.026, 2.746, 2.491, 2.26, 2.049, 1.858, 1.684, 1.526, 1.383, 1.253, 1.135, 1.028, 0.931, 0.843, 0.764, 0.692, 0.626, 0.567, 0.513, 0.465, 0.421, 0.381, 0.345, 0.312, 0.282, 0.256, 0.231, 0.209, 0.189, 0.171, 0.155, 0.14, 0.127, 0.115, 0.104, 0.094, 0.085, 0.077, 0.07], "t_h": [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0, 15.5, 16.0, 16.5, 17.0, 17.5, 18.0, 18.5, 19.0, 19.5, 20.0, 20.5, 21.0, 21.5, 22.0, 22.5, 23.0, 23.5, 24.0, 24.5, 25.0, 25.5, 26.0, 26.5, 27.0, 27.5, 28.0, 28.5, 29.0, 29.5, 30.0, 30.5, 31.0, 31.5, 32.0, 32.5, 33.0, 33.5, 34.0, 34.5, 35.0, 35.5, 36.0, 36.5, 37.0, 37.5, 38.0, 38.5, 39.0, 39.5, 40.0, 40.5, 41.0, 41.5, 42.0, 42.5, 43.0, 43.5, 44.0, 44.5, 45.0, 45.5, 46.0, 46.5, 47.0, 47.5, 48.0]}, "pos_breakdown": {"binding_modifier": 0.0, "components": [{"label": "Endpoint met", "value": 0.5}, {"label": "Binding (\u0394G / Kd)", "value": 0.0}, {"label": "Target occupancy", "value": 0.15}, {"label": "Tox flag", "value": 0.0}, {"label": "\u00d7 confidence 0.95", "value": -0.033}], "confidence_scale": 0.95, "final": 0.6174999999999999, "occupancy_modifier": 0.15, "outcome": "met", "outcome_base": 0.5, "sim_available": true, "subtotal": 0.65, "tox_penalty": 0.0}, "price_calls": [{"direction": "up", "magnitude": "strong", "name": "Vertex Pharmaceuticals", "rationale": "Trial NCT-VERIFY-002 endpoint met. Docking \u0394G -7.997 kcal/mol (Kd 2317.174 nM). Peak target occupancy 84.65%. PoS delta +0.62.", "role": "sponsor", "ticker": "VRTX"}, {"direction": "down", "magnitude": "moderate", "name": "CRISPR Therapeutics", "rationale": "Second-order read-through: a up move for Vertex Pharmaceuticals on CFTR typically implies a down move for rivals.", "role": "competitor", "ticker": "CRSP"}, {"direction": "down", "magnitude": "moderate", "name": "bluebird bio", "rationale": "Second-order read-through: a up move for Vertex Pharmaceuticals on CFTR typically implies a down move for rivals.", "role": "competitor", "ticker": "BLUE"}], "sim_result": {"auc_ng_h_ml": 37490.576, "binding_affinity_kcal_mol": -7.997, "cmax_ng_ml": 5015.482, "confidence": 0.9, "dose_mg": 150.0, "drug": "ivacaftor", "error": null, "kd_nM": 2317.174, "provenance": {"descriptors": {"hba": 4, "hbd": 3, "logp": 5.118, "mw": 392.499, "tpsa": 78.43}, "pdb_id": "9MXL", "smiles": "CC(C)(C)C1=CC(=C(C=C1NC(=O)C2=CNC3=CC=CC=C3C2=O)O)C(C)(C)C", "structure_source": "RCSB", "uniprot": "P13569"}, "target": "CFTR", "target_occupancy_pct": 84.65, "tissue": "lung", "tox_flag": false, "warnings": []}, "sponsor": "Vertex Pharmaceuticals", "sponsor_ticker": "VRTX", "target": "CFTR", "tissue": "lung"}, "dg": -7.997, "direction": "up", "drug": "ivacaftor", "event_id": "NCT-VERIFY-002:results_posted", "kd": 2317.174, "magnitude": "strong", "nct_id": "NCT-VERIFY-002", "occupancy": 84.65, "pdb_id": "9MXL", "phase": "PHASE3", "pos_delta": 0.617, "sponsor": "Vertex Pharmaceuticals", "sponsor_ticker": "VRTX", "structure_source": "RCSB", "target": "CFTR", "tissue": "lung", "tox": false, "uniprot": "P13569"}, {"detail": {"commentary": "Trial NCT-REAL-0001 \u2014 Amgen (sotorasib / KRAS): endpoint met.\nModelled probability-of-success delta: +0.47.\n  \u25b2 AMGN (Amgen, sponsor): up / strong\n  \u25bc REGN (Regeneron, competitor): down / moderate\n  \u25bc NVS (Novartis, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.", "drug": "sotorasib", "endpoint_outcome": "met", "event_id": "NCT-REAL-0001:results_posted", "nct_id": "NCT-REAL-0001", "phase": "PHASE1", "pkpd_curve": {"conc_ng_ml": [0.0, 10739.0433, 16230.6472, 18636.7702, 19259.4515, 18880.0438, 17964.8844, 16789.9651, 15516.4797, 14236.5839, 13001.0938, 11836.2352, 10753.7566, 9757.0207, 8844.663, 8012.7747, 7256.198, 6569.282, 5946.3172, 5381.7756, 4870.4358, 4407.4401, 3988.3124, 3608.9537, 3265.6251, 2954.9258, 2673.7674, 2419.3491, 2189.1323, 1980.8178, 1792.3234, 1621.7646, 1467.4353, 1327.7916, 1201.4362, 1087.1049, 983.6535, 890.0466, 805.3476, 728.7087, 659.3629, 596.6163, 539.8407, 488.4681, 441.9842, 399.9239, 361.8661, 327.43, 296.2709, 268.077, 242.5661, 219.4829, 198.5963, 179.6974, 162.5969, 147.1238, 133.1231, 120.4548, 108.992, 98.62, 89.2351, 80.7432, 73.0595, 66.107, 59.8161, 54.1238, 48.9732, 44.3128, 40.0959, 36.2803, 32.8278, 29.7038, 26.8771, 24.3194, 22.0051, 19.911, 18.0163, 16.3018, 14.7505, 13.3468, 12.0767, 10.9274, 9.8875, 8.9466, 8.0952, 7.3249, 6.6278, 5.9971, 5.4264, 4.91, 4.4428, 4.02, 3.6374, 3.2913, 2.9781, 2.6947, 2.4382], "occupancy_pct": [0.0, 95.548, 97.009, 97.385, 97.468, 97.418, 97.29, 97.106, 96.876, 96.605, 96.294, 95.944, 95.554, 95.122, 94.646, 94.122, 93.549, 92.922, 92.238, 91.494, 90.684, 89.805, 88.853, 87.824, 86.714, 85.519, 84.236, 82.863, 81.396, 79.834, 78.176, 76.422, 74.572, 72.63, 70.598, 68.48, 66.283, 64.013, 61.679, 59.289, 56.855, 54.387, 51.898, 49.399, 46.903, 44.422, 41.969, 39.555, 37.19, 34.886, 32.65, 30.49, 28.413, 26.424, 24.526, 22.722, 21.014, 19.403, 17.886, 16.465, 15.135, 13.895, 12.741, 11.67, 10.678, 9.761, 8.915, 8.136, 7.419, 6.761, 6.157, 5.604, 5.098, 4.635, 4.213, 3.827, 3.476, 3.155, 2.864, 2.598, 2.357, 2.137, 1.938, 1.757, 1.592, 1.443, 1.307, 1.184, 1.073, 0.972, 0.88, 0.797, 0.722, 0.653, 0.592, 0.536, 0.485], "t_h": [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0, 15.5, 16.0, 16.5, 17.0, 17.5, 18.0, 18.5, 19.0, 19.5, 20.0, 20.5, 21.0, 21.5, 22.0, 22.5, 23.0, 23.5, 24.0, 24.5, 25.0, 25.5, 26.0, 26.5, 27.0, 27.5, 28.0, 28.5, 29.0, 29.5, 30.0, 30.5, 31.0, 31.5, 32.0, 32.5, 33.0, 33.5, 34.0, 34.5, 35.0, 35.5, 36.0, 36.5, 37.0, 37.5, 38.0, 38.5, 39.0, 39.5, 40.0, 40.5, 41.0, 41.5, 42.0, 42.5, 43.0, 43.5, 44.0, 44.5, 45.0, 45.5, 46.0, 46.5, 47.0, 47.5, 48.0]}, "pos_breakdown": {"binding_modifier": 0.0, "components": [{"label": "Endpoint met", "value": 0.5}, {"label": "Binding (\u0394G / Kd)", "value": 0.0}, {"label": "Target occupancy", "value": 0.15}, {"label": "Tox flag", "value": -0.15}, {"label": "\u00d7 confidence 0.95", "value": -0.025}], "confidence_scale": 0.95, "final": 0.475, "occupancy_modifier": 0.15, "outcome": "met", "outcome_base": 0.5, "sim_available": true, "subtotal": 0.5, "tox_penalty": -0.15}, "price_calls": [{"direction": "up", "magnitude": "strong", "name": "Amgen", "rationale": "Trial NCT-REAL-0001 endpoint met. Docking \u0394G -8.585 kcal/mol (Kd 892.54 nM). Peak target occupancy 97.47%. Structural tox flag raised. PoS delta +0.47.", "role": "sponsor", "ticker": "AMGN"}, {"direction": "down", "magnitude": "moderate", "name": "Regeneron", "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals.", "role": "competitor", "ticker": "REGN"}, {"direction": "down", "magnitude": "moderate", "name": "Novartis", "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals.", "role": "competitor", "ticker": "NVS"}], "sim_result": {"auc_ng_h_ml": 143963.811, "binding_affinity_kcal_mol": -8.585, "cmax_ng_ml": 19259.45, "confidence": 0.9, "dose_mg": 960.0, "drug": "sotorasib", "error": null, "kd_nM": 892.54, "provenance": {"descriptors": {"hba": 6, "hbd": 1, "logp": 5.296, "mw": 560.605, "tpsa": 102.23}, "pdb_id": "7VVB", "smiles": "C[C@H]1CN(CCN1C2=NC(=O)N(C3=NC(=C(C=C32)F)C4=C(C=CC=C4F)O)C5=C(C=CN=C5C(C)C)C)C(=O)C=C", "structure_source": "RCSB", "uniprot": "P01116"}, "target": "KRAS", "target_occupancy_pct": 97.47, "tissue": "tumor", "tox_flag": true, "warnings": []}, "sponsor": "Amgen", "sponsor_ticker": "AMGN", "target": "KRAS", "tissue": "tumor"}, "dg": -8.585, "direction": "up", "drug": "sotorasib", "event_id": "NCT-REAL-0001:results_posted", "kd": 892.54, "magnitude": "strong", "nct_id": "NCT-REAL-0001", "occupancy": 97.47, "pdb_id": "7VVB", "phase": "PHASE1", "pos_delta": 0.475, "sponsor": "Amgen", "sponsor_ticker": "AMGN", "structure_source": "RCSB", "target": "KRAS", "tissue": "tumor", "tox": true, "uniprot": "P01116"}], "summary": {"analyzed": 2, "avg_sim_seconds": 509.0, "by_sponsor": {"Amgen": {"mean_pos": 0.475, "n": 1}, "Vertex Pharmaceuticals": {"mean_pos": 0.617, "n": 1}}, "by_target": {"CFTR": {"mean_pos": 0.617, "n": 1}, "KRAS": {"mean_pos": 0.475, "n": 1}}, "counts": {"completed": 2, "failed": 0, "needs_attention": 0, "queued": 0, "running": 0}, "market_moving": 2, "mean_dg": -8.291, "mean_occupancy": 91.1, "mean_pos_delta": 0.546, "median_dg": -8.291, "success_rate": 1.0, "total": 2, "tox_rate": 0.5}};
+    const RUNS = DATA.runs.slice();
+    let sortKey = "pos_delta", sortDir = -1, selected = null;
+
+    const num = (x, d = 2) => (x === null || x === undefined) ? "—" : (+x).toFixed(d);
+    const arrow = (dir) => ({ up: "▲", down: "▼", flat: "▬" }[dir] || "▬");
+
+    // ---- summary cards ----
+    function cards() {
+      const s = DATA.summary;
+      const items = [
+        ["Runs", s.analyzed], ["Mean ΔG", num(s.mean_dg, 2)],
+        ["Mean occ %", num(s.mean_occupancy, 1)], ["Tox rate", s.tox_rate === null ? "—" : num(s.tox_rate * 100, 0) + "%"],
+        ["Mean PoS Δ", s.mean_pos_delta === null ? "—" : (s.mean_pos_delta > 0 ? "+" : "") + num(s.mean_pos_delta, 2)],
+        ["Market-moving", s.market_moving],
+      ];
+      document.getElementById("cards").innerHTML = items.map(
+        ([l, v]) => `<div class="card"><div class="num">${v}</div><div class="lbl">${l}</div></div>`).join("");
+    }
+
+    // ---- scatter charts ----
+    function scatter(el, xs, ys, texts, colors, xt, yt, xlog) {
+      Plotly.newPlot(el, [{
+        x: xs, y: ys, text: texts, mode: "markers", type: "scatter",
+        hovertemplate: "%{text}<br>" + xt + ": %{x}<br>" + yt + ": %{y}<extra></extra>",
+        marker: { size: 13, color: colors, line: { width: 1, color: "#555" } }
+      }], {
+        margin: { t: 6, r: 10, b: 40, l: 50 }, height: 260,
+        xaxis: { title: xt, type: xlog ? "log" : "linear", zeroline: true },
+        yaxis: { title: yt, zeroline: true }
+      }, { displayModeBar: false, responsive: true });
+    }
+    function charts() {
+      const p = DATA.relationships.points;
+      if (!p.length) { document.querySelector(".charts").innerHTML = '<p class="muted">No completed runs yet.</p>'; return; }
+      const txt = p.map(d => `${d.target} × ${d.drug}`);
+      const col = p.map(d => d.tox ? "#a11f1f" : "#2a6df4");
+      scatter("c_dg_pos", p.map(d => d.dg), p.map(d => d.pos), txt, col, "ΔG (kcal/mol)", "PoS Δ", false);
+      scatter("c_kd_occ", p.map(d => d.kd), p.map(d => d.occ), txt, col, "Kd (nM)", "occupancy %", true);
+      scatter("c_occ_pos", p.map(d => d.occ), p.map(d => d.pos), txt, col, "occupancy %", "PoS Δ", false);
+      Plotly.newPlot("c_hist", [{ x: p.map(d => d.pos), type: "histogram", marker: { color: "#2a6df4" } }],
+        { margin: { t: 6, r: 10, b: 40, l: 50 }, height: 260, xaxis: { title: "PoS Δ" }, yaxis: { title: "count" } },
+        { displayModeBar: false, responsive: true });
+    }
+
+    // ---- table ----
+    function renderTable() {
+      RUNS.sort((a, b) => {
+        let x = a[sortKey], y = b[sortKey];
+        if (x === null || x === undefined) x = -Infinity;
+        if (y === null || y === undefined) y = -Infinity;
+        if (typeof x === "string") return sortDir * x.localeCompare(y);
+        return sortDir * (x - y);
+      });
+      const tb = document.querySelector("#runs tbody");
+      tb.innerHTML = RUNS.map((r, i) => `
+        <tr data-i="${i}" class="${selected === r.event_id ? "selected" : ""}">
+          <td><strong>${r.target ?? "—"}</strong></td><td>${r.drug ?? "—"}</td>
+          <td>${(r.phase || "—").replace("PHASE", "P")}</td>
+          <td>${num(r.dg, 2)}</td><td>${num(r.kd, 0)}</td><td>${num(r.occupancy, 1)}</td>
+          <td>${r.tox ? "⚠︎" : "·"}</td>
+          <td>${r.pos_delta > 0 ? "+" : ""}${num(r.pos_delta, 2)}</td>
+          <td class="${r.direction}">${arrow(r.direction)} ${r.sponsor_ticker ?? "—"}</td>
+          <td>${r.pdb_id ? `<code>${r.pdb_id}</code>` : "—"}</td>
+        </tr>`).join("");
+      tb.querySelectorAll("tr").forEach(tr =>
+        tr.addEventListener("click", () => openDetail(+tr.dataset.i)));
+    }
+    document.querySelectorAll("#runs th").forEach(th => th.addEventListener("click", () => {
+      const k = th.dataset.key;
+      sortDir = (sortKey === k) ? -sortDir : (typeof RUNS[0]?.[k] === "string" ? 1 : -1);
+      sortKey = k; renderTable();
+    }));
+
+    // ---- drill-down ----
+    function openDetail(i) {
+      const r = RUNS[i], d = r.detail, s = d.sim_result, prov = s.provenance || {};
+      selected = r.event_id; renderTable();
+      const el = document.getElementById("detail");
+      el.style.display = "block";
+      el.innerHTML = `
+        <h2 style="margin-top:0">${r.target} × ${r.drug} <span class="muted" style="font-weight:400">· ${r.nct_id} · ${r.sponsor} (${r.sponsor_ticker ?? "—"})</span></h2>
+        <div class="detail-grid">
+          <div>
+            <div class="legend">Docked structure — ${prov.pdb_id ?? "?"} (${prov.structure_source ?? "?"}); cartoon = protein, sticks = ligand.</div>
+            <div class="viewer3d" id="detail-viewer"></div>
+            <div class="legend" style="margin-top:.4rem">UniProt ${prov.uniprot ?? "—"} · SMILES <code style="font-size:.7rem">${(prov.smiles ?? "").slice(0, 42)}${(prov.smiles ?? "").length > 42 ? "…" : ""}</code></div>
+          </div>
+          <div>
+            <div class="legend">PK/PD exposure (Bateman model): tissue concentration &amp; target occupancy over 48 h.</div>
+            <div id="detail-pkpd" style="height:260px"></div>
+          </div>
+          <div>
+            <div class="legend">How the PoS delta was built (reasoning trace).</div>
+            <div id="detail-waterfall" style="height:280px"></div>
+          </div>
+          <div>
+            <div class="legend">Market commentary</div>
+            <pre class="commentary">${d.commentary ?? "—"}</pre>
+          </div>
+        </div>`;
+
+      const vw = document.getElementById("detail-viewer");
+      if (prov.pdb_id) window.renderStructure(vw, prov.structure_source, prov.pdb_id, prov.uniprot);
+      else vw.innerHTML = '<div class="legend" style="padding:1rem">no structure id</div>';
+
+      // PK/PD curve (twin axis)
+      const c = d.pkpd_curve;
+      const pk = document.getElementById("detail-pkpd");
+      if (c) {
+        Plotly.newPlot(pk, [
+          { x: c.t_h, y: c.conc_ng_ml, name: "Conc (ng/mL)", mode: "lines", line: { color: "#2a6df4" } },
+          { x: c.t_h, y: c.occupancy_pct, name: "Occupancy (%)", yaxis: "y2", mode: "lines", line: { color: "#1c7a3e" } }
+        ], {
+          margin: { t: 6, r: 50, b: 40, l: 50 }, height: 260, legend: { orientation: "h", y: 1.15 },
+          xaxis: { title: "time (h)" }, yaxis: { title: "conc (ng/mL)" },
+          yaxis2: { title: "occ %", overlaying: "y", side: "right", range: [0, 100] }
+        }, { displayModeBar: false, responsive: true });
+      } else { pk.innerHTML = '<div class="legend" style="padding:1rem">curve unavailable (missing dose/MW/Kd)</div>'; }
+
+      // PoS reasoning waterfall
+      const comps = d.pos_breakdown.components;
+      Plotly.newPlot("detail-waterfall", [{
+        type: "waterfall", orientation: "v",
+        x: comps.map(c => c.label).concat(["PoS Δ"]),
+        y: comps.map(c => c.value).concat([r.pos_delta]),
+        measure: comps.map(() => "relative").concat(["total"]),
+        connector: { line: { color: "#bbb" } },
+        increasing: { marker: { color: "#1c7a3e" } }, decreasing: { marker: { color: "#a11f1f" } },
+        totals: { marker: { color: "#333" } }
+      }], { margin: { t: 6, r: 10, b: 90, l: 50 }, height: 280, yaxis: { title: "PoS contribution" } },
+        { displayModeBar: false, responsive: true });
+
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function exportJSON() {
+      const blob = new Blob([JSON.stringify(DATA, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = "trial_impact_analysis.json"; a.click();
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      cards(); charts(); renderTable();
+    });
+  </script>
+</body>
+</html>
