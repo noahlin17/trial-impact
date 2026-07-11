@@ -85,6 +85,35 @@ cd trial-impact-service && pip install -r requirements-dev.txt && ruff check . &
 
 ---
 
+## Next steps
+
+**Tighten the science**
+- Emit AutoDock Vina's top pose (PDBQT) in `SIM_RESULT_JSON` and render it in the
+  binding pocket, so the 3D view shows the *actual* docked geometry — not the
+  reference crystal ligand.
+- Pocket-aware docking (known site / cavity detection) instead of a blind box, plus
+  MM-GBSA rescoring; add a separate affinity path for biologics (antibodies can't
+  dock). Pin the sim environment (conda-lock) so every Devin run is reproducible.
+
+**Make the market call credible**
+- Weight the probability-of-success delta by trial **phase** (Phase 1 ≪ Phase 3) and
+  by whether it's the sponsor's lead asset / its market-cap exposure.
+- Wire live quotes + market cap (the `MARKET_DATA_BASE` stub) and **backtest** calls
+  against historical biotech readouts to calibrate direction and magnitude.
+- Auto-derive `endpoint_outcome` (met/missed) from the CT.gov results section /
+  press releases via an LLM classifier, instead of watchlist enrichment.
+
+**Harden & ship**
+- Enforce a structured result contract from Devin (require `structured_output`),
+  handle `blocked`/hung sessions with retries + timeouts, and alert on sim failures.
+- CI (GitHub Actions: ruff + pytest), Postgres instead of SQLite, and a deployed
+  service + watcher with a scheduled `/poll`.
+- A **results-analysis dashboard** to inspect and learn from accumulated runs
+  (cross-run comparison, physics→price relationships, per-run drill-down). See the
+  dedicated plan.
+
+---
+
 ## Honest caveats
 - The 3D viewer shows the **receptor structure the run used** (with its crystal
   ligand), not AutoDock Vina's exact docked pose — `simulation.py` currently returns
@@ -93,4 +122,3 @@ cd trial-impact-service && pip install -r requirements-dev.txt && ruff check . &
   the watcher supplies it via per-trial enrichment (`watchlist.json`) for now.
 - The market model is deliberately transparent/rules-based (not a black box) and is
   **not** calibrated to real market data — it's a research signal, not a trade.
-```
