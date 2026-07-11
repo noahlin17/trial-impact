@@ -10,6 +10,13 @@ readout — alerts to Slack/email while surfacing everything on a dashboard.
 > **Not investment advice.** Output is an automated research signal for
 > informational purposes only. A disclaimer is attached to every assessment.
 
+> **See also:** the [top-level README](../README.md) has two things not repeated
+> here — a validation of these predictions against published binding data (the
+> model's errors track known chemistry, e.g. covalent vs. non-covalent binding,
+> rather than being random), and the story of a real extraction bug caught and
+> fixed on the first run. Worth reading if you're evaluating engineering rigor,
+> not just the pipeline shape.
+
 ---
 
 ## Architecture
@@ -19,16 +26,16 @@ ClinicalTrials.gov API v2 ──poll──▶  ctgov-watcher (../ctgov-watcher)
                                        │  diff records, detect material change
                                        ▼  POST /webhook/trial-update  (HMAC-signed)
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                         Trial Impact service (Flask)                       │
-│  TRIGGER   POST /webhook/trial-update                                       │
-│     verify HMAC → resolve tickers (sponsor + competitors)                  │
-│                 → build sim prompt → Devin: POST /sessions ────────────────┼─▶ Devin session
-│                 → SQLite: insert event (queued)                            │   runs app/simulation.py
-│  RECONCILE POST /poll                                                      │   (docking + PK/PD)
-│     GET Devin session → extract SIM_RESULT_JSON ◀──────────────────────────┼── ΔG, Kd, occupancy
-│     → market_model.assess → price calls + commentary                       │
-│     → SQLite update → Slack/email alert (once) on market-movers            │
-│  OBSERVE   GET /status  → dashboard + JSON                                  │
+│                         Trial Impact service (Flask)                     │
+│  TRIGGER   POST /webhook/trial-update                                    │
+│     verify HMAC → resolve tickers (sponsor + competitors)                │
+│                 → build sim prompt → Devin: POST /sessions ──────────────┼─▶ Devin session
+│                 → SQLite: insert event (queued)                          │   runs app/simulation.py
+│  RECONCILE POST /poll                                                    │   (docking + PK/PD)
+│     GET Devin session → extract SIM_RESULT_JSON ◀────────────────────────┼── ΔG, Kd, occupancy
+│     → market_model.assess → price calls + commentary                     │
+│     → SQLite update → Slack/email alert (once) on market-movers          │
+│  OBSERVE   GET /status  → dashboard + JSON                               │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -124,7 +131,18 @@ for any market-moving readout.
 - JSON: `curl -s http://localhost:8000/status?format=json | jq`
 
 ### Run the real physics locally (optional)
+
+AutoDock Vina's Python bindings compile a C++ extension at install time and
+require Boost to be present on the system (`brew install boost` on macOS,
+`apt install libboost-all-dev` on Debian/Ubuntu — see the
+[Vina docs](https://autodock-vina.readthedocs.io/) for other platforms). If your
+local machine isn't set up for this, that's fine — this section is a bonus
+verification path, not the demo path. The actual pipeline runs the identical
+`app/simulation.py` inside Devin's own sandbox, with no local scientific-stack
+setup required; that's what produced both real results in `results/`.
+
 ```bash
+brew install boost   # or your platform's equivalent — see link above
 pip install -r requirements-sim.txt
 python -m app.simulation --target KRAS --drug sotorasib --tissue tumor --dose 960 --json-only
 ```
@@ -161,11 +179,11 @@ Signed with `X-CTGov-Signature: sha256=<hmac>` when `WATCHER_SHARED_SECRET` is s
 |----------|----------|---------|---------|
 | `DEVIN_API_KEY` | yes | — | Authenticates Devin API calls. |
 | `WATCHER_SHARED_SECRET` | recommended | — | HMAC secret; when set, webhook signatures are enforced. |
-| `SIM_REPO_URL` | no | `…/trial-impact-service` | Repo Devin clones to run the simulation. |
+| `SIM_REPO_URL` | no | `https://github.com/noahlin17/trial-impact` | Repo Devin clones to run the simulation. |
 | `SLACK_WEBHOOK_URL` | no | — | Slack alerts on market-movers. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `EMAIL_FROM` / `EMAIL_TO` | no | — | Email alerts. |
 | `TICKERS_PATH` | no | `tickers.json` | Sponsor→ticker/competitor map. |
-| `MARKET_MOVING_THRESHOLD` | no | `0.10` | `|PoS delta|` at/above which an alert fires. |
+| `MARKET_MOVING_THRESHOLD` | no | `0.10` | Fractional price-move threshold that triggers a market-moving alert (e.g. `0.10` = 10%). |
 | `DEVIN_API_BASE` | no | `https://api.devin.ai/v1` | Override for testing. |
 | `DATABASE_PATH` | no | `/data/trial_impact.db` | SQLite file location. |
 
