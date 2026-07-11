@@ -1,0 +1,35 @@
+# Run the whole service with `docker compose up`.
+services:
+  trial-impact:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Secrets are read from your shell / .env file — never baked into the image.
+      - DEVIN_API_KEY=${DEVIN_API_KEY}
+      - WATCHER_SHARED_SECRET=${WATCHER_SHARED_SECRET:-}
+      - SIM_REPO_URL=${SIM_REPO_URL:-https://github.com/noahlin17/trial-impact}
+      # Optional output channels.
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
+      - EMAIL_TO=${EMAIL_TO:-}
+      # Market model.
+      - TICKERS_PATH=tickers.json
+      - MARKET_MOVING_THRESHOLD=${MARKET_MOVING_THRESHOLD:-0.10}
+      - DATABASE_PATH=/data/trial_impact.db
+    volumes:
+      # Persist the SQLite database across container restarts.
+      - trial-impact-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  trial-impact-data:

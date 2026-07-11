@@ -1,0 +1,50 @@
+{
+  "amgen": {
+    "ticker": "AMGN",
+    "name": "Amgen",
+    "competitors": [
+      {"ticker": "REGN", "name": "Regeneron"},
+      {"ticker": "NVS", "name": "Novartis"}
+    ]
+  },
+  "regeneron": {
+    "ticker": "REGN",
+    "name": "Regeneron",
+    "competitors": [
+      {"ticker": "AMGN", "name": "Amgen"},
+      {"ticker": "SNY", "name": "Sanofi"}
+    ]
+  },
+  "vertex pharmaceuticals": {
+    "ticker": "VRTX",
+    "name": "Vertex Pharmaceuticals",
+    "competitors": [
+      {"ticker": "CRSP", "name": "CRISPR Therapeutics"},
+      {"ticker": "BLUE", "name": "bluebird bio"}
+    ]
+  },
+  "moderna": {
+    "ticker": "MRNA",
+    "name": "Moderna",
+    "competitors": [
+      {"ticker": "PFE", "name": "Pfizer"},
+      {"ticker": "BNTX", "name": "BioNTech"}
+    ]
+  },
+  "biogen": {
+    "ticker": "BIIB",
+    "name": "Biogen",
+    "competitors": [
+      {"ticker": "LLY", "name": "Eli Lilly"},
+      {"ticker": "RHHBY", "name": "Roche"}
+    ]
+  },
+  "eli lilly": {
+    "ticker": "LLY",
+    "name": "Eli Lilly",
+    "competitors": [
+      {"ticker": "NVO", "name": "Novo Nordisk"},
+      {"ticker": "BIIB", "name": "Biogen"}
+    ]
+  }
+}

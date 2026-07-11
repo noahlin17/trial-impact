@@ -1,0 +1,11 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# A pragmatic default rule set: pyflakes (F), pycodestyle (E/W), isort (I),
+# flake8-bugbear (B), and pyupgrade (UP).
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

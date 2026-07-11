@@ -1,0 +1,12 @@
+# Heavy scientific stack for the biophysical simulation (app/simulation.py).
+#
+# These are NOT installed in the web-service image — the simulation runs inside a
+# Devin session, which installs this file. Keeping them separate keeps the Flask
+# image small and fast to build.
+rdkit==2024.3.5
+meeko==0.6.0
+vina==1.2.5
+openbabel-wheel==3.1.1.20
+scipy==1.14.1
+numpy==1.26.4
+requests==2.32.3

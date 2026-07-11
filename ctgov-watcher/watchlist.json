@@ -1,0 +1,29 @@
+[
+  {
+    "nct_id": "NCT04303780",
+    "sponsor": "Amgen",
+    "drug": "sotorasib",
+    "target": "KRAS",
+    "tissue": "tumor",
+    "dose_mg": 960,
+    "endpoint_outcome": "met"
+  },
+  {
+    "nct_id": "NCT01614470",
+    "sponsor": "Vertex Pharmaceuticals",
+    "drug": "ivacaftor",
+    "target": "CFTR",
+    "tissue": "lung",
+    "dose_mg": 150,
+    "endpoint_outcome": "met"
+  },
+  {
+    "nct_id": "NCT03887455",
+    "sponsor": "Biogen",
+    "drug": "vixotrigine",
+    "target": "SCN9A",
+    "tissue": "cns",
+    "dose_mg": 200,
+    "endpoint_outcome": "missed"
+  }
+]

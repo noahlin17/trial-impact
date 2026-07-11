@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trial Impact — Status</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 2rem auto; max-width: 1200px; padding: 0 1rem; line-height: 1.45; }
+    h1 { margin-bottom: 0.25rem; }
+    .sub { color: #666; margin-top: 0; }
+    .cards { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1.5rem 0; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 1rem 1.25rem; min-width: 140px; }
+    .card .num { font-size: 1.8rem; font-weight: 700; }
+    .card .lbl { color: #666; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+    th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: #666; }
+    .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+    .queued    { background: #e8eefc; color: #1f4ea1; }
+    .running   { background: #fff4d6; color: #8a6d00; }
+    .completed { background: #e3f6e8; color: #1c7a3e; }
+    .failed    { background: #fce4e4; color: #a11f1f; }
+    .needs_attention { background: #f3e8fc; color: #6b21a8; }
+    .up   { color: #1c7a3e; font-weight: 700; }
+    .down { color: #a11f1f; font-weight: 700; }
+    .flat { color: #888; font-weight: 700; }
+    a { color: #2a6df4; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { background: #f3f3f3; padding: 0.05rem 0.3rem; border-radius: 4px; }
+    .muted { color: #999; }
+    .err { color: #a11f1f; font-size: 0.85rem; }
+    .disclaimer { color: #999; font-size: 0.8rem; margin-top: 2rem; }
+    .structs { margin-top: 2.5rem; }
+    .structs h2 { font-size: 1.15rem; margin-bottom: 0.25rem; }
+    .struct-grid { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+    .struct-card { border: 1px solid #ddd; border-radius: 10px; padding: 0.75rem; width: 380px; }
+    .struct-head { font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .viewer3d { width: 100%; height: 320px; position: relative; border-radius: 8px; overflow: hidden; background: #fbfbfd; }
+    .legend { font-size: 0.75rem; color: #888; margin-top: 0.45rem; }
+  </style>
+  <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+</head>
+<body>
+  <h1>Trial Impact</h1>
+  <p class="sub">Clinical-trial readouts → biophysical simulation (Devin) → share-price commentary</p>
+
+  <div class="cards">
+    <div class="card"><div class="num">1</div><div class="lbl">Events</div></div>
+    <div class="card"><div class="num">0</div><div class="lbl">Queued</div></div>
+    <div class="card"><div class="num">0</div><div class="lbl">Running</div></div>
+    <div class="card"><div class="num">1</div><div class="lbl">Completed</div></div>
+    <div class="card"><div class="num">0</div><div class="lbl">Failed</div></div>
+    <div class="card"><div class="num">1</div><div class="lbl">Market-moving</div></div>
+    <div class="card">
+      <div class="num">100%</div>
+      <div class="lbl">Sim success</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Trial</th><th>Sponsor / Drug / Target</th><th>Status</th>
+        <th>Binding (ΔG / Kd)</th><th>Occupancy</th><th>Price calls</th><th>Session</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+      <tr>
+        <td>
+          <code>NCT-VERIFY-002</code>
+          <div class="muted">results_posted · met</div>
+        </td>
+        <td>
+          Vertex Pharmaceuticals (<strong>VRTX</strong>)
+          <div class="muted">ivacaftor / CFTR / lung</div>
+          
+        </td>
+        <td><span class="badge completed">completed</span></td>
+        <td>
+          
+            -7.997 kcal/mol
+            <div class="muted">Kd 2317.174 nM</div>
+          
+        </td>
+        <td>
+          
+            84.65%
+          
+        </td>
+        <td>
+          
+            
+              <div class="up">
+                ▲
+                VRTX <span class="muted">(strong)</span>
+              </div>
+            
+              <div class="down">
+                ▼
+                CRSP <span class="muted">(moderate)</span>
+              </div>
+            
+              <div class="down">
+                ▼
+                BLUE <span class="muted">(moderate)</span>
+              </div>
+            
+          
+        </td>
+        <td>
+          <a href="https://app.devin.ai/sessions/dd9eda06271f4765ab58971b5f1685a9" target="_blank" rel="noopener">devin-dd9eda06271f4765ab58971b5f1685a9</a>
+          
+        </td>
+      </tr>
+      
+    </tbody>
+  </table>
+
+  <div class="structs">
+    <h2>Docked structures (the simulation)</h2>
+    <p class="sub">Protein backbone as cartoon (N→C spectrum); the docked ligand as sticks. Coordinates loaded live from RCSB / AlphaFold using the structure each Devin run actually used.</p>
+    <div class="struct-grid">
+      
+      <div class="struct-card">
+        <div class="struct-head">
+          <strong>CFTR</strong> × ivacaftor
+          <span class="muted">· NCT-VERIFY-002</span><br>
+          <span class="muted">9MXL (RCSB)
+          · ΔG -7.997 kcal/mol</span>
+        </div>
+        <div class="viewer3d"
+             data-source="RCSB"
+             data-pdb="9MXL"
+             data-uniprot="P13569"></div>
+        <div class="legend">Drag to rotate · scroll to zoom</div>
+      </div>
+      
+    </div>
+  </div>
+
+  <p class="disclaimer">
+    Automated research signal derived from a biophysical simulation and trial
+    metadata. NOT investment advice; for informational purposes only.
+  </p>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (typeof $3Dmol === "undefined") return;
+      document.querySelectorAll(".viewer3d").forEach(function (el) {
+        var viewer = $3Dmol.createViewer(el, { backgroundColor: "white" });
+        function draw() {
+          viewer.setStyle({}, { cartoon: { color: "spectrum" } });
+          viewer.setStyle({ hetflag: true }, { stick: { colorscheme: "greenCarbon", radius: 0.2 } });
+          viewer.setStyle({ resn: "HOH" }, {});   // hide waters
+          viewer.zoomTo();
+          viewer.render();
+          viewer.spin("y", 0.4);
+        }
+        // Fetch coordinates ourselves so we can fall back pdb -> cif. Many modern
+        // cryo-EM structures (e.g. CFTR) are mmCIF-only and have no legacy .pdb.
+        function load(url, fmt, next) {
+          fetch(url)
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+            .then(function (t) { viewer.addModel(t, fmt); draw(); })
+            .catch(function () {
+              if (next) { next(); }
+              else { el.innerHTML = '<div class="legend" style="padding:1rem">structure unavailable</div>'; }
+            });
+        }
+        var source = el.dataset.source, pdb = el.dataset.pdb, uni = el.dataset.uniprot;
+        if (source === "AlphaFold" && uni) {
+          load("https://alphafold.ebi.ac.uk/files/AF-" + uni + "-F1-model_v4.pdb", "pdb", null);
+        } else {
+          load("https://files.rcsb.org/download/" + pdb + ".pdb", "pdb",
+            function () { load("https://files.rcsb.org/download/" + pdb + ".cif", "cif", null); });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

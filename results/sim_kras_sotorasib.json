@@ -1,0 +1,84 @@
+{
+  "event_id": "NCT-REAL-0001:results_posted",
+  "nct_id": "NCT-REAL-0001",
+  "sponsor": "Amgen",
+  "drug": "sotorasib",
+  "target": "KRAS",
+  "tissue": "tumor",
+  "phase": "PHASE1",
+  "event_type": "results_posted",
+  "endpoint_outcome": "met",
+  "sponsor_ticker": "AMGN",
+  "competitor_tickers": [
+    {
+      "ticker": "REGN",
+      "name": "Regeneron"
+    },
+    {
+      "ticker": "NVS",
+      "name": "Novartis"
+    }
+  ],
+  "devin_session_id": "devin-9b2619f11ba54899a7f3a08038c639fb",
+  "session_url": "https://app.devin.ai/sessions/9b2619f11ba54899a7f3a08038c639fb",
+  "status": "completed",
+  "sim_result": {
+    "target": "KRAS",
+    "drug": "sotorasib",
+    "tissue": "tumor",
+    "dose_mg": 960.0,
+    "binding_affinity_kcal_mol": -8.585,
+    "kd_nM": 892.54,
+    "cmax_ng_ml": 19259.45,
+    "auc_ng_h_ml": 143963.811,
+    "target_occupancy_pct": 97.47,
+    "tox_flag": true,
+    "confidence": 0.9,
+    "provenance": {
+      "uniprot": "P01116",
+      "structure_source": "RCSB",
+      "pdb_id": "7VVB",
+      "smiles": "C[C@H]1CN(CCN1C2=NC(=O)N(C3=NC(=C(C=C32)F)C4=C(C=CC=C4F)O)C5=C(C=CN=C5C(C)C)C)C(=O)C=C",
+      "descriptors": {
+        "mw": 560.605,
+        "logp": 5.296,
+        "hbd": 1,
+        "hba": 6,
+        "tpsa": 102.23
+      }
+    },
+    "warnings": [],
+    "error": null
+  },
+  "commentary": "Trial NCT-REAL-0001 \u2014 Amgen (sotorasib / KRAS): endpoint met.\nModelled probability-of-success delta: +0.47.\n  \u25b2 AMGN (Amgen, sponsor): up / strong\n  \u25bc REGN (Regeneron, competitor): down / moderate\n  \u25bc NVS (Novartis, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
+  "price_calls": [
+    {
+      "ticker": "AMGN",
+      "name": "Amgen",
+      "role": "sponsor",
+      "direction": "up",
+      "magnitude": "strong",
+      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking \u0394G -8.585 kcal/mol (Kd 892.54 nM). Peak target occupancy 97.47%. Structural tox flag raised. PoS delta +0.47."
+    },
+    {
+      "ticker": "REGN",
+      "name": "Regeneron",
+      "role": "competitor",
+      "direction": "down",
+      "magnitude": "moderate",
+      "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals."
+    },
+    {
+      "ticker": "NVS",
+      "name": "Novartis",
+      "role": "competitor",
+      "direction": "down",
+      "magnitude": "moderate",
+      "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals."
+    }
+  ],
+  "created_at": "2026-07-11T17:58:58+00:00",
+  "updated_at": "2026-07-11T18:08:54+00:00",
+  "error_message": null,
+  "alert_sent": 1
+}

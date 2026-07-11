@@ -1,0 +1,217 @@
+"""HTTP routes for the trial-impact service.
+
+Four endpoints mapping to the automation pipeline:
+
+    trial webhook  ->  /webhook/trial-update   (trigger: spawn a Devin sim session)
+    observe        ->  /status                 (read model: events + aggregates)
+    reconcile      ->  /poll                    (advance state, score, alert)
+    liveness       ->  /health
+
+Collaborators (config, db, devin, alerter, tickers) are pulled off
+``current_app.extensions["trial_impact"]`` so they can be swapped for fakes in
+tests.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import requests
+from flask import Blueprint, current_app, jsonify, render_template, request
+
+from . import db as db_module
+from . import market_model
+from .prompts import build_simulation_prompt
+from .signing import SIGNATURE_HEADER, verify
+
+bp = Blueprint("routes", __name__)
+
+
+def _ctx() -> dict[str, Any]:
+    return current_app.extensions["trial_impact"]
+
+
+@bp.get("/health")
+def health() -> Any:
+    return jsonify({"status": "ok"})
+
+
+@bp.post("/webhook/trial-update")
+def webhook_trial_update() -> Any:
+    """Accept a clinical-trial event and spawn a Devin simulation session.
+
+    Expected JSON (as emitted by ctgov-watcher):
+        {
+          "event_type": "results_posted",
+          "nct_id": "NCT01234567",
+          "sponsor": "Acme Biopharma",
+          "drug": "ACM-101", "target": "PCSK9", "tissue": "hepatic",
+          "phase": "PHASE3", "overall_status": "COMPLETED",
+          "endpoint_outcome": "met", "dose_mg": 140
+        }
+    """
+    ctx = _ctx()
+    cfg = ctx["config"]
+    db: db_module.Database = ctx["db"]
+
+    raw = request.get_data()
+    if cfg.signature_required and not verify(
+        cfg.watcher_shared_secret, raw, request.headers.get(SIGNATURE_HEADER)
+    ):
+        return jsonify({"error": "invalid or missing signature"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    nct_id = payload.get("nct_id")
+    event_type = payload.get("event_type") or "trial_update"
+    if not nct_id:
+        return jsonify({"error": "missing 'nct_id'"}), 400
+
+    sponsor = payload.get("sponsor") or ""
+    event_id = db_module.make_event_id(nct_id, event_type)
+
+    # Resolve the sponsor + competitors to tickers up front so they are visible on
+    # the dashboard even before the simulation completes.
+    resolved = market_model.resolve_tickers(sponsor, ctx["tickers"])
+
+    common = {
+        "event_id": event_id,
+        "nct_id": nct_id,
+        "sponsor": sponsor,
+        "drug": payload.get("drug"),
+        "target": payload.get("target"),
+        "tissue": payload.get("tissue"),
+        "phase": payload.get("phase"),
+        "event_type": event_type,
+        "endpoint_outcome": payload.get("endpoint_outcome"),
+        "sponsor_ticker": resolved["sponsor_ticker"],
+        "competitor_tickers": resolved["competitors"],
+    }
+
+    # Guard: without an API key we can't create a session. Record the attempt as
+    # failed so it is visible on /status rather than silently dropped.
+    if not cfg.devin_configured:
+        event = db.upsert_new_event(
+            **common,
+            devin_session_id=None,
+            session_url=None,
+            status=db_module.STATUS_FAILED,
+            error_message="DEVIN_API_KEY not configured",
+        )
+        return jsonify({"error": "DEVIN_API_KEY not configured", "event": event}), 503
+
+    prompt = build_simulation_prompt(
+        event={**payload, "sponsor": sponsor, "dose_mg": payload.get("dose_mg")},
+        sim_repo_url=cfg.sim_repo_url,
+    )
+
+    try:
+        created = ctx["devin"].create_session(
+            prompt=prompt,
+            title=f"Simulate {sponsor} {nct_id} ({payload.get('drug', '')})"[:200],
+            tags=["trial-impact", f"nct-{nct_id}", event_type],
+        )
+    except requests.RequestException as exc:
+        event = db.upsert_new_event(
+            **common,
+            devin_session_id=None,
+            session_url=None,
+            status=db_module.STATUS_FAILED,
+            error_message=f"Failed to create Devin session: {exc}",
+        )
+        return jsonify({"error": str(exc), "event": event}), 502
+
+    event = db.upsert_new_event(
+        **common,
+        devin_session_id=created.session_id,
+        session_url=created.url,
+        status=db_module.STATUS_QUEUED,
+    )
+    return jsonify({"event": event}), 201
+
+
+@bp.get("/status")
+def status() -> Any:
+    """Return all tracked events + aggregate stats as JSON or HTML."""
+    from .stats import compute_stats
+
+    ctx = _ctx()
+    db: db_module.Database = ctx["db"]
+
+    events = db.list_events()
+    stats = compute_stats(events)
+
+    wants_json = (
+        request.args.get("format") == "json"
+        or request.accept_mimetypes.best == "application/json"
+        or "text/html" not in request.accept_mimetypes
+    )
+    if wants_json:
+        return jsonify({"events": events, "stats": stats})
+
+    return render_template("status.html", events=events, stats=stats)
+
+
+@bp.post("/poll")
+def poll() -> Any:
+    """Poll in-progress sessions; score completed sims; alert on market-movers.
+
+    Idempotent: safe to call repeatedly (a real deployment puts it on a timer).
+    """
+    ctx = _ctx()
+    cfg = ctx["config"]
+    db: db_module.Database = ctx["db"]
+    devin = ctx["devin"]
+    alerter = ctx["alerter"]
+
+    in_progress = db.list_in_progress()
+    results: list[dict[str, Any]] = []
+
+    for event in in_progress:
+        event_id = event["event_id"]
+        session_id = event.get("devin_session_id")
+        if not session_id:
+            continue
+
+        try:
+            session = devin.get_session(session_id)
+        except requests.RequestException as exc:
+            results.append({"event_id": event_id, "error": f"poll failed: {exc}"})
+            continue
+
+        alerted: list[str] = []
+        if session.mapped_status == db_module.STATUS_COMPLETED and session.sim_result:
+            assessment = market_model.assess(
+                event=event,
+                sim=session.sim_result,
+                sponsor_ticker=event.get("sponsor_ticker"),
+                sponsor_name=event.get("sponsor") or "",
+                competitors=event.get("competitor_tickers") or [],
+                threshold=cfg.market_moving_threshold,
+            )
+            db.update_event_status(
+                event_id=event_id,
+                status=db_module.STATUS_COMPLETED,
+                sim_result=session.sim_result,
+                commentary=assessment["commentary"],
+                price_calls=assessment["price_calls"],
+            )
+            if assessment["market_moving"] and not event.get("alert_sent"):
+                alerted = alerter.notify(event, assessment)
+                db.mark_alert_sent(event_id)
+        else:
+            db.update_event_status(
+                event_id=event_id,
+                status=session.mapped_status,
+                sim_result=session.sim_result,
+                error_message=session.error_message,
+            )
+
+        results.append(
+            {
+                "event_id": event_id,
+                "status": session.mapped_status,
+                "alerted": alerted,
+            }
+        )
+
+    return jsonify({"polled": len(in_progress), "results": results})
