@@ -21,11 +21,11 @@ ClinicalTrials.gov API v2 ──poll──▶  ctgov-watcher/            (gives 
                                        │ diff records, detect material change
                                        ▼ POST /webhook/trial-update  (HMAC-signed)
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                     trial-impact-service/  (Flask)                         │
-│  TRIGGER   verify signature → resolve tickers → create Devin session ──────┼─▶ Devin session
-│  ORCHESTRATE  Devin runs docking + PK/PD in its sandbox ◀──────────────────┼── real ΔG, Kd,
-│  RECONCILE /poll → parse SIM_RESULT_JSON → market model → alert            │   occupancy
-│  OBSERVE   /status → dashboard (stats, price calls, 3D structure viewer)   │
+│                     trial-impact-service/  (Flask)                       │
+│  TRIGGER   verify signature → resolve tickers → create Devin session ────┼─▶ Devin session
+│  ORCHESTRATE  Devin runs docking + PK/PD in its sandbox ◀────────────────┼── real ΔG, Kd,
+│  RECONCILE /poll → parse SIM_RESULT_JSON → market model → alert          │   occupancy
+│  OBSERVE   /status → dashboard (stats, price calls, 3D structure viewer) │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,6 +71,52 @@ docked structure, the reconstructed PK/PD exposure curve, and a step-by-step
 
 ---
 
+## Catching a bug: when the result was too clean
+
+On the first real run, the stored result matched the example values embedded in my
+own prompt — suspiciously exact. I didn't trust it. I pulled the raw Devin session
+transcript and found the cause: the transcript includes the full prompt text (which
+itself contains an example `SIM_RESULT_JSON` for formatting), and my extractor was
+matching that example *before* it ever reached Devin's actual output further down
+the transcript.
+
+Fix: skip prompt-echo messages and take the last decodable result marker in the
+transcript, plus a regression test that reproduces the exact scenario. The real
+result — sotorasib's ΔG of −8.585 and Kd of 892nM, which falls straight out of its
+actual molecular weight and logP — then flowed through correctly.
+
+This is the habit behind the validation section below: a plausible number is not
+a correct number until it's been checked.
+
+---
+
+## Validating the physics: checking predictions against real data
+
+The two results above aren't just self-consistent outputs — I checked them against
+published data on each drug's real binding behavior after the runs completed,
+rather than assuming a plausible-looking number was a correct one (see the
+prompt-echo bug above for why that habit matters here).
+
+Both predictions come out weaker than real-world affinity — expected, since blind
+docking is a coarse approximation. But the *size* of the gap tracks the underlying
+chemistry in a way that isn't random: ivacaftor, a genuinely reversible binder, is
+off by a margin that's normal for blind docking. Sotorasib is off by a much larger
+margin — and sotorasib's real potency comes from forming a permanent covalent bond
+to its target, a mechanism AutoDock Vina has no way to model, since Vina only scores
+reversible, non-covalent binding.
+
+That structure matters more than either number alone: the model's errors are
+mechanistically explicable, not arbitrary. It also points directly at the fix — a
+covalent-docking-aware tool for covalent inhibitors, or explicitly scoping v1 to
+non-covalent mechanisms and flagging covalent drugs as out-of-scope until that's
+added.
+
+I did not adjust the pipeline, prompts, or reported numbers after finding this —
+the results table shows the raw model output; this is an honest post-hoc check
+against literature, not a correction folded back in.
+
+---
+
 ## Quick start
 
 ```bash
@@ -95,6 +141,10 @@ cd trial-impact-service && pip install -r requirements-dev.txt && ruff check . &
 ## Next steps
 
 **Tighten the science**
+- Add covalent-docking support (e.g. CovDock) or explicitly flag covalent
+  inhibitors as out-of-scope for v1 — Vina's non-covalent scoring systematically
+  understates potency for drugs like sotorasib that bind irreversibly, as the
+  validation above shows.
 - Emit AutoDock Vina's top pose (PDBQT) in `SIM_RESULT_JSON` and render it in the
   binding pocket, so the 3D view shows the *actual* docked geometry — not the
   reference crystal ligand.
