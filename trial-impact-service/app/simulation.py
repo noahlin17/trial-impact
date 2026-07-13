@@ -141,18 +141,28 @@ def _download(url: str, dest: str) -> None:
 # --------------------------------------------------------------------------- #
 # Step 3 — drug → SMILES → RDKit 3D molecule
 # --------------------------------------------------------------------------- #
+# PubChem's PUG-REST property schema drifted: a request for `CanonicalSMILES` now
+# comes back keyed as `ConnectivitySMILES`, and the isomeric form is served under the
+# bare `SMILES` property. Request `SMILES` (which keeps stereochemistry — e.g.
+# sotorasib's chiral centre) and accept whichever SMILES-bearing key is present, so
+# the lookup survives either the old or the new schema.
+_SMILES_KEYS = ("SMILES", "IsomericSMILES", "CanonicalSMILES", "ConnectivitySMILES")
+
+
 def fetch_ligand_smiles(drug: str) -> str:
-    """Look up a canonical SMILES for ``drug`` via PubChem PUG-REST."""
+    """Look up a SMILES string for ``drug`` via PubChem PUG-REST."""
     url = (
         "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/"
-        f"{requests.utils.quote(drug)}/property/CanonicalSMILES/JSON"
+        f"{requests.utils.quote(drug)}/property/SMILES/JSON"
     )
     resp = requests.get(url, timeout=_HTTP_TIMEOUT)
     resp.raise_for_status()
-    props = resp.json()["PropertyTable"]["Properties"]
-    if not props or "CanonicalSMILES" not in props[0]:
-        raise RuntimeError(f"no SMILES found for drug '{drug}'")
-    return props[0]["CanonicalSMILES"]
+    props = resp.json().get("PropertyTable", {}).get("Properties", [])
+    if props:
+        for key in _SMILES_KEYS:
+            if props[0].get(key):
+                return props[0][key]
+    raise RuntimeError(f"no SMILES found for drug '{drug}'")
 
 
 def embed_ligand(smiles: str):
