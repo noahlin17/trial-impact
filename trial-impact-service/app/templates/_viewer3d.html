@@ -1,6 +1,11 @@
 <!-- Shared 3Dmol structure viewer, used by both /status and /analysis.
      Defines window.renderStructure(el, source, pdb, uniprot) — call it on demand
-     (analysis drill-down) or in a DOMContentLoaded loop (status dashboard). -->
+     (analysis drill-down) or in a DOMContentLoaded loop (status dashboard).
+
+     This renders the *reference structure the run docked against* (with its own
+     crystal ligand), not the computed pose: the docked pose is ~8 KB of PDB text and
+     could not be transported back through the single-line result contract without the
+     agent truncating it. See "Docked pose" under Limitations in the README. -->
 <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
 <script>
   window.renderStructure = function (el, source, pdb, uni) {
@@ -27,7 +32,14 @@
         });
     }
     if (source === "AlphaFold" && uni) {
-      load("https://alphafold.ebi.ac.uk/files/AF-" + uni + "-F1-model_v4.pdb", "pdb", null);
+      // AFDB bumps the model version in the filename (a pinned v4 URL 404'd for every
+      // target once AFDB rolled forward), so try newest-first rather than pinning one.
+      var af = function (v) {
+        return "https://alphafold.ebi.ac.uk/files/AF-" + uni + "-F1-model_" + v + ".pdb";
+      };
+      load(af("v6"), "pdb", function () {
+        load(af("v5"), "pdb", function () { load(af("v4"), "pdb", null); });
+      });
     } else {
       load("https://files.rcsb.org/download/" + pdb + ".pdb", "pdb",
         function () { load("https://files.rcsb.org/download/" + pdb + ".cif", "cif", null); });

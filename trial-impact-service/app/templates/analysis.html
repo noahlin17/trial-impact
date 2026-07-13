@@ -164,7 +164,7 @@
         <h2 style="margin-top:0">${r.target} × ${r.drug} <span class="muted" style="font-weight:400">· ${r.nct_id} · ${r.sponsor} (${r.sponsor_ticker ?? "—"})</span></h2>
         <div class="detail-grid">
           <div>
-            <div class="legend">Docked structure — ${prov.pdb_id ?? "?"} (${prov.structure_source ?? "?"}); cartoon = protein, sticks = ligand.</div>
+            <div class="legend">Reference structure — ${prov.pdb_id ?? "?"} (${prov.structure_source ?? "?"}); cartoon = protein, sticks = its <em>own</em> crystal ligand. This is the structure the run docked <em>against</em>, not the computed pose (see Limitations).</div>
             <div class="viewer3d" id="detail-viewer"></div>
             <div class="legend" style="margin-top:.4rem">UniProt ${prov.uniprot ?? "—"} · SMILES <code style="font-size:.7rem">${(prov.smiles ?? "").slice(0, 42)}${(prov.smiles ?? "").length > 42 ? "…" : ""}</code></div>
           </div>

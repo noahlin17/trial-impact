@@ -38,12 +38,13 @@
     .struct-head { font-size: 0.9rem; margin-bottom: 0.5rem; }
     .viewer3d { width: 100%; height: 320px; position: relative; border-radius: 8px; overflow: hidden; background: #fbfbfd; }
     .legend { font-size: 0.75rem; color: #888; margin-top: 0.45rem; }
+    .nav { margin: 0.5rem 0 0; font-size: 0.95rem; }
   </style>
-  <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
 </head>
 <body>
   <h1>Trial Impact</h1>
   <p class="sub">Clinical-trial readouts → biophysical simulation (Devin) → share-price commentary</p>
+  <p class="nav"><strong>Status</strong> · <a href="/analysis">Results analysis →</a></p>
 
   <div class="cards">
     <div class="card"><div class="num">1</div><div class="lbl">Events</div></div>
@@ -76,17 +77,18 @@
           Vertex Pharmaceuticals (<strong>VRTX</strong>)
           <div class="muted">ivacaftor / CFTR / lung</div>
           
+          
         </td>
         <td><span class="badge completed">completed</span></td>
         <td>
           
-            -7.997 kcal/mol
-            <div class="muted">Kd 2317.174 nM</div>
+            -8.702 kcal/mol
+            <div class="muted">Kd 738.217 nM</div>
           
         </td>
         <td>
           
-            84.65%
+            94.54%
           
         </td>
         <td>
@@ -110,7 +112,7 @@
           
         </td>
         <td>
-          <a href="https://app.devin.ai/sessions/dd9eda06271f4765ab58971b5f1685a9" target="_blank" rel="noopener">devin-dd9eda06271f4765ab58971b5f1685a9</a>
+          <a href="https://app.devin.ai/sessions/b5411412c57f4c0ab676b71bd75ccbae" target="_blank" rel="noopener">devin-b5411412c57f4c0ab676b71bd75ccbae</a>
           
         </td>
       </tr>
@@ -127,12 +129,12 @@
         <div class="struct-head">
           <strong>CFTR</strong> × ivacaftor
           <span class="muted">· NCT-VERIFY-002</span><br>
-          <span class="muted">9MXL (RCSB)
-          · ΔG -7.997 kcal/mol</span>
+          <span class="muted">AF-P13569-F1 (AlphaFold)
+          · ΔG -8.702 kcal/mol</span>
         </div>
         <div class="viewer3d"
-             data-source="RCSB"
-             data-pdb="9MXL"
+             data-source="AlphaFold"
+             data-pdb="AF-P13569-F1"
              data-uniprot="P13569"></div>
         <div class="legend">Drag to rotate · scroll to zoom</div>
       </div>
@@ -145,37 +147,58 @@
     metadata. NOT investment advice; for informational purposes only.
   </p>
 
+  <!-- Shared 3Dmol structure viewer, used by both /status and /analysis.
+     Defines window.renderStructure(el, source, pdb, uniprot) — call it on demand
+     (analysis drill-down) or in a DOMContentLoaded loop (status dashboard).
+
+     This renders the *reference structure the run docked against* (with its own
+     crystal ligand), not the computed pose: the docked pose is ~8 KB of PDB text and
+     could not be transported back through the single-line result contract without the
+     agent truncating it. See "Docked pose" under Limitations in the README. -->
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+<script>
+  window.renderStructure = function (el, source, pdb, uni) {
+    if (typeof $3Dmol === "undefined") return;
+    el.innerHTML = "";
+    var viewer = $3Dmol.createViewer(el, { backgroundColor: "white" });
+    function draw() {
+      viewer.setStyle({}, { cartoon: { color: "spectrum" } });
+      viewer.setStyle({ hetflag: true }, { stick: { colorscheme: "greenCarbon", radius: 0.2 } });
+      viewer.setStyle({ resn: "HOH" }, {});   // hide waters
+      viewer.zoomTo();
+      viewer.render();
+      viewer.spin("y", 0.4);
+    }
+    // Fetch coordinates ourselves so we can fall back pdb -> cif. Many modern
+    // cryo-EM structures (e.g. CFTR) are mmCIF-only and have no legacy .pdb.
+    function load(url, fmt, next) {
+      fetch(url)
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then(function (t) { viewer.addModel(t, fmt); draw(); })
+        .catch(function () {
+          if (next) { next(); }
+          else { el.innerHTML = '<div class="legend" style="padding:1rem">structure unavailable</div>'; }
+        });
+    }
+    if (source === "AlphaFold" && uni) {
+      // AFDB bumps the model version in the filename (a pinned v4 URL 404'd for every
+      // target once AFDB rolled forward), so try newest-first rather than pinning one.
+      var af = function (v) {
+        return "https://alphafold.ebi.ac.uk/files/AF-" + uni + "-F1-model_" + v + ".pdb";
+      };
+      load(af("v6"), "pdb", function () {
+        load(af("v5"), "pdb", function () { load(af("v4"), "pdb", null); });
+      });
+    } else {
+      load("https://files.rcsb.org/download/" + pdb + ".pdb", "pdb",
+        function () { load("https://files.rcsb.org/download/" + pdb + ".cif", "cif", null); });
+    }
+  };
+</script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      if (typeof $3Dmol === "undefined") return;
       document.querySelectorAll(".viewer3d").forEach(function (el) {
-        var viewer = $3Dmol.createViewer(el, { backgroundColor: "white" });
-        function draw() {
-          viewer.setStyle({}, { cartoon: { color: "spectrum" } });
-          viewer.setStyle({ hetflag: true }, { stick: { colorscheme: "greenCarbon", radius: 0.2 } });
-          viewer.setStyle({ resn: "HOH" }, {});   // hide waters
-          viewer.zoomTo();
-          viewer.render();
-          viewer.spin("y", 0.4);
-        }
-        // Fetch coordinates ourselves so we can fall back pdb -> cif. Many modern
-        // cryo-EM structures (e.g. CFTR) are mmCIF-only and have no legacy .pdb.
-        function load(url, fmt, next) {
-          fetch(url)
-            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
-            .then(function (t) { viewer.addModel(t, fmt); draw(); })
-            .catch(function () {
-              if (next) { next(); }
-              else { el.innerHTML = '<div class="legend" style="padding:1rem">structure unavailable</div>'; }
-            });
-        }
-        var source = el.dataset.source, pdb = el.dataset.pdb, uni = el.dataset.uniprot;
-        if (source === "AlphaFold" && uni) {
-          load("https://alphafold.ebi.ac.uk/files/AF-" + uni + "-F1-model_v4.pdb", "pdb", null);
-        } else {
-          load("https://files.rcsb.org/download/" + pdb + ".pdb", "pdb",
-            function () { load("https://files.rcsb.org/download/" + pdb + ".cif", "cif", null); });
-        }
+        window.renderStructure(el, el.dataset.source, el.dataset.pdb, el.dataset.uniprot);
       });
     });
   </script>

@@ -17,12 +17,13 @@ Pipeline
 4. **Prepare receptor + ligand** to PDBQT (Meeko for the ligand, OpenBabel for the
    receptor).
 5. **Dock** with AutoDock Vina → best binding free energy ΔG (kcal/mol); derive the
-   dissociation constant ``Kd`` from ΔG = RT·ln(Kd).
-6. **PK/PD** — a first-order-absorption one-compartment ODE (SciPy ``solve_ivp``)
-   for plasma/tissue exposure, coupled to a receptor-occupancy model driven by the
-   docked ``Kd`` → ``cmax``, ``auc``, ``target_occupancy_pct``.
+   dissociation constant ``Kd`` from ΔG = RT·ln(Kd). Only the scalar ΔG comes back —
+   the pose is too large for the result contract (see the README).
+6. **PK/PD** — a first-order-absorption one-compartment model solved in **closed form**
+   (Bateman), coupled to a receptor-occupancy model driven by the docked ``Kd`` →
+   ``cmax``, ``auc``, ``target_occupancy_pct``. No ODE solver (and so no SciPy) needed.
 
-The heavy dependencies (``rdkit``, ``meeko``, ``vina``, ``scipy``, ``numpy``,
+The heavy dependencies (``rdkit``, ``meeko``, ``vina``, ``numpy``,
 ``openbabel``) are imported **lazily inside the functions that need them** so this
 module imports cleanly in the web service and the test suite, which never run the
 physics — they fake Devin. Those deps live in ``requirements-sim.txt`` and are
@@ -68,10 +69,20 @@ class SimResult:
     auc_ng_h_ml: float | None = None
     target_occupancy_pct: float | None = None
     tox_flag: bool | None = None
+    covalent_flag: bool | None = None
     confidence: float | None = None
     provenance: dict[str, Any] = field(default_factory=dict)
+    docking_box: dict[str, Any] | None = None
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
+    # Set by the *session*, not by this code: true if the agent had to modify this
+    # script to get the run to complete. A patched run's numbers did not come from the
+    # code in this repo, so it is not reproducible from source and must say so — see
+    # "Result contract" in the README. Silent divergence has bitten us twice (a
+    # PubChem schema change and an mmCIF-only structure), which is why it is a field
+    # and not a convention.
+    code_patched: bool = False
+    patch_summary: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -124,11 +135,39 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
 
     # Fall back to the AlphaFold DB predicted model.
     af_path = os.path.join(workdir, f"AF-{uniprot}.pdb")
-    _download(
-        f"https://alphafold.ebi.ac.uk/files/AF-{uniprot}-F1-model_v4.pdb", af_path
-    )
+    _download(_alphafold_pdb_url(uniprot), af_path)
     _log(f"using AlphaFold model AF-{uniprot}-F1")
     return af_path, {"structure_source": "AlphaFold", "pdb_id": f"AF-{uniprot}-F1"}
+
+
+# AlphaFold DB stamps a model version into the filename (…-F1-model_v6.pdb) and bumps
+# it over time. Hardcoding one silently 404s for *every* target the day AFDB rolls
+# forward — which is exactly what happened: the pinned `v4` URL broke the entire
+# fallback, so any target without a legacy experimental .pdb failed outright instead
+# of degrading to a predicted model. Resolve the version instead of assuming it.
+_AF_API = "https://alphafold.ebi.ac.uk/api/prediction"
+_AF_KNOWN_VERSIONS = ("v6", "v5", "v4")
+
+
+def _alphafold_pdb_url(uniprot: str) -> str:
+    """Current AlphaFold DB .pdb URL for ``uniprot`` (API first, then known versions)."""
+    try:
+        resp = requests.get(f"{_AF_API}/{uniprot}", timeout=_HTTP_TIMEOUT)
+        resp.raise_for_status()
+        entries = resp.json()
+        if entries and entries[0].get("pdbUrl"):
+            return entries[0]["pdbUrl"]
+    except (requests.RequestException, KeyError, IndexError, ValueError) as exc:
+        _log(f"AlphaFold API lookup failed ({exc}); probing known model versions")
+
+    for version in _AF_KNOWN_VERSIONS:  # newest first
+        url = f"https://alphafold.ebi.ac.uk/files/AF-{uniprot}-F1-model_{version}.pdb"
+        try:
+            if requests.head(url, timeout=_HTTP_TIMEOUT, allow_redirects=True).ok:
+                return url
+        except requests.RequestException:
+            continue
+    raise RuntimeError(f"no AlphaFold model available for {uniprot}")
 
 
 def _download(url: str, dest: str) -> None:
@@ -141,18 +180,29 @@ def _download(url: str, dest: str) -> None:
 # --------------------------------------------------------------------------- #
 # Step 3 — drug → SMILES → RDKit 3D molecule
 # --------------------------------------------------------------------------- #
+# PubChem's PUG-REST property schema drifted: a request for `CanonicalSMILES` now comes
+# back keyed as `ConnectivitySMILES`, so the old lookup raised "no SMILES found" for
+# *every* drug — the pipeline could not fetch a ligand at all. Request `SMILES` (the
+# isomeric form, which keeps stereochemistry — e.g. sotorasib's chiral centre; the
+# connectivity form would silently drop it and change the docked geometry) and accept
+# whichever SMILES-bearing key comes back, so the lookup survives either schema.
+_SMILES_KEYS = ("SMILES", "IsomericSMILES", "CanonicalSMILES", "ConnectivitySMILES")
+
+
 def fetch_ligand_smiles(drug: str) -> str:
-    """Look up a canonical SMILES for ``drug`` via PubChem PUG-REST."""
+    """Look up a SMILES string for ``drug`` via PubChem PUG-REST."""
     url = (
         "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/"
-        f"{requests.utils.quote(drug)}/property/CanonicalSMILES/JSON"
+        f"{requests.utils.quote(drug)}/property/SMILES/JSON"
     )
     resp = requests.get(url, timeout=_HTTP_TIMEOUT)
     resp.raise_for_status()
-    props = resp.json()["PropertyTable"]["Properties"]
-    if not props or "CanonicalSMILES" not in props[0]:
-        raise RuntimeError(f"no SMILES found for drug '{drug}'")
-    return props[0]["CanonicalSMILES"]
+    props = resp.json().get("PropertyTable", {}).get("Properties", [])
+    if props:
+        for key in _SMILES_KEYS:
+            if props[0].get(key):
+                return props[0][key]
+    raise RuntimeError(f"no SMILES found for drug '{drug}'")
 
 
 def embed_ligand(smiles: str):
@@ -181,6 +231,37 @@ def ligand_descriptors(mol) -> dict[str, float]:
         "hba": Lipinski.NumHAcceptors(mol),
         "tpsa": Descriptors.TPSA(mol),
     }
+
+
+# SMARTS for common covalent-inhibitor warheads. This is a heuristic *flag* only:
+# Vina still scores such ligands reversibly, so it under-represents their potency.
+#
+# The Michael-acceptor patterns require an **acyclic** C=C (`;!R`). A real warhead is an
+# exocyclic vinyl (an acrylamide, `N-C(=O)-CH=CH2`); an α,β-unsaturated amide *inside* a
+# ring is just a conjugated heterocycle and is not electrophilic in the same way. Without
+# `;!R` this flagged **ivacaftor** — a reversible CFTR potentiator — as covalent, because
+# `embed_ligand` kekulizes its 4-oxoquinoline ring and the ring's C=C then matched a bare
+# `C=CC(=O)N`. Validated against 4 known covalent drugs (sotorasib, osimertinib,
+# ibrutinib, afatinib) and 4 reversible ones (ivacaftor, ibuprofen, imatinib,
+# atorvastatin) — see tests.
+_COVALENT_WARHEADS = (
+    "[CX3;!R]=[CX3;!R][CX3](=O)[NX3,OX2]",  # acrylamide / acrylate (Michael acceptor)
+    "[Cl,Br,I]-[CH2]-[CX3](=O)[NX3]",       # halo-acetamide
+    "[CX3;!R]=[CX3;!R][SX4](=O)(=O)",       # vinyl sulfone / sulfonamide
+    "B([OX2])[OX2]",                        # boronic acid / ester
+    "C1OC1",                                # epoxide
+)
+
+
+def detect_covalent(mol) -> bool:
+    """True if the ligand contains a recognised covalent warhead (heuristic)."""
+    from rdkit import Chem
+
+    for smarts in _COVALENT_WARHEADS:
+        patt = Chem.MolFromSmarts(smarts)
+        if patt is not None and mol.HasSubstructMatch(patt):
+            return True
+    return False
 
 
 # --------------------------------------------------------------------------- #
@@ -238,7 +319,17 @@ def _obabel(src: str, dst: str, extra: list[str] | None = None) -> None:
 # Step 5 — docking
 # --------------------------------------------------------------------------- #
 def compute_docking_box(pdb_path: str) -> tuple[list[float], list[float]]:
-    """Blind-docking box: receptor centroid + padded bounding box (capped)."""
+    """A padded *blind* box over the whole receptor (center + size, in Å).
+
+    Blind docking is the honest default here: we do not know which pocket the drug
+    binds. A pocket-focused box would be sharper, but only if the pocket is chosen
+    correctly — see "Docking box" under Limitations in the README. Centering on the
+    largest co-crystallized ligand was tried and **reverted**: KRAS structure 7VVB
+    carries only the nucleotide GNP (a GTP analog), so that heuristic centered the
+    box on the *nucleotide* pocket rather than the switch-II pocket where sotorasib
+    actually binds. Picking the right pocket needs a drug-bound structure (or a
+    pocket-detection step), not "the biggest HETATM".
+    """
     import numpy as np  # lazy
 
     coords = []
@@ -256,15 +347,30 @@ def compute_docking_box(pdb_path: str) -> tuple[list[float], list[float]]:
     center = arr.mean(axis=0)
     extent = arr.max(axis=0) - arr.min(axis=0) + 8.0  # 8 Å padding
     size = np.minimum(extent, 40.0)  # cap for tractable blind docking
+    _log("using blind docking box over the whole receptor")
     return center.tolist(), size.tolist()
 
 
+# Vina treats seed=0 as "pick a random seed", so the previous `seed=0` made every run
+# non-deterministic — repeat runs of the same drug/target drifted (ΔG -8.42 / -8.59 /
+# -8.59 for sotorasib/KRAS). A fixed non-zero seed makes a run reproducible, which the
+# whole result contract depends on: you cannot call a number reproducible-from-source
+# if the source rolls a new seed each time.
+_VINA_SEED = 42
+
+
 def run_vina(receptor_pdbqt: str, ligand_pdbqt: str, box) -> float:
-    """Dock and return the best pose's binding free energy ΔG (kcal/mol)."""
+    """Dock and return the best pose's binding free energy ΔG (kcal/mol).
+
+    Only the scalar ΔG is returned. The top pose is *not* transported back: it is ~8 KB
+    of PDB text, and embedding it in the single-line SIM_RESULT_JSON contract made the
+    agent truncate that line — silently turning a good run into an unparseable one. See
+    "Docked pose" under Limitations in the README.
+    """
     from vina import Vina  # lazy
 
     center, size = box
-    v = Vina(sf_name="vina", cpu=os.cpu_count() or 1, seed=0)
+    v = Vina(sf_name="vina", cpu=os.cpu_count() or 1, seed=_VINA_SEED)
     v.set_receptor(receptor_pdbqt)
     v.set_ligand_from_file(ligand_pdbqt)
     v.compute_vina_maps(center=center, box_size=size)
@@ -401,9 +507,23 @@ def run_simulation(
             desc = ligand_descriptors(mol)
             result.provenance["descriptors"] = {k: round(v, 3) for k, v in desc.items()}
 
+            # Covalent-warhead flag (heuristic; non-fatal). Vina scores reversibly,
+            # so a covalent binder's ΔG under-represents its true potency.
+            try:
+                result.covalent_flag = detect_covalent(mol)
+            except Exception as exc:  # noqa: BLE001 — flag is best-effort
+                result.warnings.append(f"covalent detection skipped: {exc}")
+
             ligand_pdbqt = prepare_ligand_pdbqt(mol, workdir)
             receptor_pdbqt = prepare_receptor_pdbqt(pdb_path, workdir)
             box = compute_docking_box(pdb_path)
+            # Record the box as provenance so a reader can see exactly what volume was
+            # searched (and that it was a blind box, not a pocket-focused one).
+            result.docking_box = {
+                "center": [round(c, 3) for c in box[0]],
+                "size": [round(s, 3) for s in box[1]],
+                "mode": "blind",
+            }
 
             dg = run_vina(receptor_pdbqt, ligand_pdbqt, box)
             result.binding_affinity_kcal_mol = round(dg, 3)

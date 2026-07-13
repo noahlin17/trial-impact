@@ -79,6 +79,11 @@
           {{ e.sponsor }}{% if e.sponsor_ticker %} (<strong>{{ e.sponsor_ticker }}</strong>){% endif %}
           <div class="muted">{{ e.drug or "—" }} / {{ e.target or "—" }} / {{ e.tissue or "—" }}</div>
           {% if e.error_message %}<div class="err">{{ e.error_message }}</div>{% endif %}
+          {% if e.sim_result and e.sim_result.code_patched %}
+          <div class="err" title="{{ e.sim_result.patch_summary or '' }}">
+            ⚠ not reproducible from source — the session patched <code>simulation.py</code> to complete this run
+          </div>
+          {% endif %}
         </td>
         <td><span class="badge {{ e.status }}">{{ e.status }}</span></td>
         <td>

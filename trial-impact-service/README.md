@@ -10,13 +10,6 @@ readout — alerts to Slack/email while surfacing everything on a dashboard.
 > **Not investment advice.** Output is an automated research signal for
 > informational purposes only. A disclaimer is attached to every assessment.
 
-> **See also:** the [top-level README](../README.md) has two things not repeated
-> here — a validation of these predictions against published binding data (the
-> model's errors track known chemistry, e.g. covalent vs. non-covalent binding,
-> rather than being random), and the story of a real extraction bug caught and
-> fixed on the first run. Worth reading if you're evaluating engineering rigor,
-> not just the pipeline shape.
-
 ---
 
 ## Architecture
@@ -26,16 +19,16 @@ ClinicalTrials.gov API v2 ──poll──▶  ctgov-watcher (../ctgov-watcher)
                                        │  diff records, detect material change
                                        ▼  POST /webhook/trial-update  (HMAC-signed)
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                         Trial Impact service (Flask)                     │
-│  TRIGGER   POST /webhook/trial-update                                    │
-│     verify HMAC → resolve tickers (sponsor + competitors)                │
-│                 → build sim prompt → Devin: POST /sessions ──────────────┼─▶ Devin session
-│                 → SQLite: insert event (queued)                          │   runs app/simulation.py
-│  RECONCILE POST /poll                                                    │   (docking + PK/PD)
-│     GET Devin session → extract SIM_RESULT_JSON ◀────────────────────────┼── ΔG, Kd, occupancy
-│     → market_model.assess → price calls + commentary                     │
-│     → SQLite update → Slack/email alert (once) on market-movers          │
-│  OBSERVE   GET /status  → dashboard + JSON                               │
+│                         Trial Impact service (Flask)                       │
+│  TRIGGER   POST /webhook/trial-update                                       │
+│     verify HMAC → resolve tickers (sponsor + competitors)                  │
+│                 → build sim prompt → Devin: POST /sessions ────────────────┼─▶ Devin session
+│                 → SQLite: insert event (queued)                            │   runs app/simulation.py
+│  RECONCILE POST /poll                                                      │   (docking + PK/PD)
+│     GET Devin session → extract SIM_RESULT_JSON ◀──────────────────────────┼── ΔG, Kd, occupancy
+│     → market_model.assess → price calls + commentary                       │
+│     → SQLite update → Slack/email alert (once) on market-movers            │
+│  OBSERVE   GET /status  → dashboard + JSON                                  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,7 +38,7 @@ The pipeline has four stages, each isolated into its own module:
 |-------|----------|--------|----------------|
 | **Trigger** | `POST /webhook/trial-update` | `app/routes.py`, `app/signing.py` | Verify the signed webhook, resolve tickers, spawn a Devin simulation session, persist the event. |
 | **Orchestrate** | — | `app/devin_client.py`, `app/prompts.py`, `app/simulation.py` | Tell Devin to run the docking + PK/PD pipeline; parse the structured result back. |
-| **Observe** | `GET /status` | `app/routes.py`, `app/stats.py` | Read model: every event, its sim result, tickers, price calls, and aggregates (JSON or HTML). |
+| **Observe** | `GET /status` · `GET /analysis` | `app/routes.py`, `app/stats.py`, `app/analysis.py` | Read model: every event, its sim result, tickers, price calls and aggregates (`/status`); plus a corpus view to *learn from* the runs — physics→price relationships and a per-run drill-down (`/analysis`). |
 | **Reconcile** | `POST /poll` | `app/routes.py`, `app/market_model.py`, `app/alerts.py` | Poll in-flight sessions, score completed sims, and alert once on market-movers. |
 
 ### Why Devin runs the simulation
@@ -53,8 +46,9 @@ The pipeline has four stages, each isolated into its own module:
 The tissue/protein simulation is **real biophysics**, not a stub: fetch the target
 structure (UniProt → experimental PDB, else AlphaFold), fetch the ligand
 (PubChem → SMILES → RDKit 3D), dock with **AutoDock Vina** for a real binding free
-energy ΔG, then solve a **SciPy** PK/PD ODE for tissue exposure and target
-occupancy. That needs a full sandbox that can `pip install` a heavy scientific
+energy ΔG (returning the top pose), then solve the PK/PD model in **closed form**
+(Bateman) for tissue exposure and target occupancy. That needs a full sandbox that
+can `pip install` a heavy scientific
 stack, pull structures, and iterate on failures — exactly what a Devin session is.
 One session per event keeps runs isolated, independently retryable, and observable
 (the same design the pipeline uses throughout).
@@ -62,6 +56,22 @@ One session per event keeps runs isolated, independently retryable, and observab
 `app/simulation.py` is the canonical, CLI-runnable pipeline; Devin clones the repo
 (`SIM_REPO_URL`), installs `requirements-sim.txt`, runs it, and reports back a
 single `SIM_RESULT_JSON:` line the service parses.
+
+### The result contract (and why it has a `code_patched` field)
+
+A Devin session is an *agent*, not a runner: when a step fails it will fix it and
+carry on. That is exactly what you want for `pip install` problems — and exactly what
+you do **not** want for the science, because a session that quietly edits
+`simulation.py` reports numbers that did not come from the code in this repo. Two real
+cases bit us: PubChem renamed the SMILES property (`CanonicalSMILES` →
+`ConnectivitySMILES`/`SMILES`), and a cryo-EM structure was mmCIF-only. Both times the
+run "succeeded" with plausible values, and both times the committed code could not
+have produced them.
+
+So the contract makes divergence *loud*: the session must set `code_patched: true` and
+`patch_summary` if it modified the script, and a patched run is surfaced on `/status`
+as **not reproducible from source**. A plausible number is not a correct number, and a
+number you cannot regenerate is not a result.
 
 ---
 
@@ -74,16 +84,19 @@ app/
   db.py             # SQLite data-access layer (single `trial_events` table, no ORM)
   signing.py        # HMAC-SHA256 sign/verify (shared with the watcher)
   prompts.py        # builds the simulation task each Devin session receives
-  simulation.py     # REAL physics: docking (Vina) + PK/PD (SciPy). Runs in Devin.
+  simulation.py     # REAL physics: docking (Vina) + closed-form PK/PD. Runs in Devin.
   devin_client.py   # Devin API client + SIM_RESULT_JSON extraction + status mapping
   market_model.py   # PoS delta → directional price calls + commentary (the "model")
   alerts.py         # Slack + email fan-out for market-moving readouts
-  routes.py         # the four HTTP endpoints
-  stats.py          # aggregate metrics
-  templates/status.html   # dashboard
+  routes.py         # the HTTP endpoints
+  stats.py          # aggregate metrics for /status
+  analysis.py       # cross-run corpus: physics→price relationships + per-run drill-down
+  templates/status.html     # live dashboard (events, price calls, 3D structures)
+  templates/analysis.html   # /analysis — learn from the corpus (Plotly)
+  templates/_viewer3d.html  # shared 3Dmol viewer partial, reused by both dashboards
 tickers.json        # sponsor → ticker + competitor map
 requirements.txt    # web-service deps (Flask, requests, gunicorn)
-requirements-sim.txt# heavy sim deps (rdkit, meeko, vina, openbabel, scipy) — installed by Devin
+requirements-sim.txt# heavy sim deps (rdkit, meeko, vina, openbabel, numpy) — installed by Devin
 simulate_trial.py   # fires signed trial-event payloads (stand-in for the watcher)
 wsgi.py             # gunicorn / dev-server entrypoint
 tests/test_app.py   # end-to-end flow with in-memory fakes (offline)
@@ -131,18 +144,7 @@ for any market-moving readout.
 - JSON: `curl -s http://localhost:8000/status?format=json | jq`
 
 ### Run the real physics locally (optional)
-
-AutoDock Vina's Python bindings compile a C++ extension at install time and
-require Boost to be present on the system (`brew install boost` on macOS,
-`apt install libboost-all-dev` on Debian/Ubuntu — see the
-[Vina docs](https://autodock-vina.readthedocs.io/) for other platforms). If your
-local machine isn't set up for this, that's fine — this section is a bonus
-verification path, not the demo path. The actual pipeline runs the identical
-`app/simulation.py` inside Devin's own sandbox, with no local scientific-stack
-setup required; that's what produced both real results in `results/`.
-
 ```bash
-brew install boost   # or your platform's equivalent — see link above
 pip install -r requirements-sim.txt
 python -m app.simulation --target KRAS --drug sotorasib --tissue tumor --dose 960 --json-only
 ```
@@ -156,6 +158,8 @@ python -m app.simulation --target KRAS --drug sotorasib --tissue tumor --dose 96
 | `POST` | `/webhook/trial-update` | Verify signature, spawn a Devin sim session, store the event. `201`. |
 | `GET`  | `/status` | All events + aggregate stats. HTML for browsers, JSON otherwise (or `?format=json`). |
 | `POST` | `/poll` | Poll in-flight sessions, score completed sims, alert once. Idempotent. |
+| `GET`  | `/analysis` | Corpus view: physics→price scatter, sortable run table, and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). |
+| `GET`  | `/analysis.json` | The same payload as JSON (`app/analysis.py::build_payload`). |
 | `GET`  | `/health` | Liveness probe. |
 
 ### Webhook payload shape
@@ -179,13 +183,128 @@ Signed with `X-CTGov-Signature: sha256=<hmac>` when `WATCHER_SHARED_SECRET` is s
 |----------|----------|---------|---------|
 | `DEVIN_API_KEY` | yes | — | Authenticates Devin API calls. |
 | `WATCHER_SHARED_SECRET` | recommended | — | HMAC secret; when set, webhook signatures are enforced. |
-| `SIM_REPO_URL` | no | `https://github.com/noahlin17/trial-impact` | Repo Devin clones to run the simulation. |
+| `SIM_REPO_URL` | no | `…/trial-impact-service` | Repo Devin clones to run the simulation. |
 | `SLACK_WEBHOOK_URL` | no | — | Slack alerts on market-movers. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `EMAIL_FROM` / `EMAIL_TO` | no | — | Email alerts. |
 | `TICKERS_PATH` | no | `tickers.json` | Sponsor→ticker/competitor map. |
-| `MARKET_MOVING_THRESHOLD` | no | `0.10` | Fractional price-move threshold that triggers a market-moving alert (e.g. `0.10` = 10%). |
+| `MARKET_MOVING_THRESHOLD` | no | `0.10` | `|PoS delta|` at/above which an alert fires. |
 | `DEVIN_API_BASE` | no | `https://api.devin.ai/v1` | Override for testing. |
 | `DATABASE_PATH` | no | `/data/trial_impact.db` | SQLite file location. |
+
+---
+
+## Limitations & modeling caveats
+
+This is a research prototype. The modeling choices are deliberately transparent and
+approximate; the known limitations below are on record so results are read with the
+right caveats. **Nothing here is investment advice.** (✅ = addressed; ◑ = partially
+addressed; ○ = documented, future work.)
+
+### Scope & chemistry
+- **Small molecules only** ○ — the docking path models small-molecule drugs;
+  biologics/antibodies can't be docked and are out of scope.
+- **Docking is fast & approximate** ○ — AutoDock Vina is an empirical scoring
+  function, not a rigorous binding free-energy method. FEP / MM-GBSA are more
+  accurate but far heavier; ΔG here is a *relative* signal, not a measured affinity.
+- **Generic PK constants** ○ — `ka`, `Vd`, `CL` are fixed physiological placeholders
+  and `Kp` is order-of-magnitude, not drug-specific. There's no clean API for human
+  PK params; allometric scaling needs animal data and structure→PK ML (ADMET-AI /
+  pkCSM) is only ~±80%. The pragmatic path is per-drug **enrichment overrides**
+  (same mechanism as `endpoint_outcome`); mechanistic `Kp` (Rodgers–Rowland) needs
+  pKa + fu on top of the logP we already compute.
+- **Covalent binders** ◑ — now **flagged** via RDKit substructure match, but still
+  *scored as reversible*, so their potency is under-represented. Proper covalent
+  scoring needs the Meeko/AutoDock reactive-docking protocol (reactive atom typing +
+  flexible target Cys) — deferred.
+  **The flag is recorded, not acted on:** `covalent_flag` is stored and surfaced, but
+  the market model does not read it, so a covalent binder's understated ΔG is not
+  compensated anywhere downstream. It is provenance for a human reading the run, not
+  an input to the score. (Sotorasib trips it, as expected.)
+- **Single structure, rigid receptor** ○ — one experimental (or AlphaFold) structure
+  per target, no ensemble or flexible-side-chain docking. Vina supports both
+  (ensemble = dock the ranked PDBe structure list; flex = split rigid/flex PDBQT);
+  deferred because they change every run's numbers.
+- **Structure choice is not pinned** ○ — the target structure is whatever PDBe/SIFTS
+  `best_structures` ranks first *at run time*, and the PDB id is recorded but never
+  fixed. That ranking can change as new structures are deposited, so a future re-run
+  of the same trial could silently dock a **different structure** and return a
+  different ΔG — the runs on record are not reproducible by construction. (Not
+  observed so far: the KRAS runs have consistently resolved to `7VVB`.) The fix is to
+  pin the resolved `pdb_id` per trial in the enrichment file and reuse it on re-runs.
+  Ranking by resolution/coverage also means the chosen structure **need not contain
+  the drug** — see the docking-box entry above.
+- **`fetch_structure` cannot read mmCIF** ○ — it downloads `…/{pdb_id}.pdb` only. Many
+  modern cryo-EM structures are **mmCIF-only** and 404 on the legacy `.pdb` endpoint
+  (typically *because* they are too large for the legacy format), so the experimental
+  path is simply unavailable for them and the run degrades to a predicted model. The
+  `pdb → cif` fallback that exists today is in the **3D viewer only**. A proper fix
+  wants a native mmCIF parser (gemmi) rather than a cif→pdb conversion, since
+  converting an oversized structure back into PDB columns risks silently truncating
+  it; `prepare_receptor_pdbqt` and `compute_docking_box` also both assume fixed-column
+  PDB text. Deferred for that reason.
+  **Consequence for the recorded CFTR run:** `9MXL` / `structure_source: RCSB` /
+  confidence 0.9 is **not reproducible from this source tree** — `9MXL.pdb` 404s, so
+  the Devin session must have worked around it inside its sandbox. That is a failed
+  result contract (the stored number did not come from this code), and it is the
+  strongest argument for pinning the sim to a hash of `simulation.py`.
+- **AlphaFold fallback URL was pinned to a stale version** ✅ — AFDB stamps a model
+  version into the filename (`…-F1-model_v6.pdb`) and bumps it over time. The code
+  hardcoded `v4`, which AFDB has since rolled past, so **every** AlphaFold fallback
+  404'd — the safety net for targets with no experimental structure was silently dead,
+  turning a graceful degradation into a hard failure. Now resolved via the AFDB API
+  (`/api/prediction/{acc}`) with a newest-first version probe as backup; the 3D viewer
+  chains `v6 → v5 → v4` for the same reason.
+- **Docking box is blind** ○ — the box spans the whole receptor rather than a known
+  pocket, so Vina searches everywhere. Pocket-focused boxing was **implemented and
+  then deliberately reverted**: centering on the largest co-crystallized ligand is
+  the standard trick, but it silently picks the *wrong* pocket when the structure's
+  ligand is a cofactor. Concretely — the KRAS structure our own pipeline selects
+  (**7VVB**) contains only **GNP**, a GTP analog, so that heuristic centered the box
+  on the **nucleotide pocket**, while sotorasib is a covalent binder of the
+  **switch-II pocket**. It still returned a plausible-looking ΔG (−8.64), which is
+  precisely what makes it dangerous. Blind docking is slower and blurrier but does
+  not quietly dock into the wrong site. The real fix is to dock against a
+  **drug-bound** structure (6OIM for KRAS/sotorasib) pinned per trial, or to add a
+  pocket-detection step (fpocket / P2Rank) — not "take the biggest HETATM".
+- **Docked pose is not returned** ○ — only the scalar ΔG comes back, so the 3D view
+  shows the **reference structure** the run docked against (with its own crystal
+  ligand), *not* the geometry Vina computed. Returning the pose was **implemented and
+  then reverted**, and the reason is the interesting part: the pose is ~8 KB of PDB
+  text, and the result contract is a *single `SIM_RESULT_JSON:` line echoed back
+  through an agent transcript*. At that size the agent stopped reproducing the line
+  verbatim — it truncated the JSON with `...` and moved the full payload into a file
+  attachment — so the line no longer parsed and a **successful run was recorded as
+  `needs_attention` with no result**. Worse, it was *intermittent*: a 7.5 KB pose came
+  through intact on an earlier run, an 8.4 KB one did not. A contract that works right
+  up until the payload grows is a trap, so the pose stays out of it.
+  **Fix:** don't ship bulk data through the transcript. Either compress it
+  (gzip + base64 takes ~8 KB of PDB to ~2.4 KB) or, better, give the session a real
+  side channel — write the pose to object storage and return a URL, keeping the line
+  small and fixed-size no matter what the physics produces.
+- **Docking runs were non-deterministic** ✅ — `run_vina` passed `seed=0`, which Vina
+  interprets as *"choose a random seed"*, so repeat runs of the same drug/target drifted
+  (ΔG −8.42 / −8.59 / −8.59 for sotorasib–KRAS). Now pinned to a fixed seed. Reproducible
+  numbers are a precondition for the result contract meaning anything.
+
+### Market model
+- **Uncalibrated, hand-tuned** ○ — deterministic and fully inspectable: the PoS
+  delta is built additively (`pos_breakdown`) and the headline number derives from
+  that breakdown, so they can never disagree. But the weights (0.5 / 0.2 / 0.15…)
+  and thresholds are magic numbers. The real fix is **backtesting** against
+  historical biotech readouts and actual next-day price moves to fit them.
+- **Missed-trial asymmetry** ✅ — fixed. Modifiers are now applied by meaning
+  (efficacy corroboration only strengthens a win; tox is always a downside risk)
+  rather than mirrored by the readout sign, which previously let a tox flag reduce
+  the downside of a *failed* trial. The met-trial path is unchanged.
+- **No phase weighting** ○ — a Phase 1 pass shouldn't move a stock like a Phase 3;
+  the base should scale by phase (`{P1:0.4, P2:0.7, P3:1.0}` ≈ 1 line). Deliberately
+  left out this round to avoid changing the demo's numbers.
+- **Naive competitor read-through** ○ — competitors are assumed to move opposite the
+  sponsor, one magnitude bucket softer. Real read-through depends on mechanism /
+  target overlap and modality, not just "is a competitor."
+- **`endpoint_outcome` not auto-derived** ○ — met/missed is supplied via enrichment
+  (`watchlist.json`), not parsed from CT.gov. An LLM classifier over the results
+  section / press releases would close the loop.
 
 ---
 

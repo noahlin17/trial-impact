@@ -97,7 +97,6 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
             ],
         }
 
-    direction = 1.0 if base >= 0 else -1.0
     kd = sim.get("kd_nM")
     dg = sim.get("binding_affinity_kcal_mol")
 
@@ -118,11 +117,17 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
 
     tox_raw = -0.15 if sim.get("tox_flag") else 0.0
 
-    # Modifiers push in the direction of the clinical readout, then the whole signal
-    # is scaled by the simulation's confidence.
-    binding = direction * binding_raw
-    occupancy = direction * occ_raw
-    tox = direction * tox_raw
+    # Apply modifiers by *meaning*, not by mirroring the readout sign. (The old code
+    # multiplied every modifier by direction=-1 for a miss, which let a tox flag
+    # perversely *reduce* the downside of a failed trial.)
+    #   - Efficacy corroboration (binding, occupancy) only strengthens a WIN;
+    #     molecular potency doesn't rescue a missed clinical endpoint, so it is
+    #     dropped for a miss. The met path is therefore byte-identical to before.
+    #   - Tox is always a risk term (negative) — for wins and misses alike.
+    is_win = base > 0
+    binding = binding_raw if is_win else 0.0
+    occupancy = occ_raw if is_win else 0.0
+    tox = tox_raw
     subtotal = base + binding + occupancy + tox
 
     confidence = sim.get("confidence") or 0.7
