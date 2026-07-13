@@ -19,16 +19,16 @@ ClinicalTrials.gov API v2 ──poll──▶  ctgov-watcher (../ctgov-watcher)
                                        │  diff records, detect material change
                                        ▼  POST /webhook/trial-update  (HMAC-signed)
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                         Trial Impact service (Flask)                       │
-│  TRIGGER   POST /webhook/trial-update                                       │
-│     verify HMAC → resolve tickers (sponsor + competitors)                  │
-│                 → build sim prompt → Devin: POST /sessions ────────────────┼─▶ Devin session
-│                 → SQLite: insert event (queued)                            │   runs app/simulation.py
-│  RECONCILE POST /poll                                                      │   (docking + PK/PD)
-│     GET Devin session → extract SIM_RESULT_JSON ◀──────────────────────────┼── ΔG, Kd, occupancy
-│     → market_model.assess → price calls + commentary                       │
-│     → SQLite update → Slack/email alert (once) on market-movers            │
-│  OBSERVE   GET /status  → dashboard + JSON                                  │
+│                         Trial Impact service (Flask)                     │
+│  TRIGGER   POST /webhook/trial-update                                    │
+│     verify HMAC → resolve tickers (sponsor + competitors)                │
+│                 → build sim prompt → Devin: POST /sessions ──────────────┼─▶ Devin session
+│                 → SQLite: insert event (queued)                          │   runs app/simulation.py
+│  RECONCILE POST /poll                                                    │   (docking + PK/PD)
+│     GET Devin session → extract SIM_RESULT_JSON ◀────────────────────────┼── ΔG, Kd, occupancy
+│     → market_model.assess → price calls + commentary                     │
+│     → SQLite update → Slack/email alert (once) on market-movers          │
+│  OBSERVE   GET /status  → dashboard + JSON                               │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
