@@ -1,14 +1,19 @@
 # Trial Impact
 
-An event-driven system that runs structure-based chemistry on clinical-trial readouts and
-produces a quantitative estimate of target engagement, rather than a categorical read on the
-result.
+An event-driven system that runs structure-based chemistry on **preclinical / Phase 1**
+clinical-trial events and produces a quantitative estimate of target engagement, rather than a
+categorical read on the result.
 
-When a trial posts results, the service opens an isolated [Devin](https://devin.ai) session
-that performs protein–ligand docking (AutoDock Vina) and a PK/PD solve against the drug and
-its target, and returns a binding affinity, an implied Kd and a derived target occupancy —
-computed from the structure and the chemistry rather than from the sponsor's description of
-the result.
+The system is built around a single question — *does the molecule engage its target at a tolerated
+exposure?* — which is a preclinical / Phase 1 question by construction. When a trial event arrives,
+the service opens an isolated [Devin](https://devin.ai) session that performs protein–ligand docking
+(AutoDock Vina) and a PK/PD solve against the drug and its target, and returns a binding affinity, an
+implied Kd and a derived target occupancy — computed from the structure and the chemistry rather than
+from the sponsor's description of the result.
+
+Because binding is a fixed molecular property that is largely resolved by the end of Phase 1, the
+actionable scope is **preclinical / Phase 1**; later-phase events are treated as educational
+illustrations (see [Trial phase](#trial-phase--the-preclinical--phase-1-scope)).
 
 > **Not investment advice.** Output is an automated research signal for informational
 > purposes only; a disclaimer is attached to each assessment.
@@ -187,8 +192,15 @@ described above; it shows that the pipeline runs end to end, and it is not a tra
 
 | Trial | Target × Drug | Structure (route) | ΔG (kcal/mol) | Kd | Target occ. ‡ | Flags | Model call |
 |-------|---------------|-----------|---------------|----|-----------|-----|-----------|
-| Phase 1 | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | **−7.202 ± 0.187** | 8412 nM | 31.0% ‡ | ⚠︎ tox ‡ · covalent | ▲ AMGN moderate · ▼ REGN/NVS |
-| Phase 3 | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | −7.404 ± 0.007 † | 6061 nM | 2.06% ‡ | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
+| Phase 1 — **in scope** | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | **−7.202 ± 0.187** | 8412 nM | 31.0% ‡ | ⚠︎ tox ‡ · covalent | ▲ AMGN moderate · ▼ REGN/NVS |
+| Phase 3 — *educational only* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | −7.404 ± 0.007 † | 6061 nM | 2.06% ‡ | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
+
+**Only the Phase 1 row is in the actionable scope** — this is the tier the system is built for. The
+Phase 3 CFTR × ivacaftor run is included purely as an *educational* illustration of the pipeline on a
+well-characterized drug; it is not a tradeable signal. As set out in
+[Trial phase — the preclinical / Phase 1 scope](#trial-phase--the-preclinical--phase-1-scope),
+binding is a molecular property fixed from the start and largely established by end of Phase 1, so a
+Phase 2/3 event adds efficacy / statistical evidence the physics does not model.
 
 Every number in both rows reproduces from the committed source: Kd, Cmax, free-drug occupancy
 and both PoS deltas fall out of the mean ΔG deterministically (verified by two independent full
@@ -288,6 +300,29 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 
 Genuine per-drug pharmacology needs enrichment overrides (`fu`, `Vd`, `CL` per drug — the
 same mechanism as `endpoint_outcome`) or a structure→PK model.
+
+### Trial phase — the preclinical / Phase 1 scope
+
+The pipeline is scoped to **preclinical / Phase 1** by construction, because that is the only phase
+at which its one question carries new information. The pipeline answers *does the molecule engage its
+target at a tolerated exposure?* — and that is a preclinical / Phase 1 question:
+
+- Binding affinity is a fixed property of the molecule and structure: **ΔG does not change between
+  phases.** Target engagement is largely **established by the end of Phase 1**, through human PK,
+  tolerated dose and (increasingly) direct occupancy readouts.
+- Phase 2 and Phase 3 ask questions the physics does not touch: P2 is efficacy (does engaging the
+  target help patients — a target-validation / disease-biology question); P3 is whether that effect
+  replicates at scale with adequate statistics and safety. By then engagement is settled and priced,
+  so a docking number is **redundant** rather than informative.
+
+So the physics carries the most incremental information exactly when clinical uncertainty about
+engagement is highest — preclinical / Phase 1 — which is why the system targets that tier and treats
+any Phase 2/3 event as an illustration of the pipeline rather than a tradeable signal. See
+[THESIS.md §3.3](THESIS.md).
+
+Since the scope is a single tier, **the market model is phase-agnostic by design** — there is no
+phase weighting. Phase determines only *whether* an event is actionable (Phase 1) or educational
+(Phase 2/3); it never scales the call.
 
 **The practical upshot.** The *binding* half of the pipeline is defensible today for a
 **reversible, non-covalent small molecule against a small globular protein with an

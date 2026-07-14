@@ -10,6 +10,14 @@ readout — alerts to Slack/email while surfacing everything on a dashboard.
 > **Not investment advice.** Output is an automated research signal for
 > informational purposes only. A disclaimer is attached to every assessment.
 
+> **Scope — preclinical / Phase 1 only.** The actionable tier is preclinical / Phase 1; Phase 2/3
+> runs are educational illustrations, not tradeable signals. The physics answers whether a molecule
+> *engages its target* — a fixed molecular property largely proven out by end of Phase 1 — so there
+> is rarely a reason to run the chemistry on a Phase 2/3 trial, where the open questions (efficacy,
+> statistics, safety at scale) are ones the pipeline does not model. See the root
+> [README](../README.md#trial-phase--scoped-to-preclinical--phase-1) and
+> [THESIS.md §3.3](../THESIS.md).
+
 ---
 
 ## Architecture
