@@ -36,6 +36,7 @@ import argparse
 import json
 import math
 import os
+import statistics
 import sys
 import tempfile
 from dataclasses import asdict, dataclass, field
@@ -69,6 +70,13 @@ class SimResult:
     tissue: str
     dose_mg: float
     binding_affinity_kcal_mol: float | None = None
+    # Docking is stochastic: the same input drifts run-to-run unless the sampler's seed
+    # is pinned. Reporting a single seed to three decimals overstates precision, so the
+    # docking estimator now docks across several seeds and reports the mean ΔG here plus
+    # its standard deviation below. ``None`` when a single draw was taken (or for the
+    # structure-free baseline, which does not dock and has no sampling noise).
+    binding_affinity_sd_kcal_mol: float | None = None
+    replicates: int | None = None
     kd_nM: float | None = None
     cmax_ng_ml: float | None = None
     auc_ng_h_ml: float | None = None
@@ -377,9 +385,22 @@ def compute_docking_box(pdb_path: str) -> tuple[list[float], list[float]]:
 # if the source rolls a new seed each time.
 _VINA_SEED = 42
 
+# Number of seeds docked per run. A single pinned seed is reproducible but its ΔG still
+# lands somewhere in the sampler's run-to-run spread, so reporting it to three decimals
+# claims a precision the method does not have. Docking a small fixed set of seeds lets
+# the pipeline report a mean ± sd instead of one draw (see issue #11). The seeds are
+# derived deterministically from _VINA_SEED, so the *set* — and therefore the mean — is
+# still reproducible from source.
+_VINA_REPLICATES = 3
 
-def run_vina(receptor_pdbqt: str, ligand_pdbqt: str, box) -> float:
-    """Dock and return the best pose's binding free energy ΔG (kcal/mol).
+
+def _derive_seeds(replicates: int) -> list[int]:
+    """Deterministic seed set for the replicate docks (reproducible from source)."""
+    return [_VINA_SEED + i for i in range(max(1, replicates))]
+
+
+def run_vina(receptor_pdbqt: str, ligand_pdbqt: str, box, seed: int = _VINA_SEED) -> float:
+    """Dock once at ``seed`` and return the best pose's binding free energy ΔG (kcal/mol).
 
     Only the scalar ΔG is returned. The top pose is *not* transported back: it is ~8 KB
     of PDB text, and embedding it in the single-line SIM_RESULT_JSON contract made the
@@ -389,12 +410,51 @@ def run_vina(receptor_pdbqt: str, ligand_pdbqt: str, box) -> float:
     from vina import Vina  # lazy
 
     center, size = box
-    v = Vina(sf_name="vina", cpu=os.cpu_count() or 1, seed=_VINA_SEED)
+    v = Vina(sf_name="vina", cpu=os.cpu_count() or 1, seed=seed)
     v.set_receptor(receptor_pdbqt)
     v.set_ligand_from_file(ligand_pdbqt)
     v.compute_vina_maps(center=center, box_size=size)
     v.dock(exhaustiveness=8, n_poses=5)
     return float(v.energies(n_poses=1)[0][0])
+
+
+def dock_replicates(
+    receptor_pdbqt: str, ligand_pdbqt: str, box, replicates: int = _VINA_REPLICATES
+) -> dict[str, Any]:
+    """Dock across ``replicates`` seeds and summarise the ΔG distribution.
+
+    Returns the mean ΔG (the point estimate), its standard deviation (sampling noise),
+    the seed set, and the per-seed energies — see :func:`summarize_dg`.
+    """
+    seeds = _derive_seeds(replicates)
+    energies = [run_vina(receptor_pdbqt, ligand_pdbqt, box, seed=s) for s in seeds]
+    summary = summarize_dg(energies)
+    summary["seeds"] = seeds
+    return summary
+
+
+def summarize_dg(energies: list[float]) -> dict[str, Any]:
+    """Mean / sd / n of a list of per-seed ΔG values (pure; unit-tested without Vina)."""
+    if not energies:
+        raise ValueError("no docking energies to summarise")
+    n = len(energies)
+    return {
+        "dg_mean": statistics.fmean(energies),
+        # Sample sd needs ≥2 points; a single draw has no measurable spread.
+        "dg_sd": statistics.stdev(energies) if n > 1 else None,
+        "n": n,
+        "energies": [round(e, 3) for e in energies],
+    }
+
+
+# Confidence penalty for docking noise: a tight ΔG spread costs nothing, but a spread
+# approaching ~0.4 kcal/mol (≈ 2× the drift seen for sotorasib pre-pinning) halves the
+# best-case structure bonus. Capped so noise alone cannot drive confidence to the floor.
+def _dg_noise_penalty(dg_sd: float | None) -> float:
+    """Map a ΔG standard deviation (kcal/mol) to a confidence penalty in [0, 0.2]."""
+    if not dg_sd:
+        return 0.0
+    return min(0.2, 0.5 * dg_sd)
 
 
 def kd_from_dg(dg_kcal_mol: float) -> float:
@@ -602,10 +662,24 @@ def run_simulation(
                 "mode": "blind",
             }
 
-            dg = run_vina(receptor_pdbqt, ligand_pdbqt, box)
+            # Dock across a fixed seed set and report the mean ΔG ± sd, not one draw.
+            # The replicate count is part of the model definition (bumping it would bump
+            # the estimator version), so it is a pipeline constant, not a caller knob.
+            dock = dock_replicates(receptor_pdbqt, ligand_pdbqt, box)
+            dg = dock["dg_mean"]
             result.binding_affinity_kcal_mol = round(dg, 3)
+            result.binding_affinity_sd_kcal_mol = (
+                round(dock["dg_sd"], 3) if dock["dg_sd"] is not None else None
+            )
+            result.replicates = dock["n"]
+            result.provenance["vina_seeds"] = dock["seeds"]
+            result.provenance["dg_replicates"] = dock["energies"]
             result.kd_nM = round(kd_from_dg(dg), 3)
-            _log(f"ΔG = {dg:.2f} kcal/mol  →  Kd = {result.kd_nM:.1f} nM")
+            sd_txt = "" if dock["dg_sd"] is None else f" ± {dock['dg_sd']:.2f}"
+            _log(
+                f"ΔG = {dg:.2f}{sd_txt} kcal/mol (n={dock['n']})  →  "
+                f"Kd = {result.kd_nM:.1f} nM"
+            )
 
             # Free-drug occupancy: only the unbound fraction (fu) engages the target.
             fu_value, fu_source = resolve_fu(drug, fu)
@@ -631,9 +705,13 @@ def run_simulation(
             )
             result.tox_flag = violations >= 2
 
-            # Confidence: experimental structure > predicted; full run > fallbacks.
+            # Confidence: experimental structure > predicted; full run > fallbacks;
+            # and noisier docking (larger ΔG spread across seeds) is less trustworthy.
             base = 0.9 if prov["structure_source"] == "RCSB" else 0.7
-            result.confidence = round(max(0.3, base - 0.05 * len(result.warnings)), 3)
+            noise_penalty = _dg_noise_penalty(result.binding_affinity_sd_kcal_mol)
+            result.confidence = round(
+                max(0.3, base - 0.05 * len(result.warnings) - noise_penalty), 3
+            )
     except Exception as exc:  # noqa: BLE001 — surface any pipeline failure as data
         result.error = f"{type(exc).__name__}: {exc}"
         _log(f"simulation failed: {result.error}")

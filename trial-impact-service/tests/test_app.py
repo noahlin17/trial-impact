@@ -446,6 +446,46 @@ def test_fu_correction_flips_the_market_call():
     assert market_model._magnitude(abs(free["final"])) == "moderate"
 
 
+# --- multi-seed docking: mean +/- sd instead of one draw --------------------- #
+def test_summarize_dg_mean_sd_and_single_draw():
+    from app.simulation import summarize_dg
+
+    s = summarize_dg([-8.4, -8.6, -8.8])
+    assert round(s["dg_mean"], 3) == -8.6
+    assert s["dg_sd"] is not None and s["dg_sd"] > 0
+    assert s["n"] == 3 and s["energies"] == [-8.4, -8.6, -8.8]
+    # A single draw has no measurable spread.
+    assert summarize_dg([-8.6])["dg_sd"] is None
+    with pytest.raises(ValueError):
+        summarize_dg([])
+
+
+def test_derive_seeds_deterministic():
+    from app.simulation import _derive_seeds
+
+    assert _derive_seeds(3) == [42, 43, 44]  # reproducible from _VINA_SEED
+    assert _derive_seeds(0) == [42]  # never docks zero times
+
+
+def test_dg_noise_penalty_is_bounded_and_monotone():
+    from app.simulation import _dg_noise_penalty
+
+    assert _dg_noise_penalty(None) == 0.0
+    assert _dg_noise_penalty(0.0) == 0.0
+    assert _dg_noise_penalty(0.2) == pytest.approx(0.1)
+    assert _dg_noise_penalty(10.0) == 0.2  # capped
+
+
+def test_rationale_reports_dg_uncertainty():
+    ev = {"nct_id": "NCT-X", "endpoint_outcome": "met", "target": "KRAS"}
+    with_sd = {"binding_affinity_kcal_mol": -8.6, "binding_affinity_sd_kcal_mol": 0.12,
+               "replicates": 3, "kd_nM": 862.6, "target_occupancy_pct": 81.0}
+    without = {"binding_affinity_kcal_mol": -8.6, "kd_nM": 862.6,
+               "target_occupancy_pct": 81.0}
+    assert "-8.6±0.12 (n=3)" in market_model._sponsor_rationale(ev, with_sd, 0.475)
+    assert "±" not in market_model._sponsor_rationale(ev, without, 0.475)
+
+
 # --- covalent-warhead detection ---------------------------------------------- #
 # SMILES inlined (no network). Skipped unless RDKit is present — it ships in
 # requirements-sim.txt and normally runs inside the Devin sandbox, not the web tier.
