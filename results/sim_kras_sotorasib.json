@@ -27,21 +27,18 @@
     "drug": "sotorasib",
     "tissue": "tumor",
     "dose_mg": 960.0,
-    "binding_affinity_kcal_mol": -8.336,
-    "binding_affinity_sd_kcal_mol": 0.01,
+    "binding_affinity_kcal_mol": -7.202,
+    "binding_affinity_sd_kcal_mol": 0.187,
     "replicates": 3,
-    "kd_nM": 1336.854,
+    "kd_nM": 8412.324,
     "cmax_ng_ml": 19259.451,
     "auc_ng_h_ml": 143390.88,
-    "target_occupancy_pct": 73.87,
+    "target_occupancy_pct": 31.0,
     "tox_flag": true,
     "covalent_flag": true,
-    "confidence": 0.895,
+    "confidence": 0.806,
     "provenance": {
       "uniprot": "P01116",
-      "structure_source": "RCSB",
-      "pdb_id": "7VVB",
-      "structure_format": "pdb",
       "smiles": "C[C@H]1CN(CCN1C2=NC(=O)N(C3=NC(=C(C=C32)F)C4=C(C=CC=C4F)O)C5=C(C=CN=C5C(C)C)C)C(=O)C=C",
       "descriptors": {
         "mw": 560.605,
@@ -50,54 +47,63 @@
         "hba": 6,
         "tpsa": 102.23
       },
+      "structure_source": "RCSB",
+      "pdb_id": "6OIM",
+      "structure_format": "pdb",
       "vina_seeds": [
         42,
         43,
         44
       ],
       "dg_replicates": [
-        -8.346,
-        -8.335,
-        -8.327
+        -7.118,
+        -7.417,
+        -7.072
       ],
       "fu": 0.11,
       "fu_source": "curated (plasma protein binding)"
     },
     "docking_box": {
       "center": [
-        -19.192,
-        40.956,
-        -3.009
+        -5.432,
+        -4.545,
+        1.288
       ],
       "size": [
-        40.0,
-        40.0,
-        40.0
+        22.0,
+        22.0,
+        22.0
       ],
-      "mode": "blind"
+      "mode": "covalent-tethered (curated holo)",
+      "target_class": "KRAS G12C (covalent, switch-II pocket)",
+      "reactive_residue": "A:CYS:12",
+      "tether": {
+        "warhead": "acrylamide/Michael acceptor",
+        "smarts": "C=CC(=O)N"
+      }
     },
     "warnings": [],
     "error": null,
-    "estimator": "vina-docking-pkpd@1",
+    "estimator": "vina-docking-pkpd@2",
     "code_patched": false,
     "patch_summary": null
   },
-  "commentary": "Trial NCT-REAL-0001 \u2014 Amgen (sotorasib / KRAS): endpoint met.\nModelled probability-of-success delta: +0.47.\n  \u25b2 AMGN (Amgen, sponsor): up / strong\n  \u25bc REGN (Regeneron, competitor): down / moderate\n  \u25bc NVS (Novartis, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
+  "commentary": "Trial NCT-REAL-0001 \u2014 Amgen (sotorasib / KRAS): endpoint met.\nModelled probability-of-success delta: +0.32.\n  \u25b2 AMGN (Amgen, sponsor): up / moderate\n  \u25bc REGN (Regeneron, competitor): down / slight\n  \u25bc NVS (Novartis, competitor): down / slight\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
   "price_calls": [
     {
       "ticker": "AMGN",
       "name": "Amgen",
       "role": "sponsor",
       "direction": "up",
-      "magnitude": "strong",
-      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking \u0394G -8.336\u00b10.01 (n=3) kcal/mol (Kd 1336.854 nM). Peak target occupancy 73.87%. Structural tox flag raised. PoS delta +0.47."
+      "magnitude": "moderate",
+      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking \u0394G -7.202\u00b10.187 (n=3) kcal/mol (Kd 8412.324 nM). Peak target occupancy 31.0%. Structural tox flag raised. PoS delta +0.32."
     },
     {
       "ticker": "REGN",
       "name": "Regeneron",
       "role": "competitor",
       "direction": "down",
-      "magnitude": "moderate",
+      "magnitude": "slight",
       "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals."
     },
     {
@@ -105,12 +111,12 @@
       "name": "Novartis",
       "role": "competitor",
       "direction": "down",
-      "magnitude": "moderate",
+      "magnitude": "slight",
       "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals."
     }
   ],
   "created_at": "2026-07-14T05:49:41+00:00",
-  "updated_at": "2026-07-14T05:49:41+00:00",
+  "updated_at": "2026-07-14T07:41:51+00:00",
   "error_message": null,
   "alert_sent": 1
 }

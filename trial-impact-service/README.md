@@ -70,7 +70,7 @@ result contract, reproducibility, corpus — is model-agnostic. Two ship today:
 
 | Estimator id | What it is |
 |---|---|
-| `vina-docking-pkpd@1` | The real structure-based docking + PK/PD pipeline (the default). |
+| `vina-docking-pkpd@2` | The real structure-based docking + PK/PD pipeline (the default). Bumped from `@1` when pocket-aware routing changed the ΔG numbers. |
 | `ligand-efficiency-baseline@1` | A deliberately naive, **structure-free control**: ΔG ≈ 0.3 kcal/mol × heavy-atom count, run through the same PK/PD model. Not a physical model — a floor the docking must beat to justify its cost. Reported at low confidence and flagged in `warnings`. |
 
 The **comparison is the product**, not any single model's number: `/analysis` shows an
@@ -243,6 +243,20 @@ right caveats. **Nothing here is investment advice.** (✅ = addressed; ◑ = pa
 addressed; ○ = documented, future work.)
 
 ### Scope & chemistry
+- **The "high-accuracy universe" is routed by chemistry/target class, not drug name** ◑ —
+  `app/binding_site.select_binding_site` classifies each run and boxes it accordingly, with no
+  per-drug branching, so **net-new drugs route themselves**. The universe we now dock *more
+  accurately than the old blind box* is: (a) **reversible** drugs with any experimental
+  co-crystal — curated per target class or auto-discovered by RCSB graph-relaxed chemical search
+  — boxed on the real bound ligand; and (b) **covalent** drugs whose warhead is a tetherable
+  Michael acceptor **and** whose target is a curated covalent class (KRAS G12C, EGFR, BTK),
+  tethered to the geometrically-detected reactive cysteine. Everything else degrades to fpocket
+  then the blind centroid box and **says which tier it took** in `docking_box.mode`. The routing
+  ladder, the covalent lower-bound caveat, and the fallback limitations are detailed under the
+  **Docking box** and **Covalent binders** entries below. A key structural constraint: a covalent
+  co-crystal ligand is the *reacted adduct*, so its chemical identity ≠ the free drug's — covalent
+  targets therefore key off the curated class + structure-derived reactive residue, not ligand
+  matching.
 - **Small molecules only** ○ — the docking path models small-molecule drugs;
   biologics/antibodies can't be docked and are out of scope.
 - **Docking is fast & approximate** ○ — AutoDock Vina is an empirical scoring
@@ -259,16 +273,19 @@ addressed; ○ = documented, future work.)
   concentration — they are total-drug quantities. Both estimators share the same `fu`-aware
   PK/PD, and legacy artifacts without a stored `fu` reconstruct at `fu = 1.0`.
 
-  | Run | Total-drug occupancy (old) | Free-drug occupancy (now) |
+  | Run | Total-drug occupancy (old) | Free-drug + pocket-aware occupancy (now) |
   |---|---|---|
-  | KRAS × sotorasib (fu 0.11, ~89% bound) | 97.6% | **73.9%** |
-  | CFTR × ivacaftor (fu 0.01, >99% bound) | 94.5% | **6.7%** |
+  | KRAS × sotorasib (fu 0.11, ~89% bound) | 97.6% | **31.0%** |
+  | CFTR × ivacaftor (fu 0.01, >99% bound) | 94.5% | **2.06%** |
 
-  Occupancy feeds `pos_breakdown`, so ivacaftor now crosses the `occ < 30` branch: its **+0.15
+  The **now** column reflects *both* the free-drug term and the pocket-aware boxing below (KRAS
+  docks the switch-II pocket of 6OIM; CFTR the ivacaftor site of 6O2P), so it differs from the
+  fu-only figures (73.9% / 6.7%) shipped before routing — the new pocket ΔGs are weaker than the
+  old blind-slab ΔGs, which lowers occupancy further.
+  Occupancy feeds `pos_breakdown`, so ivacaftor still crosses the `occ < 30` branch: its **+0.15
   engagement bonus becomes a −0.10 penalty**. The VRTX call nonetheless stays `strong` in the
-  regenerated corpus — because native mmCIF support (below) raised CFTR's confidence 0.7 → 0.874
-  and the resulting PoS (0.37) still clears the `strong` threshold — so this fix changed the
-  occupancy contribution's *sign*, not the headline magnitude this time.
+  regenerated corpus (PoS delta **+0.38**), because the endpoint-met and confidence terms clear
+  the threshold — so this fix changed the occupancy contribution's *sign*, not the headline call.
   **Caveat:** the curated `fu` table is small (a per-drug enrichment path, same mechanism as
   `endpoint_outcome`, is the general fix), and the free-drug correction does **not** repair the
   generic PK model (single-dose, one-compartment, F ≈ 1) it sits on top of.
@@ -302,27 +319,37 @@ addressed; ○ = documented, future work.)
   pkCSM) is only ~±80%. The pragmatic path is per-drug **enrichment overrides**
   (same mechanism as `endpoint_outcome`); mechanistic `Kp` (Rodgers–Rowland) needs
   pKa + fu on top of the logP we already compute.
-- **Covalent binders** ◑ — now **flagged** via RDKit substructure match, but still
-  *scored as reversible*, so their potency is under-represented. Proper covalent
-  scoring needs the Meeko/AutoDock reactive-docking protocol (reactive atom typing +
-  flexible target Cys) — deferred.
-  **The flag is recorded, not acted on:** `covalent_flag` is stored and surfaced, but
-  the market model does not read it, so a covalent binder's understated ΔG is not
-  compensated anywhere downstream. It is provenance for a human reading the run, not
-  an input to the score. (Sotorasib trips it, as expected.)
+- **Covalent binders are tethered to the right pocket, but still scored reversibly** ◑ —
+  a flagged covalent warhead (RDKit SMARTS) against a **curated covalent target class**
+  (KRAS G12C, EGFR, BTK) is now routed through a covalent-tethered box. `app/binding_site.py`
+  finds the class's reactive cysteine **geometrically** — the Cys Sγ within ~2.5 Å of the bound
+  ligand in the curated holo structure, *not* a hardcoded residue number — Meeko tethers the
+  warhead to it (`mk_prepare_ligand --tether_smarts`), and Vina docks in a tight box centered on
+  that residue (`docking_box.mode: "covalent-tethered (curated holo)"`, with the reactive residue
+  and warhead in provenance). This fixes the **pocket** (decisive for KRAS's cryptic switch-II
+  site) and seeds a covalent-geometry pose.
+  **What it is NOT:** the Vina score is still the **reversible** scoring function — no covalent
+  bond enthalpy is added — so this is a pocket-correct, geometry-tethered *lower bound*, not true
+  reactive scoring. The Python `vina` bindings cannot consume Meeko's flexible-residue covalent
+  output (they reject its `BEGIN_RES`/`END_RES` records and expect a `TORSDOF` line, which the
+  prep strips/adds), so full reactive/flexible-residue docking needs AutoDock-GPU — not on the
+  conda channels, deferred. Only **Michael-acceptor/acrylamide** warheads are tetherable today;
+  other detected warheads and non-curated targets fall back to reversible docking **with a
+  warning**. `covalent_flag` is still not read by the market model, so KRAS's understated ΔG is
+  not compensated downstream.
 - **Single structure, rigid receptor** ○ — one experimental (or AlphaFold) structure
   per target, no ensemble or flexible-side-chain docking. Vina supports both
   (ensemble = dock the ranked PDBe structure list; flex = split rigid/flex PDBQT);
   deferred because they change every run's numbers.
-- **Structure choice is not pinned** ○ — the target structure is whatever PDBe/SIFTS
-  `best_structures` ranks first *at run time*, and the PDB id is recorded but never
-  fixed. That ranking can change as new structures are deposited, so a future re-run
-  of the same trial could silently dock a **different structure** and return a
-  different ΔG — the runs on record are not reproducible by construction. (Not
-  observed so far: the KRAS runs have consistently resolved to `7VVB`.) The fix is to
-  pin the resolved `pdb_id` per trial in the enrichment file and reuse it on re-runs.
-  Ranking by resolution/coverage also means the chosen structure **need not contain
-  the drug** — see the docking-box entry above.
+- **Structure is pinned for curated classes / discovered holo, else run-time-ranked** ◑ —
+  curated target classes pin a drug-bound holo structure (KRAS G12C → `6OIM`, CFTR potentiator →
+  `6O2P`), and reversible drugs can auto-discover a co-crystal by RCSB graph-relaxed chemical
+  search, so those runs dock a fixed, drug-relevant structure and are reproducible by
+  construction. Uncurated/undiscovered targets still fall back to PDBe/SIFTS `best_structures`
+  ranked *at run time* (recorded, not fixed), so a future re-run could dock a different structure
+  and return a different ΔG. **Discovery caveat:** it currently takes the first chemical-search
+  hit rather than ranking candidates by resolution/method/coverage; provenance records the chosen
+  entry so the choice is auditable.
 - **`fetch_structure` reads mmCIF natively** ✅ — it downloads `…/{pdb_id}.pdb` first and, on a
   404, **falls back to `…/{pdb_id}.cif` and converts it with `gemmi`** (`_cif_to_pdb`:
   `read_structure` → `setup_entities` → `write_pdb`) *before* degrading to AlphaFold. Many modern
@@ -331,15 +358,13 @@ addressed; ○ = documented, future work.)
   `provenance.structure_format` records `"pdb"` vs `"mmCIF"`. Experimental structures are still
   preferred over AlphaFold; AlphaFold remains the fallback only when RCSB has neither a PDB nor an
   mmCIF file.
-  **Consequence for the recorded CFTR run:** `9MXL` is mmCIF-only (`9MXL.pdb` 404s), so it used
-  to degrade to the AlphaFold model at confidence 0.7. It now converts via gemmi and docks the
-  **real 9MXL cryo-EM structure at confidence 0.874** (`structure_source: RCSB`,
-  `structure_format: mmCIF`) — reproducible from this source tree.
-  **Caveat:** this fixes *which* structure is docked, not *where* the box sits — 9MXL still only
-  gets ~26% box coverage (see the docking-box entry below). `gemmi.write_pdb` re-emits
-  fixed-column PDB text, which `prepare_receptor_pdbqt` and `compute_docking_box` consume as
-  before; a very large complex that overflows PDB columns would still need a mmCIF-native receptor
-  path, which is future work.
+  **Consequence for the recorded runs:** the native-mmCIF path stays available for any target
+  whose only structure is mmCIF-only, but the two published runs no longer exercise it — both now
+  pin a curated drug-bound holo (`6OIM`, `6O2P`) fetched as legacy `.pdb`. (The previous CFTR pin
+  `9MXL` actually contained **(R)-BPO-27, not ivacaftor**, so its box was never near the ivacaftor
+  site; `6O2P` is the real ivacaftor–CFTR complex, ligand code `VX7`.) `gemmi.write_pdb` re-emits
+  fixed-column PDB text; a very large complex that overflows PDB columns would still need a
+  mmCIF-native receptor path, which is future work.
 - **AlphaFold fallback URL was pinned to a stale version** ✅ — AFDB stamps a model
   version into the filename (`…-F1-model_v6.pdb`) and bumps it over time. The code
   hardcoded `v4`, which AFDB has since rolled past, so **every** AlphaFold fallback
@@ -347,49 +372,42 @@ addressed; ○ = documented, future work.)
   turning a graceful degradation into a hard failure. Now resolved via the AFDB API
   (`/api/prediction/{acc}`) with a newest-first version probe as backup; the 3D viewer
   chains `v6 → v5 → v4` for the same reason.
-- **Docking box does not cover the receptor** ○ — **the most serious open defect in the
-  physics; [issue #2](../README.md#known-issues).** Two boxing strategies have now failed
-  for the same underlying reason: neither one knows where the pocket is.
-  Pocket-focused boxing was **implemented and then deliberately reverted**. Centering on
-  the largest co-crystallized ligand is the standard trick, but it silently picks the
-  *wrong* pocket when the structure's ligand is a cofactor: the KRAS structure our own
-  pipeline selects (**7VVB**) contains only **GNP**, a GTP analog, so that heuristic
-  centered the box on the **nucleotide pocket**, while sotorasib binds the **switch-II
-  pocket**. It still returned a plausible-looking ΔG (−8.64).
-  The blind box that replaced it has a subtler version of the same bug, which I only
-  found by measuring it. `compute_docking_box` sizes the box `min(extent + 8 Å, 40 Å)`
-  but keeps it **centered on the centroid**, so once a receptor exceeds ~40 Å the box
-  stops covering it and Vina searches a central *slab*. The cap is binding in both
-  published runs — both artifacts record `size: [40, 40, 40]`. Measured with
-  `python verify_docking_box.py`:
+- **Docking box is routed to the pocket, with a disclosed fallback ladder** ◑ —
+  [issue #2](../README.md#known-issues). The blind, centroid-centered box (which covered only
+  ~26% of CFTR and, once a receptor exceeded the 40 Å cap, silently searched a central *slab*)
+  is **no longer the default**. `app/binding_site.select_binding_site` routes every run through
+  an explicit ladder and records the tier in `docking_box.mode`:
 
-  | Structure | Real extent | Atoms inside the 40 Å box |
+  | Tier | `mode` | Box comes from |
   |---|---|---|
-  | KRAS `7VVB` (experimental) | 56 × 55 × 44 Å | **~80%** |
-  | CFTR `9MXL` (experimental cryo-EM, mmCIF) | 67 × 70 × 135 Å (docked chain) | **~26%** |
+  | 1 | `covalent-tethered (curated holo)` | reactive Cys of a curated covalent class (see covalent entry) |
+  | 2 | `holo-ligand (curated)` | bound co-crystal ligand in a curated drug-bound structure |
+  | 3 | `holo-ligand (discovered)` | co-crystal ligand in an RCSB graph-relaxed chemical-search hit |
+  | 4 | `fpocket` | top-ranked geometric pocket (fpocket) |
+  | 5 | `blind` | legacy centroid box — last resort |
 
-  CFTR is a 1480-residue membrane protein and ivacaftor binds at the TM1/TM6 interface,
-  not the centroid — so **that ΔG is a dock into an arbitrary sub-volume**, and the
-  earlier claim in this file that blind docking "does not quietly dock into the wrong
-  site" was simply false. It does. It just does it less obviously than the ligand-centered
-  box did, which is worse, not better.
-  **Mitigated, not fixed:** the code now logs a warning when the cap binds, and
-  `test_docking_box_stops_covering_the_receptor_once_the_40A_cap_binds` pins the
-  behaviour. (The test it replaced asserted coverage on a ~10 Å toy receptor — the one input
-  where the cap can never trigger — so it passed while the property it claimed to check was
-  false in production.)
-  **The real fix** is cavity detection (fpocket / P2Rank) or a **drug-bound** structure
-  (6OIM for KRAS/sotorasib) pinned per trial. Simply enlarging the box is *not* a fix: an
-  uncapped CFTR box is ~2.4 M Å³, far past the volume where Vina's sampling is meaningful,
-  so it would trade a wrong answer for a useless one.
-- **The box is computed over atoms that aren't docked** ○ — `compute_docking_box` reads
-  `ATOM` *and* `HETATM`, but `prepare_receptor_pdbqt` strips waters/heteroatoms and docks
-  `ATOM` only, so the box is centered on a different atom set than Vina searches. Visible
-  in the KRAS artifact: stored center `-19.192, 40.956, -3.009` vs an ATOM-only centroid
-  of `-19.17, 40.88, -2.90`. Small in practice, wrong in principle. Deliberately **not**
-  fixed in isolation: moving the box changes ΔG, which would invalidate both published
-  artifacts and the `code_patched: false` claim that depends on them reproducing from
-  source. It gets fixed alongside the box rework above, in a single re-run.
+  The two published runs now box the correct pockets: **KRAS** docks the switch-II pocket of
+  `6OIM` (`covalent-tethered`, box `[22,22,22]` on Cys A:12), **CFTR** the ivacaftor site of
+  `6O2P` (`holo-ligand (curated)`, box centered on VX7). This replaces the old blind slab that
+  put CFTR's ΔG in an arbitrary sub-volume.
+  **Remaining caveats (documented, not fixed):**
+    * **Cognate/holo docking is partly circular** — redocking a drug into its own bound pocket
+      inflates apparent accuracy; the ΔG is pocket-correct but is not an independent prediction
+      of *where* the drug binds.
+    * **fpocket is geometric, not biological** — it ranks cavities by shape, not function. On
+      `6O2P` its top pocket sat **~79 Å** from the real ivacaftor site, which is exactly why it
+      is a low-priority *fallback*, not a pocket oracle.
+    * **The blind box is still wrong where it fires** — the Tier-D fallback keeps the 40 Å-cap
+      slab behaviour that
+      `test_docking_box_stops_covering_the_receptor_once_the_40A_cap_binds` pins. It is now the
+      last resort rather than the default, but any target with no co-crystal and no fpocket still
+      hits it. Simply enlarging it is not a fix (an uncapped CFTR box is ~2.4 M Å³, past where
+      Vina's sampling is meaningful).
+- **The blind fallback box is computed over atoms that aren't docked** ○ — `compute_docking_box`
+  (**Tier-D only**) reads `ATOM` *and* `HETATM`, while `prepare_receptor_pdbqt` docks `ATOM` only,
+  so the fallback box centers on a slightly different atom set than Vina searches. The pocket-aware
+  tiers are unaffected — they box the co-crystal ligand or the reactive residue directly. Small in
+  practice, wrong in principle; now scoped to the last-resort fallback.
 - **Docked pose is not returned** ○ — only the scalar ΔG comes back, so the 3D view
   shows the **reference structure** the run docked against (with its own crystal
   ligand), *not* the geometry Vina computed. Returning the pose was **implemented and
@@ -524,3 +542,24 @@ The test suite exercises the full webhook → poll → alert flow with in-memory
 for Devin and the alerter, so it runs offline and deterministically. The real
 biophysics runs only inside a Devin session and is therefore not part of the
 offline suite.
+
+### Simulation environment (the heavy docking stack)
+
+The docking/PK-PD physics needs RDKit, AutoDock Vina, Meeko, Open Babel, Gemmi and ProDy
+on a mutually-compatible libboost. The **canonical, reproducible** install is the conda
+lock; `requirements-sim.txt` is a best-effort pip fallback that cannot pin the native
+stack (and lacks ProDy, so it can't run the covalent-tethered route):
+
+```bash
+# canonical: exact linux-64 solve of environment-sim.yml
+conda-lock install --name trialsim conda-sim.lock.yml     # or micromamba create -n trialsim -f conda-sim.lock.yml
+bash scripts/install_fpocket.sh                            # fpocket: source-built, not on conda channels
+python regen_artifacts.py                                  # real docking → results/ artifacts
+```
+
+Documented version drift from the original pip pins (see `environment-sim.yml`): RDKit
+`2024.03.5 → 2025.09.5` and Vina `1.2.5 → 1.2.7` (the old RDKit needs libboost 1.84 while
+Vina 1.2.7 needs 1.86, so they cannot co-resolve; the newer RDKit shares Vina's 1.86),
+and Meeko `0.6.0 → 0.7.1` (0.6.0 was withdrawn from PyPI). fpocket is built from a pinned
+source tag because it is not distributed on conda-forge/bioconda; a run works without it
+by degrading to the blind box.

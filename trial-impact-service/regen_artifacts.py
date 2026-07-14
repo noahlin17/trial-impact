@@ -100,7 +100,7 @@ def _run_event(app, trial: dict) -> dict:
 
 
 def main() -> int:
-    estimator = get_estimator("vina-docking-pkpd@1")
+    estimator = get_estimator("vina-docking-pkpd@2")
     sim_results: dict[str, dict] = {}
     for t in TRIALS:
         print(f"── docking {t['target']} × {t['drug']} (real Vina, pinned seeds) ──")

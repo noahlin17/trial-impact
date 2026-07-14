@@ -53,7 +53,7 @@ _HTTP_TIMEOUT = 30
 # Identifier for the docking estimator implemented in this module. Stamped onto every
 # SimResult it produces so the result is attributable. Bump the version when a change
 # would move the numbers (a new scoring function, a different box strategy, etc.).
-VINA_ESTIMATOR_ID = "vina-docking-pkpd@1"
+VINA_ESTIMATOR_ID = "vina-docking-pkpd@2"
 
 
 def _log(msg: str) -> None:
@@ -671,31 +671,41 @@ def run_simulation(
             accession = resolve_uniprot(target, uniprot)
             result.provenance["uniprot"] = accession
 
-            pdb_path, prov = fetch_structure(accession, workdir)
-            result.provenance.update(prov)
-
             smiles = fetch_ligand_smiles(drug)
             result.provenance["smiles"] = smiles
             mol = embed_ligand(smiles)
             desc = ligand_descriptors(mol)
             result.provenance["descriptors"] = {k: round(v, 3) for k, v in desc.items()}
 
-            # Covalent-warhead flag (heuristic; non-fatal). Vina scores reversibly,
-            # so a covalent binder's ΔG under-represents its true potency.
+            # Covalent-warhead flag (heuristic; non-fatal). It gates the covalent route
+            # below; Vina still scores non-covalently, so a covalent binder's ΔG omits the
+            # bond energy even when the pose is tethered (see binding_site).
             try:
                 result.covalent_flag = detect_covalent(mol)
             except Exception as exc:  # noqa: BLE001 — flag is best-effort
                 result.warnings.append(f"covalent detection skipped: {exc}")
 
-            ligand_pdbqt = prepare_ligand_pdbqt(mol, workdir)
-            receptor_pdbqt = prepare_receptor_pdbqt(pdb_path, workdir)
-            box = compute_docking_box(pdb_path)
-            # Record the box as provenance so a reader can see exactly what volume was
-            # searched (and that it was a blind box, not a pocket-focused one).
+            # Route to the most accurate docking box for this chemistry/target class:
+            # covalent-tethered → curated holo → discovered holo → fpocket → blind. The
+            # chosen tier is recorded in docking_box["mode"], and a pre-prepared covalent-
+            # tethered ligand (when applicable) is returned so the pose starts covalent.
+            from .binding_site import select_binding_site  # lazy: avoids import cycle
+
+            site = select_binding_site(
+                target=target, uniprot=accession, smiles=smiles,
+                mol=mol, covalent=result.covalent_flag, workdir=workdir,
+            )
+            result.provenance.update(site.structure_prov)
+            result.warnings.extend(site.warnings)
+
+            receptor_pdbqt = prepare_receptor_pdbqt(site.pdb_path, workdir)
+            ligand_pdbqt = site.ligand_pdbqt or prepare_ligand_pdbqt(mol, workdir)
+            box = (site.center, site.size)
+            # Record the box (and how the pocket was chosen) so a reader can see exactly
+            # what volume was searched and by which tier.
             result.docking_box = {
-                "center": [round(c, 3) for c in box[0]],
-                "size": [round(s, 3) for s in box[1]],
-                "mode": "blind",
+                "center": site.center, "size": site.size, "mode": site.mode,
+                **site.box_provenance,
             }
 
             # Dock across a fixed seed set and report the mean ΔG ± sd, not one draw.
@@ -743,7 +753,7 @@ def run_simulation(
 
             # Confidence: experimental structure > predicted; full run > fallbacks;
             # and noisier docking (larger ΔG spread across seeds) is less trustworthy.
-            base = 0.9 if prov["structure_source"] == "RCSB" else 0.7
+            base = 0.9 if result.provenance.get("structure_source") == "RCSB" else 0.7
             noise_penalty = _dg_noise_penalty(result.binding_affinity_sd_kcal_mol)
             result.confidence = round(
                 max(0.3, base - 0.05 * len(result.warnings) - noise_penalty), 3
