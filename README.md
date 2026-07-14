@@ -50,6 +50,25 @@ largely resolved by then); later-phase events are educational illustrations (see
 
 ---
 
+## Demo — the dashboards
+
+Served locally from the two committed result artifacts (`results/sim_*.json`) into the real Flask
+app — no re-dock. Both surfaces report the honest claim only: a **relative ΔG score labelled "not a
+Kd"** and a **geometric engagement** classification — never an absolute affinity or occupancy.
+
+**`/status`** — one row per trial: docking ΔG (score), geometric engagement, and the (illustrative)
+price calls.
+
+![Status dashboard](docs/dashboard-status.png)
+
+**`/analysis`** — the corpus view: ΔG is labelled *relative, size-confounded, not an affinity*; the
+charts are engagement-count and PoS, not Kd/occupancy; occupancy is shown only when a calibrated Kd
+exists (the docking estimator reports none).
+
+![Analysis dashboard](docs/dashboard-analysis.png)
+
+---
+
 ## Motivation & (unvalidated) market thesis
 
 > **Read this section as motivation, not as a result.** The market/stock layer is an
