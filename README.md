@@ -60,13 +60,21 @@ So the estimator is not the asset. Three things plausibly are:
 | **The translation to price** | P(success) → the market's *implied* P(success) → sizing. This is finance IP and depends on your own capital and execution; it does not commoditize the way an open-source scoring function does. |
 | **The evaluation harness** | A new bio-AI model lands every quarter. The edge does not belong to whoever *has* a model — it belongs to whoever can evaluate a new one against a labeled financial corpus, point-in-time, in a week. |
 
-**That last row is what this repository actually is.** The docking is a *plugin*, and a
+**That last row is what this repository is trying to be.** The docking is a *plugin*, and a
 deliberately commodity one: it is the reference implementation and the control, not the
 source of edge. Everything around it — the event trigger, the isolated compute sandbox, the
 strict result contract, the reproducible-from-source guarantee, the corpus, the backtest — is
-**model-agnostic**. Swap Vina for a co-folding affinity model, a proprietary QSAR, or an
-internal fine-tune, and the rest of the system does not change. The `SIM_RESULT_JSON` contract
-already describes *an estimate with provenance*, not *a docking run*.
+**intended to be model-agnostic**. Swap Vina for a co-folding affinity model, a proprietary
+QSAR, or an internal fine-tune, and the rest of the system should not change.
+
+**It is not there yet, and the gap is worth being precise about.** Most of the result contract
+(`binding_affinity_kcal_mol`, `kd_nM`, exposure, occupancy, flags, `confidence`, `provenance`,
+`code_patched`) already describes *an estimate with provenance* rather than *a docking run* —
+but `docking_box` is Vina-specific, there is **no `estimator` field recording which model
+produced the number**, and `simulation.py` is a Vina-shaped monolith shipped inside the prompt.
+So the boundary is *implied* by the design, not yet *enforced* by it. Closing that is
+[the first item under Next steps](#next-steps), and it is the highest-leverage change in the
+repo.
 
 This is the honest pitch: **not "docking generates alpha," but "here is the infrastructure to
 find out what does."** If proprietary bio-AI models or novel outcome-prediction and pricing
@@ -474,7 +482,10 @@ against literature, not a correction folded back in.
 
 ```bash
 cd trial-impact-service
-cp .env.example .env          # set DEVIN_API_KEY (+ optional WATCHER_SHARED_SECRET, Slack/SMTP)
+cp .env.example .env          # set DEVIN_API_KEY (Slack/SMTP optional)
+                              # .env.example ships a non-empty WATCHER_SHARED_SECRET, so
+                              # webhook signature verification is ON by default. Blank it
+                              # to disable (dev only — the service warns loudly if you do).
 docker compose up --build     # dashboard at http://localhost:8000/status
 
 # fire a real trial event (creates a real Devin session):
@@ -702,7 +713,22 @@ session clone a **pinned commit**, which also makes "which code produced this nu
 answerable by construction and retires the `code_patched` self-report in favour of
 something verifiable. **This is the next thing I would build.**
 
-**9 · Reported precision exceeds real precision.** A single pinned Vina seed reports one
+**9 · Sponsor→ticker resolution is a hand-maintained 6-entry file, which does not survive
+the corpus thesis.** `tickers.json` maps six sponsors (`amgen`, `regeneron`, `vertex`,
+`moderna`, `biogen`, `lilly`) to a ticker plus a **hand-picked competitor list**. Everything
+this README says about pointing the watcher at a therapeutic area or building a corpus across
+the trial universe runs straight into that file. Real sponsor→ticker resolution is an
+**entity-resolution problem**, not a lookup: CT.gov sponsor strings are messy and
+inconsistent, sponsors are frequently subsidiaries of a listed parent, many are **private or
+pre-IPO** (no ticker at all — and therefore no trade), and assets get licensed or partnered so
+the economic exposure is not always the sponsor's. The competitor map has the same problem one
+level worse, since "who is a competitor" is a modelling judgment, not a fact.
+*Fix:* an entity-resolution step (sponsor string → legal entity → listed parent → ticker) over
+a reference dataset, plus explicit handling for private sponsors; and derive competitors from
+target/mechanism overlap rather than hardcoding them. **Until this exists, the system works on
+a watchlist, not on a universe** — the demo is honest, the scaling claim is not yet earned.
+
+**10 · Reported precision exceeds real precision.** A single pinned Vina seed reports one
 draw from a stochastic optimiser to three decimals (`−8.606`), when the pre-pin spread was
 0.19 kcal/mol — a ~36% swing in Kd. `cmax_ng_ml` is also a **tissue** concentration
 (`Kp`-scaled), not the plasma Cmax the name implies, and AUC is AUC(0–48h), not

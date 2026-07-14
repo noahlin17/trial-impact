@@ -99,6 +99,11 @@ tickers.json        # sponsor → ticker + competitor map
 requirements.txt    # web-service deps (Flask, requests, gunicorn)
 requirements-sim.txt# heavy sim deps (rdkit, meeko, vina, openbabel, numpy) — installed by Devin
 simulate_trial.py   # fires signed trial-event payloads (stand-in for the watcher)
+run_real.py         # fire ONE real trial event end to end (creates a real Devin session)
+demo_e2e.py         # offline walkthrough of the whole pipeline (fakes Devin; no API key)
+poll_watch.py       # poll in-flight sessions until they settle
+verify_docking_box.py  # measures what fraction of the receptor the docking box contains
+                       # — reproduces the coverage figures behind open issue #2
 wsgi.py             # gunicorn / dev-server entrypoint
 tests/test_app.py   # end-to-end flow with in-memory fakes (offline)
 ```
