@@ -412,7 +412,8 @@ def run_pkpd(
     """Summarise exposure + occupancy for a 1-compartment first-order-absorption model.
 
     The model has a closed-form (Bateman) solution, so no ODE solver is needed:
-        C(t) = F·Dose·ka / (Vd·(ka−ke)) · (e^{−ke·t} − e^{−ka·t})   [µg/mL]
+        C(t) = Dose·ka / (Vd·(ka−ke)) · (e^{−ke·t} − e^{−ka·t})   [µg/mL]
+    No bioavailability term (F is implicitly 1), so oral exposure is flattered.
     A tissue partition coefficient Kp scales the concentration reaching the target,
     and occupancy uses the docked Kd:  occ(t) = C_nM / (C_nM + Kd).
     """

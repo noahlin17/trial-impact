@@ -89,9 +89,10 @@ python -m app.simulation --target "{target}" --drug "{drug}" \\
 The pipeline resolves the UniProt accession for the target, fetches a real
 structure (experimental PDB via PDBe/SIFTS, else the AlphaFold model), fetches the
 ligand SMILES from PubChem and embeds it in 3D with RDKit, prepares receptor +
-ligand PDBQT, docks with AutoDock Vina for the binding free energy ΔG (kcal/mol),
-Kd and the top docked pose, then solves a 1-compartment PK/PD model in closed form
-(Bateman) for Cmax, AUC and target occupancy.
+ligand PDBQT, docks with AutoDock Vina for the binding free energy ΔG (kcal/mol)
+and Kd, then solves a 1-compartment PK/PD model in closed form
+(Bateman) for Cmax, AUC and target occupancy. The docked pose is NOT returned —
+only the scalars above go in the result line.
 
 If a step fails (missing dependency, unavailable structure, docking error), debug
 and re-run until it produces a result. If the target has no experimental structure,
