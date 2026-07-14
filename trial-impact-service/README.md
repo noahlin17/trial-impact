@@ -46,7 +46,8 @@ The pipeline has four stages, each isolated into its own module:
 The tissue/protein simulation is **real biophysics**, not a stub: fetch the target
 structure (UniProt → experimental PDB, else AlphaFold), fetch the ligand
 (PubChem → SMILES → RDKit 3D), dock with **AutoDock Vina** for a real binding free
-energy ΔG (returning the top pose), then solve the PK/PD model in **closed form**
+energy ΔG (the scalar only — the pose is *not* returned; see Limitations), then solve
+the PK/PD model in **closed form**
 (Bateman) for tissue exposure and target occupancy. That needs a full sandbox that
 can `pip install` a heavy scientific
 stack, pull structures, and iterate on failures — exactly what a Devin session is.
@@ -206,8 +207,53 @@ addressed; ○ = documented, future work.)
 - **Docking is fast & approximate** ○ — AutoDock Vina is an empirical scoring
   function, not a rigorous binding free-energy method. FEP / MM-GBSA are more
   accurate but far heavier; ΔG here is a *relative* signal, not a measured affinity.
+- **Occupancy is computed from *total* drug, not *free* drug** ○ — **the most serious
+  defect in the pharmacology; [issue #1](../README.md#known-issues).** `_pkpd_series`
+  evaluates `occ = C / (C + Kd)` on the total tissue concentration. Only **unbound** drug
+  engages a target (the free-drug hypothesis), and there is **no fraction-unbound (`fu`)
+  term anywhere in the pipeline**. For a highly protein-bound drug the error is enormous,
+  not marginal:
+
+  | Run | Published occupancy | Corrected for plasma protein binding |
+  |---|---|---|
+  | KRAS × sotorasib (fu ≈ 0.11, ~89% bound) | 97.6% | **~81%** |
+  | CFTR × ivacaftor (fu ≈ 0.01, >99% bound) | 94.5% | **~15%** |
+
+  And it is **load-bearing on a published market call**: occupancy feeds `pos_breakdown`,
+  so at ~15% ivacaftor crosses the `occ < 30` branch, its **+0.15 engagement bonus becomes
+  a −0.10 penalty**, the PoS delta falls 0.552 → 0.340, and the VRTX call downgrades from
+  `strong` to `moderate`. Every reported occupancy should be read as a **total-drug upper
+  bound**, not as target engagement.
+  **Fix:** an `fu` term per drug via enrichment (same mechanism as `endpoint_outcome`),
+  defaulting to 1.0. **Why not yet:** it changes occupancy, PoS *and* the market call for
+  both published runs, so both artifacts must be re-run for `code_patched: false` to keep
+  meaning anything. Documented rather than quietly patched.
+- **`tox_flag` is a drug-likeness heuristic, not a toxicity model** ○ —
+  [issue #3](../README.md#known-issues). It is `≥2 Lipinski Rule-of-5 violations`
+  (`mw>500, logp>5, hbd>5, hba>10`). Ro5 predicts **oral absorption and permeability**; it
+  says nothing about safety. Sotorasib trips it on MW 560.6 + logP 5.30 — and sotorasib is
+  an **approved, orally dosed drug**. The flag fires on it *because* it is a large
+  lipophilic oncology molecule, which is typical for the class. The market model then
+  charges **−0.15 PoS as if it were a safety finding**. The descriptor arithmetic is
+  correct; the interpretation is a category error. **Fix:** rename to `drug_likeness_flag`
+  and either drop the penalty or replace it with a real structural-alert model (PAINS /
+  Brenk) or a tox QSAR.
+- **ΔG is documented as relative but consumed as absolute** ○ —
+  [issue #4](../README.md#known-issues). This file says (correctly, below) that Vina's ΔG
+  is "a *relative* signal, not a measured affinity". The code then converts it to an
+  absolute `Kd = exp(ΔG/RT)`, feeds that into an absolute occupancy calculation, and
+  branches on **hard absolute thresholds** (`Kd ≤ 100 nM → potent`, `ΔG ≤ −9.0`). Both
+  cannot be true. The conversion also uses **T = 310.15 K** (body temperature) while Vina's
+  function is calibrated against affinities conventionally reported at **298.15 K**, making
+  every Kd systematically **~1.75× looser** — a defensible physiological choice, but one
+  that interacts directly with the `Kd ≤ 100 nM` cutoff. **Fix:** treat ΔG strictly
+  ordinally (rank against a reference set, no absolute cutoffs), or calibrate against known
+  binders for the target and own the absolute claim.
 - **Generic PK constants** ○ — `ka`, `Vd`, `CL` are fixed physiological placeholders
-  and `Kp` is order-of-magnitude, not drug-specific. There's no clean API for human
+  and `Kp` is order-of-magnitude, not drug-specific. There is also **no bioavailability
+  term** (`F` is implicitly 1), which flatters oral exposure, and `cmax_ng_ml` is a
+  **tissue** concentration (`Kp`-scaled), not the plasma Cmax the name implies; AUC is
+  AUC(0–48h), not AUC(0–∞). There's no clean API for human
   PK params; allometric scaling needs animal data and structure→PK ML (ADMET-AI /
   pkCSM) is only ~±80%. The pragmatic path is per-drug **enrichment overrides**
   (same mechanism as `endpoint_outcome`); mechanistic `Kp` (Rodgers–Rowland) needs
@@ -255,7 +301,7 @@ addressed; ○ = documented, future work.)
   (`/api/prediction/{acc}`) with a newest-first version probe as backup; the 3D viewer
   chains `v6 → v5 → v4` for the same reason.
 - **Docking box does not cover the receptor** ○ — **the most serious open defect in the
-  physics; [issue #1](../README.md#known-issues).** Two boxing strategies have now failed
+  physics; [issue #2](../README.md#known-issues).** Two boxing strategies have now failed
   for the same underlying reason: neither one knows where the pocket is.
   Pocket-focused boxing was **implemented and then deliberately reverted**. Centering on
   the largest co-crystallized ligand is the standard trick, but it silently picks the

@@ -12,8 +12,8 @@ that field exists and what it caught.)
 
 | File | Trial | Result |
 |------|-------|--------|
-| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, Phase 1, endpoint met | ΔG **−8.606** kcal/mol, Kd 862.6 nM, occupancy 97.6%, tox flagged, **covalent** (acrylamide warhead). Experimental structure **7VVB** (confidence 0.9). PoS **+0.475** → AMGN up / REGN, NVS down. |
-| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, Phase 3, endpoint met | ΔG −8.702 kcal/mol †, Kd 738.2 nM, occupancy 94.5%, clean, not covalent. **AlphaFold** model AF-P13569-F1 (confidence 0.7 — see below). PoS **+0.552** → VRTX up / CRSP, BLUE down. |
+| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, Phase 1, endpoint met | ΔG **−8.606** kcal/mol, Kd 862.6 nM, occupancy 97.6% ‡, tox flagged ‡, **covalent** (acrylamide warhead). Experimental structure **7VVB** (confidence 0.9). PoS **+0.475** → AMGN up / REGN, NVS down. |
+| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, Phase 3, endpoint met | ΔG −8.702 kcal/mol †, Kd 738.2 nM, occupancy 94.5% ‡, clean, not covalent. **AlphaFold** model AF-P13569-F1 (confidence 0.7 — see below). PoS **+0.552** → VRTX up / CRSP, BLUE down. |
 | `dashboard_kras_7VVB.html` | ″ | Rendered `/status` with the 3D viewer. |
 | `dashboard_cftr_AF-P13569-F1.html` | ″ | Rendered `/status`; AlphaFold model rendered from AFDB. |
 | `analysis_dashboard.html` | both | Rendered `/analysis`: physics→price scatter, sortable table, and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). Open it and click a row. |
@@ -22,6 +22,26 @@ Each JSON holds the trial event, the resolved sponsor/competitor tickers, the fu
 `sim_result` (binding, exposure, occupancy, tox/covalent flags, docking box,
 provenance: UniProt / PDB id / SMILES / descriptors), and the market model's
 `price_calls` + `commentary`.
+
+## ‡ How to read the occupancy and tox columns
+
+**Occupancy is a total-drug upper bound, not target engagement.** `occ = C/(C + Kd)` is
+evaluated on the *total* tissue concentration; only **unbound** drug engages a target, and
+the pipeline has no fraction-unbound (`fu`) term. Ivacaftor is **>99% plasma-protein-bound**,
+so its recorded **94.5% is really ~15%** once corrected — and that reclassifies it under the
+market model's `occ < 30` branch, turning a **+0.15 bonus into a −0.10 penalty**, dropping
+the PoS delta 0.552 → 0.340 and downgrading the VRTX call from `strong` to `moderate`.
+Sotorasib (~89% bound) corrects from 97.6% to ~81%. This is
+[issue #1](../README.md#known-issues).
+
+**The "tox" flag is a Lipinski drug-likeness heuristic, not a toxicity model** — ≥2 Ro5
+violations, which predicts oral absorption, not safety. It fires on sotorasib because
+sotorasib is a big lipophilic oncology molecule; sotorasib is also an approved drug. It is
+still priced as a −0.15 safety penalty. This is [issue #3](../README.md#known-issues).
+
+Both are documented rather than patched, because fixing either changes the numbers in these
+artifacts, and they would then no longer reproduce from the committed source — which is the
+one property this directory exists to demonstrate.
 
 ## † How to read the CFTR ΔG (and why it is not the headline)
 
@@ -40,7 +60,7 @@ committed code:
 cd ../trial-impact-service && python verify_docking_box.py
 ```
 
-This is [open issue #1](../README.md#known-issues). It is documented rather than fixed
+This is [open issue #2](../README.md#known-issues). It is documented rather than fixed
 because "make the box cover the receptor" is not actually the fix — an uncapped CFTR box
 is ~2.4 M Å³, far past the volume where Vina's sampling means anything. The fix is pocket
 detection (fpocket / P2Rank) or a drug-bound structure pinned per trial, which is a real
