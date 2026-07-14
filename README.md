@@ -52,12 +52,147 @@ claim is that the *modality* is real, that the plumbing to produce it per event 
 is reproducible from source, and that the resulting quantity is the kind of thing that can
 be validated, calibrated, and priced.
 
-The market model in this repo is deliberately a **transparent, rules-based placeholder** —
-a glass box that shows how a physics estimate would flow into a directional view, not a
-serious pricing engine. The intended path is to run it long enough to build the corpus,
-then either **work with analysts to productionize their existing pricing and evaluation
-process** using this as a new input, or **use the accumulated data to fit a quantitative
-model outright** on a scientific dimension the market is not currently pricing.
+Both the chemistry and the market mechanics in this repo are **placeholders to be refined
+and replaced, not foundations to be built on.** The market model in particular is a
+transparent, rules-based glass box that shows how a physics estimate would flow into a
+directional view — it is not a pricing engine. The intended path is to run it long enough to
+build the corpus, then either **work with analysts to productionize their existing pricing
+and evaluation process** using this as a new input, or **use the accumulated data to fit a
+quantitative model outright** on a scientific dimension the market is not currently pricing.
+
+And scoring readouts is not the destination. It is the **training set**. The destination is
+running the same machinery at *trial registration* to forecast the outcome years before it
+happens — see [The endgame](#the-endgame-forecasting-the-readout-not-reacting-to-it).
+
+---
+
+## The endgame: forecasting the readout, not reacting to it
+
+Everything above is **reactive** — a trial reads out, and we score it. That is the wrong
+end of the trade, and it is worth saying so plainly: a readout is public within minutes and
+priced almost immediately, so reacting to it is a **latency race**, and a latency race is
+not where this system's advantage is.
+
+The real target is the same machinery run **at trial registration**, when the design is
+first posted and the readout is one to three years away. At that moment CT.gov gives you the
+drug, the target, the mechanism, the dose, the phase, the endpoints, the population and the
+duration — everything the physics needs. Nothing about the *outcome* exists yet, for anyone.
+A forecast made there is not a latency edge, it is an **information edge**, it is computable
+across every registered trial at once, and it has a multi-year window in which to be right.
+
+That is the product. What follows is what has to be true for it to work — and where the
+current build honestly falls short of it.
+
+### The seam where it plugs in
+
+The market model today gates every physics modifier on `has_readout`: with no clinical
+result, it **declines to call** (see [Known issues](#known-issues) — this was a bug fix; the
+model used to emit a directional call on chemistry alone, which was wrong *because* it was
+pretending to a forecast it had not earned).
+
+That gate is exactly the seam. Today, "no readout" correctly means "no call." **The
+predictive product is what replaces that refusal with a forecast** — and it is only allowed
+to do so once the physics is strong enough to carry the load alone, which today it is not.
+
+### Drugs fail on two axes, and this repo only computes one of them
+
+| | Question | What answers it | Status here |
+|---|---|---|---|
+| **Molecule** | Is this a good drug *for that target*? | Binding affinity, selectivity, free exposure vs Kd, ADMET/tox | ◑ This is what the pipeline computes — coarsely, with [known defects](#known-issues) |
+| **Target** | Does modulating that target *change the disease*? | Human genetic evidence, prior clinical precedent, pathway biology | ○ **Not modelled at all** |
+
+This asymmetry is the single most important thing to understand about the predictive
+version. Roughly **90% of drugs entering clinical trials fail**, and the dominant cause of
+Phase 2 failure is **lack of efficacy** — which is usually a *target* problem, not a
+*molecule* problem. A drug can bind beautifully, achieve full target engagement, and still
+fail because the target was never causal in the disease.
+
+Docking cannot see that. It answers "does the molecule hit the target," and the market is
+mostly not wrong about *that*. So a pre-readout predictor built on binding affinity alone
+will be weak — **not because the chemistry is bad, but because it is answering the wrong
+half of the question.**
+
+The fix is cheap and well-evidenced: the strongest known public predictor of clinical
+success is **human genetic support for the target** (genetically-supported targets succeed at
+roughly twice the rate). Open Targets exposes a genetic-association score per
+target–indication pair, free. Combining *"is the target right?"* (genetics, precedent) with
+*"is the molecule right?"* (this pipeline) is a defensible two-axis model. Either axis alone
+is not.
+
+### Phase 1 and Phase 2 are different prediction problems
+
+Phase 1 endpoints are overwhelmingly **safety, tolerability, MTD and PK** — not efficacy
+(oncology dose-expansion aside). So the physics is *most* predictive in Phase 1, but not for
+the reason it first appears: what it can genuinely forecast there is **can you get free drug
+above Kd at the target, at a dose that is tolerated?** That is a therapeutic-index question,
+and it is squarely a chemistry + PK question. Good fit.
+
+Phase 2 is an **efficacy** question, and efficacy is a target-validation question. The
+physics is necessary but nowhere near sufficient, and this is where the genetics axis carries
+most of the weight.
+
+### The acceptance test — and the current build fails it
+
+Before any predictive claim, the refined chemistry has to clear a retrospective panel of
+**known winners and known losers**. That panel is cheap to assemble and brutally diagnostic.
+Running the pre-readout question (*is free Cmax above Kd?*) backwards on the two drugs
+already in this repo:
+
+| Drug | Docked Kd | Free Cmax | Free Cmax / Kd | Model says | Reality |
+|---|---|---|---|---|---|
+| sotorasib | 863 nM | 3,779 nM | **4.4×** | engages target | ✅ approved |
+| ivacaftor | 738 nM | 128 nM | **0.17×** | **fails to engage** | ✅ **approved, transformative** |
+
+**The pipeline as built would predict that ivacaftor does not engage CFTR.** It is one of
+the most clinically successful drugs in cystic fibrosis. The docked Kd (738 nM) is far
+weaker than ivacaftor's real potency, which traces straight back to
+[issue #2](#known-issues) — the docking box covers 19% of CFTR and never sees the real
+binding site.
+
+This is why the chemistry and the market mechanics in this repo are explicitly **placeholders
+to be replaced, not foundations to be built on**. It also re-ranks the known issues: the
+docking box and the total-vs-free-drug occupancy bug are not documentation caveats in the
+predictive world — **they are blocking defects**, because the predictive model has no
+clinical readout to fall back on and must stand entirely on numbers that are currently wrong.
+
+### What would make the backtest real
+
+The forecast is only worth what the validation is worth, and a naive backtest of this will
+produce a beautiful, false result. Four things will kill it:
+
+- **Look-ahead bias through structures.** PDB entries have **deposition dates**. Docking
+  against a co-crystal of the drug bound to its target, deposited *after* the trial was
+  registered, is using tomorrow's information to predict today. Structure selection must be
+  **point-in-time** — only structures available at the registration date. (This turns
+  [issue #7](#known-issues), "structure choice is not pinned," from a reproducibility nit
+  into a leakage vector.)
+- **The labels are biased, and biased in the worst direction.** Negative trials are
+  **systematically under-reported** — sponsors post wins and quietly discontinue losers, and
+  CT.gov results compliance is poor. A corpus built from CT.gov results alone is
+  missing-not-at-random and skewed toward successes. Outcomes have to be reconstructed from
+  press releases, 8-Ks and pipeline-discontinuation disclosures, not just the registry.
+- **Survivorship.** Terminated and withdrawn trials must stay in the sample. They are the
+  signal.
+- **Base rates.** ~90% attrition means a heavily imbalanced problem where "predict failure"
+  is a strong naive baseline. The model must beat that *and* beat the genetics-only baseline
+  before anyone should care that it uses physics.
+
+### Where the alpha actually is
+
+The trade is **not** "our model says the stock goes up." It is:
+
+> **edge = our P(success) − the market's implied P(success)**
+
+which means the market's *implied* probability is a required input, not an afterthought.
+It can be recovered from options around the catalyst (a binary event has a characteristic
+signature in the vol surface) or by decomposing the sponsor's market cap against a
+risk-adjusted NPV of the pipeline. You trade the **divergence**, not the level.
+
+And that formulation determines the universe for you: a Phase 1 asset is *noise* inside
+Amgen's market cap. The signal only appears where the trial is **material to enterprise
+value** — small- and mid-cap, single-asset or lead-asset, catalyst-driven biotech, where a
+readout moves the stock 50–80%. This is precisely what the watcher's configurable scoping is
+for.
 
 ---
 
@@ -343,6 +478,19 @@ cd trial-impact-service && pip install -r requirements-dev.txt && ruff check . &
   a separate affinity path for biologics (antibodies can't dock). Pin the sim
   environment (conda-lock); Vina's seed is already pinned, so ΔG now reproduces.
 
+**Add the axis the physics cannot see** — the prerequisite for any pre-readout forecast
+(see [The endgame](#the-endgame-forecasting-the-readout-not-reacting-to-it))
+- **Target validation as a first-class feature.** Pull the **Open Targets** genetic-association
+  score for the target–indication pair. Genetically-supported targets succeed at roughly twice
+  the rate, which makes this the strongest known public predictor of clinical success — and a
+  stronger one than anything docking produces. Docking answers *"is the molecule right?"*;
+  this answers *"is the target right?"*, and that is the axis most drugs actually fail on.
+- Add prior clinical precedent for the target/mechanism, and trial-design quality
+  (endpoint choice, powering, biomarker enrichment) as features.
+- **Build the retrospective validation panel** of known winners and known losers, and make
+  the chemistry clear it before trusting any forecast. The current build fails this panel —
+  it predicts ivacaftor, an approved drug, does not engage its target.
+
 **Turn the signal into a priced feature** *(this is the path to alpha, and it is
 sequenced deliberately — none of it is worth doing until the science above is sound,
 because calibrating a model on a biased signal just launders the bias)*
@@ -351,22 +499,32 @@ because calibrating a model on a biased signal just launders the bias)*
    results section and sponsor press releases with an **LLM classifier**, instead of
    watchlist enrichment. Until this exists, the corpus cannot grow without a human in it,
    which is the binding constraint on everything below.
-2. **Build the corpus.** Run the watcher, scoped to a universe, and accumulate
-   `(structure, chemistry, ΔG, Kd, occupancy, phase, outcome, realized price move)` per
-   readout. Backfill it over historical readouts — the physics is computable retroactively
-   for any past trial whose drug and target are known, so **the corpus does not have to be
-   accumulated in real time**, which is what makes a backtest feasible at all.
+2. **Build the corpus — point-in-time, and with honest labels.** Accumulate
+   `(structure, chemistry, ΔG, Kd, free-exposure, genetics, phase, design, outcome, realized
+   move)` per trial. Backfill over history — the physics is computable retroactively for any
+   past trial whose drug and target are known, so **the corpus need not be accumulated in
+   real time**, which is the only reason a backtest is feasible at all. Two rules make or
+   break it: **filter structures by deposition date** (docking a co-crystal published *after*
+   the trial registered is look-ahead bias), and **reconstruct outcomes from press releases /
+   8-Ks, not just CT.gov** (negative trials are systematically under-reported, so a registry-only
+   corpus is missing-not-at-random and skewed toward winners). Keep terminated and withdrawn
+   trials in the sample.
 3. **Validate the feature before pricing it.** Ask the only question that matters first:
-   *does the physics estimate carry information about the outcome, conditional on what the
-   market already knew?* Score ΔG/occupancy against realized outcomes and next-day moves,
-   and check its **residual correlation against the label and against consensus** — a
-   feature that merely restates the readout is worth nothing, however scientific it looks.
-4. **Then price it.** Two paths, and they are not exclusive: work with analysts to
-   **productionize their existing pricing and evaluation process** with this as a new
-   input, or fit a **quantitative model outright** on the accumulated corpus. Wire live
-   quotes and market cap (no market-data client exists yet), and weight the
-   probability-of-success delta by trial **phase** (Phase 1 ≪ Phase 3) and by the
-   sponsor's exposure to the asset.
+   *does the physics estimate carry information about the outcome, conditional on what was
+   already knowable?* Score it against realized outcomes, and check its **residual signal
+   over two baselines** — the label/consensus, and a **genetics-only model**. A feature that
+   merely restates the readout is worth nothing however scientific it looks, and a physics
+   model that cannot beat a free Open Targets score is not worth running. With ~90% base-rate
+   attrition, "predict failure" is itself a strong naive baseline that must be cleared.
+4. **Then price it.** Recover the market's **implied** probability of success — from options
+   around the catalyst, or by decomposing market cap against a risk-adjusted NPV — because the
+   edge is `our P(success) − implied P(success)`, not the level of our own call. Trade the
+   divergence. Scope the universe to where the trial is **material to enterprise value**
+   (SMID-cap, single/lead-asset biotech), since a Phase 1 asset is noise inside a large-cap
+   market cap. Then either productionize an analyst's existing process with this as a new
+   input, or fit a quantitative model outright on the corpus. Wire live quotes and market cap
+   (no market-data client exists yet), and weight by **phase** and by the sponsor's exposure
+   to the asset.
 
 The rules-based market model in this repo is a **glass-box placeholder** for step 4 — it
 exists to show the shape of the pipeline end to end, not to be traded. Replacing it is the
