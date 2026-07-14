@@ -319,16 +319,19 @@ def _obabel(src: str, dst: str, extra: list[str] | None = None) -> None:
 # Step 5 — docking
 # --------------------------------------------------------------------------- #
 def compute_docking_box(pdb_path: str) -> tuple[list[float], list[float]]:
-    """A padded *blind* box over the whole receptor (center + size, in Å).
+    """A centroid-centered box, padded 8 Å and capped at 40 Å (center + size, in Å).
 
-    Blind docking is the honest default here: we do not know which pocket the drug
-    binds. A pocket-focused box would be sharper, but only if the pocket is chosen
-    correctly — see "Docking box" under Limitations in the README. Centering on the
-    largest co-crystallized ligand was tried and **reverted**: KRAS structure 7VVB
-    carries only the nucleotide GNP (a GTP analog), so that heuristic centered the
-    box on the *nucleotide* pocket rather than the switch-II pocket where sotorasib
-    actually binds. Picking the right pocket needs a drug-bound structure (or a
-    pocket-detection step), not "the biggest HETATM".
+    Blind: we do not know which pocket the drug binds. Centering on the largest
+    co-crystal ligand was tried and reverted (KRAS 7VVB carries only the nucleotide
+    GNP, so it boxed the wrong pocket).
+
+    KNOWN ISSUE — the 40 Å cap keeps the volume tractable for Vina, but the box stays
+    on the centroid, so on a receptor larger than ~40 Å this searches a central slab,
+    not the protein. Measured (`python verify_docking_box.py`): KRAS 7VVB (56x55x44 Å)
+    ~80% of atoms in the box; CFTR AF-P13569-F1 (139x117x147 Å) ~19%. "Blind" is not
+    "exhaustive" — on a large target this silently docks an arbitrary sub-volume. A fix
+    needs pocket detection (fpocket / P2Rank) or a drug-bound structure pinned per
+    trial. See "Docking box" under Limitations in the README.
     """
     import numpy as np  # lazy
 
@@ -347,7 +350,12 @@ def compute_docking_box(pdb_path: str) -> tuple[list[float], list[float]]:
     center = arr.mean(axis=0)
     extent = arr.max(axis=0) - arr.min(axis=0) + 8.0  # 8 Å padding
     size = np.minimum(extent, 40.0)  # cap for tractable blind docking
-    _log("using blind docking box over the whole receptor")
+    if float(extent.max()) > 40.0:
+        _log(
+            "WARNING: receptor is larger than the 40 A box cap - docking a central "
+            "slab, not the whole receptor (see compute_docking_box)"
+        )
+    _log("using blind docking box (centroid-centered, 40 A cap)")
     return center.tolist(), size.tolist()
 
 

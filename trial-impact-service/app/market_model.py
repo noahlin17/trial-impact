@@ -124,10 +124,18 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
     #     molecular potency doesn't rescue a missed clinical endpoint, so it is
     #     dropped for a miss. The met path is therefore byte-identical to before.
     #   - Tox is always a risk term (negative) — for wins and misses alike.
+    #
+    # Every term here is a *modifier on a readout*. With no readout (outcome unknown,
+    # base 0.0) there is nothing to modify, so they are all dropped and the model
+    # declines to call. Otherwise a tox flag alone scored -0.15 × 0.95 = -0.1425,
+    # cleared the 0.10 market-moving threshold, and emitted a "down" call on chemistry
+    # with no clinical news behind it — and `unknown` is the default for every trial
+    # the watchlist has not enriched, so that was the common path, not an edge case.
     is_win = base > 0
+    has_readout = outcome in ("met", "missed")
     binding = binding_raw if is_win else 0.0
     occupancy = occ_raw if is_win else 0.0
-    tox = tox_raw
+    tox = tox_raw if has_readout else 0.0
     subtotal = base + binding + occupancy + tox
 
     confidence = sim.get("confidence") or 0.7
@@ -150,6 +158,14 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
             {"label": "Target occupancy", "value": round(occupancy, 3)},
             {"label": "Tox flag", "value": round(tox, 3)},
             {"label": f"× confidence {round(scale, 2)}", "value": round(final - subtotal, 3)},
+        ]
+        if has_readout
+        else [
+            {"label": f"Endpoint {outcome} — no call", "value": 0.0},
+            {
+                "label": "Physics is a modifier on a readout, not a signal on its own",
+                "value": 0.0,
+            },
         ],
     }
 

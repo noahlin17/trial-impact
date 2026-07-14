@@ -254,18 +254,49 @@ addressed; ○ = documented, future work.)
   turning a graceful degradation into a hard failure. Now resolved via the AFDB API
   (`/api/prediction/{acc}`) with a newest-first version probe as backup; the 3D viewer
   chains `v6 → v5 → v4` for the same reason.
-- **Docking box is blind** ○ — the box spans the whole receptor rather than a known
-  pocket, so Vina searches everywhere. Pocket-focused boxing was **implemented and
-  then deliberately reverted**: centering on the largest co-crystallized ligand is
-  the standard trick, but it silently picks the *wrong* pocket when the structure's
-  ligand is a cofactor. Concretely — the KRAS structure our own pipeline selects
-  (**7VVB**) contains only **GNP**, a GTP analog, so that heuristic centered the box
-  on the **nucleotide pocket**, while sotorasib is a covalent binder of the
-  **switch-II pocket**. It still returned a plausible-looking ΔG (−8.64), which is
-  precisely what makes it dangerous. Blind docking is slower and blurrier but does
-  not quietly dock into the wrong site. The real fix is to dock against a
-  **drug-bound** structure (6OIM for KRAS/sotorasib) pinned per trial, or to add a
-  pocket-detection step (fpocket / P2Rank) — not "take the biggest HETATM".
+- **Docking box does not cover the receptor** ○ — **the most serious open defect in the
+  physics; [issue #1](../README.md#known-issues).** Two boxing strategies have now failed
+  for the same underlying reason: neither one knows where the pocket is.
+  Pocket-focused boxing was **implemented and then deliberately reverted**. Centering on
+  the largest co-crystallized ligand is the standard trick, but it silently picks the
+  *wrong* pocket when the structure's ligand is a cofactor: the KRAS structure our own
+  pipeline selects (**7VVB**) contains only **GNP**, a GTP analog, so that heuristic
+  centered the box on the **nucleotide pocket**, while sotorasib binds the **switch-II
+  pocket**. It still returned a plausible-looking ΔG (−8.64).
+  The blind box that replaced it has a subtler version of the same bug, which I only
+  found by measuring it. `compute_docking_box` sizes the box `min(extent + 8 Å, 40 Å)`
+  but keeps it **centered on the centroid**, so once a receptor exceeds ~40 Å the box
+  stops covering it and Vina searches a central *slab*. The cap is binding in both
+  published runs — both artifacts record `size: [40, 40, 40]`. Measured with
+  `python verify_docking_box.py`:
+
+  | Structure | Real extent | Atoms inside the 40 Å box |
+  |---|---|---|
+  | KRAS `7VVB` | 56 × 55 × 44 Å | **80%** |
+  | CFTR `AF-P13569-F1` | 139 × 117 × 147 Å | **19%** |
+
+  CFTR is a 1480-residue membrane protein and ivacaftor binds at the TM1/TM6 interface,
+  not the centroid — so **that ΔG is a dock into an arbitrary sub-volume**, and the
+  earlier claim in this file that blind docking "does not quietly dock into the wrong
+  site" was simply false. It does. It just does it less obviously than the ligand-centered
+  box did, which is worse, not better.
+  **Mitigated, not fixed:** the code now logs a warning when the cap binds, and
+  `test_docking_box_stops_covering_the_receptor_once_the_40A_cap_binds` pins the
+  behaviour. (The test it replaced asserted coverage on a ~10 Å toy receptor — the one
+  input where the cap can never trigger — so it passed while the property it named was
+  false in production. A test that can only pass is not a test.)
+  **The real fix** is cavity detection (fpocket / P2Rank) or a **drug-bound** structure
+  (6OIM for KRAS/sotorasib) pinned per trial. Simply enlarging the box is *not* a fix: an
+  uncapped CFTR box is ~2.4 M Å³, far past the volume where Vina's sampling is meaningful,
+  so it would trade a wrong answer for a useless one.
+- **The box is computed over atoms that aren't docked** ○ — `compute_docking_box` reads
+  `ATOM` *and* `HETATM`, but `prepare_receptor_pdbqt` strips waters/heteroatoms and docks
+  `ATOM` only, so the box is centered on a different atom set than Vina searches. Visible
+  in the KRAS artifact: stored center `-19.192, 40.956, -3.009` vs an ATOM-only centroid
+  of `-19.17, 40.88, -2.90`. Small in practice, wrong in principle. Deliberately **not**
+  fixed in isolation: moving the box changes ΔG, which would invalidate both published
+  artifacts and the `code_patched: false` claim that depends on them reproducing from
+  source. It gets fixed alongside the box rework above, in a single re-run.
 - **Docked pose is not returned** ○ — only the scalar ΔG comes back, so the 3D view
   shows the **reference structure** the run docked against (with its own crystal
   ligand), *not* the geometry Vina computed. Returning the pose was **implemented and
@@ -296,6 +327,16 @@ addressed; ○ = documented, future work.)
   (efficacy corroboration only strengthens a win; tox is always a downside risk)
   rather than mirrored by the readout sign, which previously let a tox flag reduce
   the downside of a *failed* trial. The met-trial path is unchanged.
+- **Spurious alerts on `unknown` outcomes** ✅ — fixed, and this one was live on the
+  *common* path. Every term in `pos_breakdown` is a modifier on a clinical readout, but
+  they were applied even when there was no readout: an `unknown` outcome (base `0.0`)
+  plus a tox flag scored `-0.15 × 0.95 = -0.1425`, which clears the `0.10`
+  market-moving threshold and emits a **"down" call on a trial that has reported
+  nothing** — a directional signal derived purely from the drug's Lipinski violations.
+  And `unknown` is the *default* for every trial the watchlist has not enriched, so this
+  was the majority path in production, not an edge case. The modifiers are now gated on
+  `has_readout`, so no readout means no call. Both published runs are `met`, so their
+  numbers are byte-identical — a regression test asserts exactly that.
 - **No phase weighting** ○ — a Phase 1 pass shouldn't move a stock like a Phase 3;
   the base should scale by phase (`{P1:0.4, P2:0.7, P3:1.0}` ≈ 1 line). Deliberately
   left out this round to avoid changing the demo's numbers.
@@ -305,6 +346,21 @@ addressed; ○ = documented, future work.)
 - **`endpoint_outcome` not auto-derived** ○ — met/missed is supplied via enrichment
   (`watchlist.json`), not parsed from CT.gov. An LLM classifier over the results
   section / press releases would close the loop.
+
+### Security & operations
+- **Webhook signature verification fails open** ◑ — `signature_required` is
+  `bool(WATCHER_SHARED_SECRET)`, so if the secret is unset the service accepts **any**
+  caller's trial event, and each accepted event spends a real Devin session. The
+  fail-open default is deliberate (the demos and local runs post unsigned), but it used
+  to be *silent*, which is the actual problem: an operator who forgot the secret in
+  production would get an open, billable endpoint with no indication of it. `create_app`
+  now logs a loud warning at startup when verification is disabled. It still fails open —
+  a production deployment should make the secret mandatory and refuse to boot without it.
+- **No retries or timeouts on hung sessions** ○ — a Devin session that goes `blocked` or
+  hangs is left for a human; `blocked` is deliberately non-terminal so `/poll` can pick it
+  up again, but nothing escalates it.
+- **SQLite, single process** ○ — fine for a prototype, wrong for concurrent writers.
+  Postgres is the obvious swap; the repository interface is already narrow enough for it.
 
 ---
 

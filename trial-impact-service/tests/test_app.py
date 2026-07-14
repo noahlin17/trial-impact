@@ -336,6 +336,28 @@ def test_met_trial_unchanged_by_fix():
     assert abs(b["final"] - 0.475) < 1e-9
 
 
+def test_unknown_outcome_does_not_emit_a_call_on_chemistry_alone():
+    """No readout means no call.
+
+    `unknown` is the default for every trial the watchlist has not enriched, so this
+    is the *common* path in production. A tox flag alone used to score
+    -0.15 × 0.95 = -0.1425, clear the 0.10 market-moving threshold, and emit a "down"
+    call on a trial that had reported nothing — a spurious alert on the majority path.
+    """
+    ev = {"nct_id": "N", "endpoint_outcome": "unknown", "target": "KRAS", "sponsor": "Amgen"}
+    b = market_model.pos_breakdown(ev, RICH_SIM)   # RICH_SIM carries tox_flag=True
+
+    assert b["outcome_base"] == 0.0
+    assert b["tox_penalty"] == 0.0                 # was -0.15
+    assert b["final"] == 0.0                       # was -0.1425
+    assert abs(market_model.pos_delta(ev, RICH_SIM)) < 0.10   # below the threshold
+
+    out = market_model.assess(ev, RICH_SIM, "AMGN", "Amgen", [], threshold=0.10)
+    assert out["price_calls"] == [] or all(
+        c["direction"] == "flat" for c in out["price_calls"]
+    )
+
+
 def test_market_model_handles_missing_sim():
     ev = {"nct_id": "N", "endpoint_outcome": "met", "target": "X", "sponsor": "Amgen"}
     # No physics available — still directional, at reduced conviction.
@@ -345,7 +367,7 @@ def test_market_model_handles_missing_sim():
 
 # --- reasoning trace: breakdown must reduce exactly to the delta ------------- #
 def test_pos_breakdown_reduces_to_delta():
-    for outcome in ("met", "missed"):
+    for outcome in ("met", "missed", "unknown"):
         ev = {"nct_id": "N", "endpoint_outcome": outcome, "target": "KRAS", "sponsor": "Amgen"}
         for sim in (RICH_SIM, STRONG_WIN, {"error": "boom"}, None):
             b = market_model.pos_breakdown(ev, sim)
@@ -445,13 +467,13 @@ def _holo_pdb(n_ligand_atoms=8):
     return "".join(out)
 
 
-def test_docking_box_is_blind_and_covers_the_receptor(tmp_path):
+def test_docking_box_is_blind_not_ligand_centered(tmp_path):
     """The box is deliberately blind (see README: pocket-focused boxing was reverted
     because the largest co-crystal ligand is not necessarily the drug's pocket).
 
-    The property that matters is coverage: the box must enclose every atom, rather than
-    be parked on one ligand — a focused box would sit on the co-crystal ligand (x≈10)
-    and could exclude the rest of the receptor (x≈0).
+    On a receptor small enough that the 40 Å cap does not bind, the box encloses
+    every atom rather than parking on the co-crystal ligand (x≈10) and excluding the
+    rest of the receptor (x≈0).
     """
     pytest.importorskip("numpy")
     from app.simulation import compute_docking_box
@@ -463,6 +485,45 @@ def test_docking_box_is_blind_and_covers_the_receptor(tmp_path):
     lo, hi = center[0] - size[0] / 2, center[0] + size[0] / 2
     assert lo <= 0.0 and hi >= 10.0     # spans protein (x=0) *and* ligand (x=10)
     assert size != [22.5, 22.5, 22.5]   # not the reverted ligand-centered box
+    assert max(size) < 40.0             # the cap is NOT what produced this coverage
+
+
+def test_docking_box_stops_covering_the_receptor_once_the_40A_cap_binds(tmp_path):
+    """KNOWN ISSUE (README → Limitations → "Docking box"): the box is capped at 40 Å
+    but stays centered on the centroid, so on any receptor larger than ~40 Å it
+    silently searches a central slab instead of the protein.
+
+    This is a characterization test: it pins the *current, wrong* behaviour so that a
+    future fix has to delete it deliberately rather than a "coverage" test passing by
+    accident. The old test asserted coverage on a ~10 Å toy receptor — the one input
+    where the cap can never trigger — so it could never have caught this.
+
+    Real measurements from the two published runs (reproduce with
+    ``python verify_docking_box.py``):
+
+        KRAS 7VVB          extent  56 x  55 x  44 Å  ->  ~80% of atoms in the box
+        CFTR AF-P13569-F1  extent 139 x 117 x 147 Å  ->  ~19% of atoms in the box
+    """
+    pytest.importorskip("numpy")
+    from app.simulation import compute_docking_box
+
+    # A 100 Å extended receptor — the scale of a real multi-domain membrane protein.
+    atoms = [
+        _pdb_line("ATOM", i, "CA", "ALA", float(i), 0.0, 0.0, "C") for i in range(101)
+    ]
+    p = tmp_path / "big.pdb"
+    p.write_text("".join(atoms))
+
+    center, size = compute_docking_box(str(p))
+
+    assert size[0] == 40.0              # the cap is binding, not the 108 Å true extent
+    lo, hi = center[0] - size[0] / 2, center[0] + size[0] / 2
+    inside = sum(1 for i in range(101) if lo <= float(i) <= hi)
+
+    # The receptor is NOT covered: the box holds a ~40% central slab and Vina never
+    # sees the other 60% — including, on a real target, the actual binding pocket.
+    assert inside < 101
+    assert inside / 101 < 0.5
 
 
 # --- analysis payload + route ----------------------------------------------- #

@@ -21,6 +21,7 @@ from pathlib import Path
 from app import create_app
 from app.config import Config
 from app.db import Database, make_event_id
+from app.signing import SIGNATURE_HEADER, sign
 
 
 def load_dotenv(path: str = ".env") -> None:
@@ -71,7 +72,14 @@ def main() -> int:
     }
     print("\n── Firing webhook (REAL Devin session will be created) ──")
     print(json.dumps(payload, indent=2))
-    resp = client.post("/webhook/trial-update", json=payload)
+    # Sign the body exactly as the watcher would, so this works whether or not
+    # WATCHER_SHARED_SECRET is set. (.env.example ships a non-empty placeholder, so a
+    # quick-start user *will* have verification enabled; posting unsigned would 401.)
+    body_bytes = json.dumps(payload).encode()
+    headers = {"Content-Type": "application/json"}
+    if cfg.watcher_shared_secret:
+        headers[SIGNATURE_HEADER] = sign(cfg.watcher_shared_secret, body_bytes)
+    resp = client.post("/webhook/trial-update", data=body_bytes, headers=headers)
     print(f"\n→ {resp.status_code}")
     body = resp.get_json()
     print(json.dumps(body, indent=2)[:1500])
