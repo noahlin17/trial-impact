@@ -3,6 +3,13 @@
 # These are NOT installed in the web-service image — the simulation runs inside a
 # Devin session, which installs this file. Keeping them separate keeps the Flask
 # image small and fast to build.
+#
+# NOTE: this pip file is a *best-effort fallback*. The canonical, reproducible install
+# is `conda-sim.lock.yml` (see environment-sim.yml / the service README): it pins the
+# full native stack on a common libboost and adds ProDy, which the covalent-tethered
+# route needs and which does not pip-install cleanly against NumPy 1.26. Installed from
+# this pip file alone, covalent tethering and fpocket are unavailable and the pipeline
+# degrades to reversible docking + the blind box.
 rdkit==2024.3.5
 # meeko 0.6.0 (the historical pin) is no longer available from PyPI, so ligand prep
 # now runs meeko 0.7.1. This is deliberate toolchain drift: absolute ΔG values differ

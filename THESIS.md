@@ -162,15 +162,21 @@ already in this repository, both of which are approved:
 
 | Drug | Docked Kd | Free Cmax | Free Cmax / Kd | Model implies | Actual |
 |---|---|---|---|---|---|
-| sotorasib | 1,337 nM | 3,779 nM | 2.8× | engages target | approved |
-| ivacaftor | 1,777 nM | 128 nM | 0.07× | does not engage | approved |
+| sotorasib | 8,412 nM | 3,779 nM | 0.45× | does not engage | approved |
+| ivacaftor | 6,061 nM | 128 nM | 0.02× | does not engage | approved |
 
-The pipeline as built still implies that ivacaftor barely engages CFTR (free-drug occupancy
-6.7%). Ivacaftor is an effective, approved CF therapy. The docked Kd is far weaker than the
-drug's reported potency, which now traces back almost entirely to the docking box covering only
-~26% of CFTR and not containing the binding site — the free-drug (`fu`) correction, which used to
-be the other half of this gap, is now applied inside the pipeline (occupancy uses `C_free = fu·C`),
-so the remaining error is the blind box, not a missing `fu` term.
+The pipeline as built now implies that *neither* drug engages its target (free-drug occupancy
+31.0% for sotorasib, 2.06% for ivacaftor). Both are approved, effective therapies, so the
+retrospective check still fails — and it now fails on *both* rows rather than one. Note the
+direction of the change: pocket-aware routing did **not** make the numbers "look right." It made
+the docked Kd *weaker* (8,412 / 6,061 nM vs the old 1,337 / 1,777 nM), because the previous KRAS
+score came from a blind box that happened to sit in a favorable slab and the previous CFTR score
+was docked against a mis-labelled structure (9MXL contains (R)-BPO-27, not ivacaftor). The honest
+reading is that an empirical, cognate, reversible-only docking ΔG — even one boxed on the correct
+pocket — is not calibrated to reproduce a drug's clinical potency, and the covalent KRAS score is
+additionally a reversible lower bound (no bond enthalpy). The free-drug (`fu`) correction is
+applied inside the pipeline (occupancy uses `C_free = fu·C`); it is real but it is not what closes
+this gap.
 
 (The free-fraction values are now resolved inside the pipeline via a small curated
 plasma-protein-binding table — sotorasib fu 0.11, ivacaftor fu 0.01 — rather than applied by hand;

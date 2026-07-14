@@ -1,0 +1,35 @@
+# Canonical simulation environment for the docking + PK/PD pipeline.
+#
+# This is the source of truth for the heavy scientific stack that a Devin session
+# (or `regen_artifacts.py`) runs. It is locked to an exact linux-64 solve in
+# `conda-sim.lock.yml` via `conda-lock` — install the lock, not this file, for a
+# reproducible run (see the service README). fpocket is NOT on conda-forge/bioconda,
+# so it is built from a pinned source tag by the environment setup (blueprint /
+# `scripts/install_fpocket.sh`), not listed here.
+#
+# Version drift from the original pip pins (documented, not silent):
+#   * rdkit 2024.03.5 → 2025.09.5 and vina 1.2.5 → 1.2.7: the old rdkit pin needs
+#     libboost 1.84 while vina 1.2.7 needs 1.86, so they cannot co-resolve on conda;
+#     the newer rdkit shares vina's boost 1.86.
+#   * meeko 0.6.0 → 0.7.1: 0.6.0 was withdrawn from PyPI/conda.
+# Flask ships as a pip dep so the locked env alone can run regen_artifacts.py.
+name: trialsim
+channels:
+  - conda-forge
+  - bioconda
+platforms:
+  - linux-64
+dependencies:
+  - python=3.12
+  - numpy=1.26.4
+  - scipy=1.13.*
+  - rdkit=2025.09.5       # rdkit/vina share libboost 1.86 (2024.03 pinned 1.84 → conflict)
+  - openbabel=3.1.*
+  - gemmi=0.6.*
+  - prody=2.6.1           # tethered covalent docking (Meeko CovalentBuilder)
+  - meeko=0.7.1           # ligand + covalent prep
+  - vina=1.2.7            # AutoDock Vina python bindings
+  - requests>=2.32
+  - pip
+  - pip:
+      - Flask==3.1.0      # service path used by regen_artifacts.py (create_app)

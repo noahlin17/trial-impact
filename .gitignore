@@ -15,5 +15,8 @@ venv/
 # Local databases / run artifacts
 *.db
 
+# Session-local sim toolchain (micromamba env, prototypes) — never commit (multi-GB)
+.tooling/
+
 # OS / editor
 .DS_Store

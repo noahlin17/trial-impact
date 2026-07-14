@@ -8,6 +8,7 @@ simulation runs inside a Devin session, which these tests stand in for).
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -757,12 +758,11 @@ def _holo_pdb(n_ligand_atoms=8):
 
 
 def test_docking_box_is_blind_not_ligand_centered(tmp_path):
-    """The box is deliberately blind (see README: pocket-focused boxing was reverted
-    because the largest co-crystal ligand is not necessarily the drug's pocket).
-
-    On a receptor small enough that the 40 Å cap does not bind, the box encloses
-    every atom rather than parking on the co-crystal ligand (x≈10) and excluding the
-    rest of the receptor (x≈0).
+    """``compute_docking_box`` is the **Tier-D fallback** (blind, centroid-centered) box,
+    used only when no curated/discovered co-crystal and no fpocket pocket is available
+    (see ``app.binding_site``). The default path is now pocket-aware; this asserts the
+    fallback still behaves as documented — enclosing every atom on a small receptor
+    rather than parking on an arbitrary ligand.
     """
     pytest.importorskip("numpy")
     from app.simulation import compute_docking_box
@@ -778,16 +778,13 @@ def test_docking_box_is_blind_not_ligand_centered(tmp_path):
 
 
 def test_docking_box_stops_covering_the_receptor_once_the_40A_cap_binds(tmp_path):
-    """KNOWN ISSUE (README → Limitations → "Docking box"): the box is capped at 40 Å
-    but stays centered on the centroid, so on any receptor larger than ~40 Å it
-    silently searches a central slab instead of the protein.
+    """The **Tier-D fallback** box is capped at 40 Å but stays centroid-centered, so on a
+    receptor larger than ~40 Å it searches a central slab, not the whole protein. This is
+    exactly why the router prefers the pocket-aware tiers (covalent-tethered / curated /
+    discovered holo / fpocket) and only falls back to this blind box when nothing better is
+    available — the limitation is preserved here so the fallback's coverage stays honest.
 
-    This is a characterization test: it pins the *current, wrong* behaviour so that a
-    future fix has to delete it deliberately rather than a "coverage" test passing by
-    accident. The old test asserted coverage on a ~10 Å toy receptor — the one input
-    where the cap can never trigger — so it could never have caught this.
-
-    Real measurements from the two published runs (reproduce with
+    Real measurements from the pre-routing published runs (reproduce with
     ``python verify_docking_box.py``):
 
         KRAS 7VVB          extent  56 x  55 x  44 Å  ->  ~80% of atoms in the box
@@ -834,3 +831,241 @@ def test_analysis_payload_and_route(ctx):
 
     html = client.get("/analysis", headers={"Accept": "text/html"}).data.decode()
     assert "Results Analysis" in html and "detail-waterfall" in html
+
+
+# --- binding-site routing (pure parsing / classification; no network or Vina) --- #
+def _bs_atom(rec, serial, name, resn, chain, resnum, x, y, z, elem):
+    """One fixed-column PDB record with a configurable chain and residue number."""
+    return (
+        f"{rec:<6}{serial:>5} {name:<4}{'':1}{resn:>3} {chain:1}{resnum:>4}{'':4}"
+        f"{x:>8.3f}{y:>8.3f}{z:>8.3f}{1.0:>6.2f}{0.0:>6.2f}{'':10}{elem:>2}\n"
+    )
+
+
+def _covalent_holo_pdb():
+    """A holo receptor whose Cys A:12 Sγ sits ~1.5 Å from a bound ligand (the covalent
+    bond), plus a distal Cys A:50 that must NOT be picked as reactive."""
+    lines = [
+        _bs_atom("ATOM", 1, "CA", "CYS", "A", 12, 8.0, 10.0, 10.0, "C"),
+        _bs_atom("ATOM", 2, "CB", "CYS", "A", 12, 9.0, 10.0, 10.0, "C"),
+        _bs_atom("ATOM", 3, "SG", "CYS", "A", 12, 10.0, 10.0, 10.0, "S"),
+        _bs_atom("ATOM", 4, "SG", "CYS", "A", 50, 40.0, 40.0, 40.0, "S"),
+    ]
+    lines += [
+        _bs_atom("HETATM", 100 + i, "C1", "LIG", "A", 900, 11.5 + i, 10.0, 10.0, "C")
+        for i in range(6)
+    ]
+    return "".join(lines)
+
+
+def _reversible_holo_pdb():
+    """A receptor with a co-crystal ligand VX7 offset from the protein centroid."""
+    lines = [
+        _bs_atom("ATOM", i, "CA", "ALA", "A", i, 0.0, 0.0, float(i), "C") for i in range(5)
+    ]
+    lines += [
+        _bs_atom("HETATM", 100 + i, "C1", "VX7", "A", 900, 20.0 + i, 5.0, 5.0, "C")
+        for i in range(4)
+    ]
+    return "".join(lines)
+
+
+def test_resolve_target_class_by_symbol_not_drug():
+    from app.binding_site import resolve_target_class
+
+    assert resolve_target_class("KRAS").covalent is True
+    assert resolve_target_class("KRAS G12C").holo_pdb == "6OIM"  # class token match
+    assert resolve_target_class("CFTR").covalent is False
+    assert resolve_target_class("EGFR").covalent is True
+    assert resolve_target_class("MADE-UP-TARGET") is None
+
+
+def test_covalent_tether_detects_michael_acceptor_only():
+    pytest.importorskip("rdkit")
+    from app.binding_site import covalent_tether
+    from app.simulation import embed_ligand
+
+    acrylamide = covalent_tether(embed_ligand("C=CC(=O)Nc1ccccc1"))
+    assert acrylamide is not None and acrylamide[1] == "C=CC(=O)N"
+    # A benign aromatic amide has no Michael acceptor → not tetherable.
+    assert covalent_tether(embed_ligand("CC(=O)Nc1ccccc1")) is None
+
+
+def test_detect_reactive_cys_picks_bonded_cysteine(tmp_path):
+    pytest.importorskip("numpy")
+    from app.binding_site import detect_reactive_cys
+
+    p = tmp_path / "cov.pdb"
+    p.write_text(_covalent_holo_pdb())
+    assert detect_reactive_cys(str(p)) == ("A", 12)  # not the distal A:50
+
+    # No bound ligand within covalent distance → no reactive cysteine.
+    q = tmp_path / "apo.pdb"
+    q.write_text(_bs_atom("ATOM", 1, "SG", "CYS", "A", 12, 0.0, 0.0, 0.0, "S"))
+    assert detect_reactive_cys(str(q)) is None
+
+
+def test_ligand_box_centers_on_cocrystal_not_receptor(tmp_path):
+    pytest.importorskip("numpy")
+    from app.binding_site import ligand_box, residue_box
+
+    p = tmp_path / "holo.pdb"
+    p.write_text(_reversible_holo_pdb())
+    center, size, code = ligand_box(str(p), ["VX7"])
+    assert code == "VX7"
+    assert center[0] == pytest.approx(21.5, abs=0.5)  # on the ligand (x≈20-23), not x≈0
+    assert max(size) <= 30.0  # capped, focused — not a whole-receptor slab
+
+    cov = tmp_path / "cov.pdb"
+    cov.write_text(_covalent_holo_pdb())
+    rc_center, rc_size = residue_box(str(cov), "A", 12)
+    assert rc_center == [9.0, 10.0, 10.0]  # the Cys CB
+    assert rc_size == [22.0, 22.0, 22.0]
+
+
+def test_select_binding_site_routes_covalent_to_tethered(tmp_path, monkeypatch):
+    """A covalent warhead + a curated covalent class → covalent-tethered route, with the
+    reactive residue and tether recorded in provenance (no network / Meeko needed)."""
+    pytest.importorskip("rdkit")
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+    from app.simulation import embed_ligand
+
+    holo = tmp_path / "6OIM.pdb"
+    holo.write_text(_covalent_holo_pdb())
+    monkeypatch.setattr(bs, "_fetch_experimental_pdb", lambda pdb_id, wd: (str(holo), "pdb"))
+    monkeypatch.setattr(bs, "prepare_covalent_ligand", lambda *a, **k: str(tmp_path / "lig.pdbqt"))
+
+    site = bs.select_binding_site(
+        target="KRAS", uniprot="P01116", smiles="C=CC(=O)Nc1ccccc1",
+        mol=embed_ligand("C=CC(=O)Nc1ccccc1"), covalent=True, workdir=str(tmp_path),
+    )
+    assert site.mode == "covalent-tethered (curated holo)"
+    assert site.box_provenance["reactive_residue"] == "A:CYS:12"
+    assert site.ligand_pdbqt is not None
+    assert site.center == [9.0, 10.0, 10.0]
+
+
+def test_select_binding_site_falls_back_to_blind(tmp_path, monkeypatch):
+    """An uncurated target with no discovered co-crystal and no fpocket → the blind
+    Tier-D fallback still runs (existing behaviour preserved)."""
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+
+    recep = tmp_path / "af.pdb"
+    recep.write_text(_reversible_holo_pdb())
+    monkeypatch.setattr(bs, "discover_holo", lambda uni, smi: None)
+    monkeypatch.setattr(
+        bs, "fetch_structure",
+        lambda uni, wd: (str(recep), {"structure_source": "AlphaFold", "pdb_id": f"AF-{uni}-F1"}),
+    )
+    monkeypatch.setattr(bs, "fpocket_box", lambda pdb, wd: None)
+
+    site = bs.select_binding_site(
+        target="NOVELKINASE", uniprot="Q99999", smiles="c1ccccc1",
+        mol=None, covalent=False, workdir=str(tmp_path),
+    )
+    assert site.mode == "blind"
+    assert site.structure_prov["structure_source"] == "AlphaFold"
+
+
+def test_select_binding_site_reversible_curated_holo(tmp_path, monkeypatch):
+    """A curated reversible class (CFTR) → holo-ligand box on its co-crystal ligand VX7,
+    with the ligand code and target class recorded in provenance."""
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+
+    holo = tmp_path / "6O2P.pdb"
+    holo.write_text(_reversible_holo_pdb())
+    monkeypatch.setattr(bs, "_fetch_experimental_pdb", lambda pdb_id, wd: (str(holo), "pdb"))
+
+    site = bs.select_binding_site(
+        target="CFTR", uniprot="P13569", smiles="CC1(C)...",
+        mol=None, covalent=False, workdir=str(tmp_path),
+    )
+    assert site.mode == "holo-ligand (curated)"
+    assert site.box_provenance["co_crystal_ligand"] == "VX7"
+    assert site.box_provenance["target_class"] == "CFTR potentiator site"
+    assert site.center[0] == pytest.approx(21.5, abs=0.5)  # on VX7, not the centroid
+
+
+def test_covalent_route_skips_graph_discovery(tmp_path, monkeypatch):
+    """A covalent drug's bound ligand is the reacted *adduct* (chemically ≠ the free
+    drug), so Tier-B graph discovery must NOT be attempted for covalent runs — an
+    uncurated covalent target degrades straight to fpocket/blind instead."""
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+
+    recep = tmp_path / "af.pdb"
+    recep.write_text(_reversible_holo_pdb())
+
+    def _boom(*a, **k):
+        raise AssertionError("discover_holo must not run on the covalent path")
+
+    monkeypatch.setattr(bs, "discover_holo", _boom)
+    monkeypatch.setattr(
+        bs, "fetch_structure",
+        lambda uni, wd: (str(recep), {"structure_source": "AlphaFold", "pdb_id": f"AF-{uni}-F1"}),
+    )
+    monkeypatch.setattr(bs, "fpocket_box", lambda pdb, wd: None)
+
+    site = bs.select_binding_site(
+        target="UNCURATED", uniprot="Q88888", smiles="C=CC(=O)Nc1ccccc1",
+        mol=None, covalent=True, workdir=str(tmp_path),
+    )
+    assert site.mode == "blind"  # reached without calling discover_holo
+
+
+def test_select_binding_site_unsupported_warhead_warns_and_falls_back(tmp_path, monkeypatch):
+    """A curated covalent class but a warhead that is not a tetherable Michael acceptor →
+    reversible-scored residue box (not tethered), with an explicit warning."""
+    pytest.importorskip("rdkit")
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+    from app.simulation import embed_ligand
+
+    holo = tmp_path / "6OIM.pdb"
+    holo.write_text(_covalent_holo_pdb())
+    monkeypatch.setattr(bs, "_fetch_experimental_pdb", lambda pdb_id, wd: (str(holo), "pdb"))
+
+    # A benign amide: covalent flag is set, but no tetherable warhead is present.
+    site = bs.select_binding_site(
+        target="KRAS", uniprot="P01116", smiles="CC(=O)Nc1ccccc1",
+        mol=embed_ligand("CC(=O)Nc1ccccc1"), covalent=True, workdir=str(tmp_path),
+    )
+    assert site.mode == "covalent-residue (curated holo, reversible fallback)"
+    assert site.ligand_pdbqt is None
+    assert any("not a tetherable" in w for w in site.warnings)
+
+
+def test_fpocket_box_parses_top_pocket(tmp_path, monkeypatch):
+    """When fpocket is on PATH, ``fpocket_box`` parses pocket1_vert.pqr into a capped box;
+    when it is absent it returns None (→ blind fallback)."""
+    pytest.importorskip("numpy")
+    import subprocess
+
+    import app.binding_site as bs
+
+    recep = tmp_path / "rec.pdb"
+    recep.write_text(_reversible_holo_pdb())
+
+    def _fake_run(cmd, capture_output=True, text=True):
+        # cmd = ["fpocket", "-f", <clean_in>]; emit the pocket vertices fpocket would write.
+        clean_in = cmd[2]
+        out_dir = os.path.join(clean_in[:-4] + "_out", "pockets")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "pocket1_vert.pqr"), "w") as fh:
+            for i in range(4):
+                fh.write(_bs_atom("ATOM", i, "C", "STP", "A", 1, 5.0 + i, 6.0, 7.0, "C"))
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bs.shutil, "which", lambda name: "/usr/bin/fpocket")
+    monkeypatch.setattr(bs.subprocess, "run", _fake_run)
+    box = bs.fpocket_box(str(recep), str(tmp_path))
+    assert box is not None
+    center, size = box
+    assert center[0] == pytest.approx(6.5, abs=0.5)
+    assert max(size) <= 30.0
+
+    monkeypatch.setattr(bs.shutil, "which", lambda name: None)
+    assert bs.fpocket_box(str(recep), str(tmp_path)) is None

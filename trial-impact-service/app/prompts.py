@@ -80,9 +80,19 @@ git checkout {sim_repo_commit}
 git rev-parse HEAD    # must print {sim_repo_commit}
 ```
 
-2. Install the scientific stack: `pip install -r requirements-sim.txt`. AutoDock
-   Vina, RDKit, Meeko and OpenBabel may need system libraries or a conda/mamba
-   environment — install whatever is required and fix issues until imports work.
+2. Install the scientific stack. The **canonical, reproducible** install is the conda
+   lock (RDKit, AutoDock Vina, Meeko, OpenBabel, Gemmi, ProDy, NumPy, SciPy on a common
+   libboost):
+
+```
+conda-lock install --name trialsim conda-sim.lock.yml
+# or: micromamba create -n trialsim -f conda-sim.lock.yml
+bash scripts/install_fpocket.sh   # fpocket is source-built (not on conda channels)
+```
+
+   `requirements-sim.txt` remains a best-effort pip fallback, but it cannot pin the
+   full native stack — prefer the lock. fpocket powers the geometric-pocket fallback; a
+   run still works without it (it degrades to the blind box).
 
 The commit `{sim_repo_commit}` is the single source of truth for this run. Pinning it
 is what makes the result reproducible from source and independently checkable, so run
@@ -96,12 +106,15 @@ python -m app.simulation --estimator "{estimator}" \\
     --tissue "{tissue}" --dose {dose} --json-only
 ```
 The selected estimator does the work. The default docking estimator resolves the
-UniProt accession for the target, fetches a real structure (experimental PDB via
-PDBe/SIFTS, else the AlphaFold model), fetches the ligand SMILES from PubChem and
-embeds it in 3D with RDKit, prepares receptor + ligand PDBQT, docks with AutoDock
-Vina for the binding free energy ΔG (kcal/mol) and Kd, then solves a 1-compartment
-PK/PD model in closed form (Bateman) for Cmax, AUC and target occupancy. The docked
-pose is NOT returned — only the scalars above go in the result line.
+UniProt accession for the target, fetches the ligand SMILES from PubChem and embeds it
+in 3D with RDKit, then **routes the docking box by chemistry/target class**: a covalent
+warhead against a curated covalent class (e.g. KRAS G12C) is tethered to the class's
+reactive cysteine; otherwise it uses a curated or auto-discovered drug-bound co-crystal
+box, then fpocket, then the blind centroid box — recording the tier in
+`docking_box.mode`. It docks with AutoDock Vina across a fixed seed set for the mean ΔG
+(kcal/mol) ± sd and Kd, then solves a 1-compartment PK/PD model in closed form (Bateman)
+for Cmax, AUC and free-drug target occupancy. The docked pose is NOT returned — only the
+scalars above go in the result line.
 
 If a step fails (missing dependency, unavailable structure, docking error), debug
 and re-run until it produces a result. If the target has no experimental structure,
