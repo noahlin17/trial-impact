@@ -1,77 +1,113 @@
 # Trial Impact
 
-**A new data modality for trial-event investing: run real computational chemistry on
-every clinical-trial readout, and get back a number instead of a label.**
+An event-driven system that runs structure-based chemistry on clinical-trial readouts and
+produces a quantitative estimate of target engagement, rather than a categorical read on the
+result.
 
-When a trial posts results, this spins up an isolated **[Devin](https://devin.ai)**
-session that does genuine **protein–ligand docking (AutoDock Vina) + PK/PD** against the
-drug and its target, and returns an independent, quantitative estimate of **binding
-affinity and implied target engagement** — computed from structure and chemistry, not
-from the sponsor's press release.
+When a trial posts results, the service opens an isolated [Devin](https://devin.ai) session
+that performs protein–ligand docking (AutoDock Vina) and a PK/PD solve against the drug and
+its target, and returns a binding affinity, an implied Kd and a derived target occupancy —
+computed from the structure and the chemistry rather than from the sponsor's description of
+the result.
 
-> **Not investment advice.** Every output is an automated research signal for
-> informational purposes only; a disclaimer is attached to each assessment.
+> **Not investment advice.** Output is an automated research signal for informational
+> purposes only; a disclaimer is attached to each assessment.
 
 ---
 
-## The thesis
+## Thesis
 
-Every desk watching a readout already gets a **label** — endpoint met or missed. It is public
-within minutes, everyone has it, and it is priced almost immediately. It says nothing about
-whether the molecule *should* work.
+A desk watching a readout receives a label: the endpoint was met, or it was not. That label is
+public within minutes and priced quickly, and it says little about whether the molecule should
+have been expected to work. This system produces a second input for the same event — a
+continuous estimate of target engagement — which can be scored against realized outcomes,
+entered into a probability model as one feature among several, and accumulated into a dataset.
 
-This produces a second, **orthogonal** input for the same event: an independent biophysical
-estimate of target engagement, computed from the protein structure and the ligand chemistry
-rather than from the sponsor's framing. **A number, not a label.** Numbers can be backtested
-against realized outcomes, and can enter a pricing model as their own feature — with errors
-plausibly uncorrelated with the market's priors, because they come from physics rather than
-sentiment or consensus.
+The reason to attempt it now is cost. Structure-based chemistry per trial has historically
+required a computational chemist. An agent sandbox does it per event, in minutes, for roughly
+the cost of the API calls.
 
-The economics are what make it a *feed* rather than a research project: structure-resolved
-chemistry per readout used to mean a computational chemist on staff; an agent sandbox does it
-**per event, in minutes, at API cost**, scoped to whatever universe the watcher points at.
+### The chemistry is unlikely to be an edge on its own
 
-### But the physics is not the moat
+That cost argument also cuts against the project. A signal's value tends to decay with the cost
+of reproducing it, and the cost here is low: Vina is free and has been available since 2010,
+RDKit, the PDB, AlphaFold DB, PubChem and Open Targets are all free, and this pipeline was
+assembled in days with agent assistance. If a ΔG is cheaply computable by anyone, it is
+reasonable to assume it is largely in the price already.
 
-The same sentence cuts the other way, and it should be said before anyone else says it.
-**A signal's value decays with the cost of reproducing it** — and the cost here is near zero.
-Vina is free and fifteen years old; RDKit, the PDB, AlphaFold DB, PubChem and Open Targets are
-all free; an agent wrote this pipeline in days (this repo's git history says so). If everyone
-can compute a ΔG for every trial, **ΔG is in the price.** Docking ahead of a readout is a
-commodity and should be assumed to commoditize further.
+So the edge, if there is one, is not in the chemistry. It would be in producing a
+**better-calibrated estimate of P(success)** than the one implied by the market, and trading the
+difference:
 
-So the estimator is not the asset. Three things plausibly are: **the labeled, point-in-time
-corpus** (models commoditize, data does not — and honest failure labels are hard to build
-precisely because the registry under-reports negatives); **the translation to price**; and
-**the evaluation harness** — because a new bio-AI model lands every quarter, and the edge
-belongs not to whoever *has* one but to whoever can test it against a labeled financial corpus,
-point-in-time, in a week.
+> edge = our P(success) − the market's implied P(success)
 
-**That last one is what this repo is trying to be.** The docking is a deliberately commodity
-*plugin* — the reference implementation and the control, not the source of edge. The honest
-pitch is **not "docking generates alpha" but "here is the infrastructure to find out what
-does."** It is also why the reproducibility discipline here is load-bearing rather than fussy:
-*a backtest across models whose numbers you cannot attribute is worthless.*
+The chemistry is one input to that estimate. Its job is to add incremental information, not to
+carry the argument.
 
-**Where this actually stands.** Both the chemistry and the market model are **placeholders
-meant to be refined and replaced.** The docking box does not cover the receptor; occupancy is
-computed from total rather than free drug; the market model is uncalibrated and rules-based.
-All of it is in [Known issues](#known-issues) rather than glossed. **The claim is not that
-these numbers are tradeable, or that docking is an edge** — it is that the modality is real,
-the plumbing exists and is reproducible from source, and the resulting quantity is the kind of
-thing a better model can be validated and priced against.
+### Why a weak signal might still be usable
 
-And scoring readouts is not the destination — it is the **training set**. The destination is
-running the same machinery at *trial registration* to forecast outcomes years ahead. Two things
-have to be true first, and neither is today: drugs fail mostly on **target validation**, which
-docking cannot see (human genetics is the strongest known public predictor — Open Targets gives
-it away free), and the chemistry has to clear a retrospective panel of known winners, **which
-this build fails**: it predicts that ivacaftor, an approved and transformative CF drug, does not
-engage its target.
+Grinold's fundamental law relates the information ratio to skill per decision and the number of
+independent decisions: `IR ≈ IC × √breadth`. A specialist analyst has a relatively high
+information coefficient across few names; a system of this kind would have a low one across many.
 
-📄 **The full argument — the moat, the two axes of failure, the phase decomposition, the
-acceptance test, what would make a backtest real, and where the alpha actually is — is in
-[THESIS.md](THESIS.md).**
+The table below is **illustrative, not measured** — the IC values are assumptions chosen to show
+the shape of the relationship, not estimates:
+
+| | IC (assumed) | decisions/yr | IR ≈ IC·√N |
+|---|---|---|---|
+| Specialist, concentrated coverage | 0.15 | 15 | 0.58 |
+| This system, modest edge, broad coverage | 0.05 | 200 | 0.71 |
+| …with chemistry adding some IC | 0.07 | 200 | 0.99 |
+| …and coverage extended further | 0.07 | 400 | 1.40 |
+
+The implication is that a weak but genuine signal applied to many decisions may be worth more
+than a strong one applied to few. A commoditized input does not need to be a good signal — it
+needs to be a slightly informative one that can be produced at scale, and scale is what the
+sandbox provides. It also suggests where to look: specialist coverage concentrates on a small
+number of high-profile catalysts, so the less-covered part of the universe is where a systematic
+estimate is more likely to add something. That is a coverage argument rather than an insight
+argument.
+
+### What this repository does and does not establish
+
+It establishes that the pipeline runs, that its outputs are **reproducible from source**, and
+that its failure modes are visible rather than silent. That is a precondition for testing the
+thesis. It is not evidence for it.
+
+Both the chemistry and the market model are placeholders. The docking box does not cover the
+receptor; occupancy is computed from total rather than free drug; the market model is
+uncalibrated and rules-based. These are set out in [Known issues](#known-issues). The current
+numbers are not tradeable, and the pipeline currently implies that ivacaftor — an approved and
+effective CF therapy — does not engage its target.
+
+The assumption most likely to be fatal is not "can we compute the chemistry," which works, but
+"does the chemistry carry information the market does not already have," which is untested. A
+baseline of phase × indication base rates plus a free genetic-association score is probably a
+reasonably strong prior on its own, and the physics has to beat it. That experiment is cheap and
+should be run before any further work on the physics.
+
+### The wider view
+
+[THESIS.md](THESIS.md) §5 sets out a broader position — held as a hypothesis rather than a
+finding, and formed from following the recent wave of AI-for-biology companies rather than from
+outcome data. In short: AI tooling is plausibly changing the outcome distribution of drug
+development, through patient selection, biomarker stratification and adaptive trial design, while
+pricing remains anchored to the historical distribution. If AI-enhanced trials have genuinely
+different odds and the market does not separate them from conventional ones, that gap is the
+opportunity. The evidence for the underlying claim is currently thin, and §5.2 says where I think
+it is most likely to be wrong.
+
+The weak point in that argument is not the economics but the **observability**: sponsors do not
+label trials as AI-enhanced, and without a classifier that identifies them from public data there
+is no trade, however real the effect. That classifier would be built from **trial protocol
+data** — eligibility criteria, stratification, adaptive-design features, endpoint choice — which
+ClinicalTrials.gov publishes and which the watcher here already ingests. On that view the more
+valuable direction for this project is not better docking but a move from *the molecule* to *the
+trial design*.
+
+📄 The full argument — defensibility, the two axes of drug failure, the pre-readout case, what a
+credible backtest would require, where the thesis is weakest, and the order in which its
+assumptions could be falsified — is in **[THESIS.md](THESIS.md)**.
 
 ---
 
@@ -101,22 +137,20 @@ Each has its own README with full detail.
 
 ### Why Devin
 
-The simulation is **real biophysics**, not a stub: fetch the target structure
+The simulation is a real pipeline rather than a stub: fetch the target structure
 (UniProt → experimental PDB, else AlphaFold), fetch the ligand (PubChem → SMILES →
-RDKit 3D), dock with **AutoDock Vina** for a real ΔG, then solve the PK/PD model in
-**closed form** (Bateman) for tissue exposure and target occupancy.
+RDKit 3D), dock with AutoDock Vina for a ΔG, then solve a PK/PD model in closed form
+(Bateman) for tissue exposure and target occupancy.
 
-That workload is the reason an agent sandbox is the right substrate rather than a
-convenience. It needs to `pip install` a heavy, fragile scientific stack (RDKit, Meeko,
-OpenBabel, Vina), pull structures from four different upstream APIs, and **iterate when
-any of them fails** — which they do, constantly, and in ways that are not knowable in
-advance (see the API-rot section below). A fixed container would have to anticipate every
-failure; a session can respond to one. That is precisely the "scientist at the desk"
-property, and it is what makes per-event structural chemistry cheap enough to run as a
-data feed instead of a research project. One isolated session per trial event keeps runs
-independently retryable and separately auditable.
+The workload is the reason a sandbox is used rather than a fixed container. It has to
+`pip install` a heavy and fragile scientific stack (RDKit, Meeko, OpenBabel, Vina), pull
+structures from four upstream APIs, and recover when any of them fails — which they do,
+in ways that are not predictable in advance (see the API-rot section below). A container
+would have to anticipate each failure; a session can respond to one. That adaptability is
+what makes per-event chemistry cheap enough to run at scale. One isolated session per
+trial event also keeps runs independently retryable and separately auditable.
 
-The tradeoff is that an agent will *also* fix things you did not want fixed — including
+The tradeoff is that an agent will also fix things it was not asked to fix — including
 the science. That is not hypothetical: it has happened twice here, and it is why the
 result contract carries a `code_patched` field. See
 [the result contract](trial-impact-service/README.md#the-result-contract-and-why-it-has-a-code_patched-field).
@@ -149,27 +183,26 @@ described above; it shows that the pipeline runs end to end, and it is not a tra
 | Phase 1 | KRAS × sotorasib | 7VVB (RCSB, exp.) | **−8.606** | 863 nM | 97.6% ‡ | ⚠︎ tox ‡ · covalent | ▲ AMGN strong · ▼ REGN/NVS |
 | Phase 3 | CFTR × ivacaftor | AF-P13569 (AlphaFold) | −8.702 † | 738 nM | 94.5% ‡ | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
 
-Every number in both rows has been **re-derived from the committed source** — Kd, Cmax,
-occupancy and both PoS deltas reproduce to the last digit, so the `code_patched: false`
-each run reports is verified rather than self-reported. The numbers came from
-`simulation.py` *as committed*, not from a session quietly patching it to get past a
-broken upstream API. That field exists because it caught exactly that (see below).
+Every number in both rows has been re-derived from the committed source: Kd, Cmax, occupancy
+and both PoS deltas reproduce to the last digit. The `code_patched: false` each run reports is
+therefore verified rather than self-reported — the numbers came from `simulation.py` as
+committed, not from a session that patched it to work around a broken upstream API. That field
+exists because it caught exactly that case (see below).
 
-**‡ Two of these columns mean less than they appear to, and the [Known issues](#known-issues)
-say so in detail.** Occupancy is computed from **total** drug rather than free drug — there
-is no protein-binding correction — so it is an *upper bound*, not target engagement.
-Ivacaftor is >99% plasma-protein-bound; corrected, its 94.5% is closer to **~15%**, which
-would downgrade the VRTX call from `strong` to `moderate` (issue #1). And the "tox" flag is
-really **≥2 Lipinski violations** — a drug-likeness/oral-absorption heuristic, not a
-toxicity model. It fires on sotorasib because sotorasib is a big lipophilic oncology
-molecule; sotorasib is also an *approved drug* (issue #3).
+**‡ Two of these columns should be read with caution**; [Known issues](#known-issues) has the
+detail. Occupancy is computed from total rather than free drug — there is no protein-binding
+correction — so it is an upper bound rather than an estimate of target engagement. Ivacaftor is
+reported in the literature as >99% plasma-protein-bound; corrected for that, its 94.5% would be
+closer to 15%, which is enough to change the VRTX call from `strong` to `moderate` (issue #1).
+The `tox_flag` is ≥2 Lipinski violations, which is a drug-likeness and oral-absorption
+heuristic rather than a toxicity model; it fires on sotorasib, which is an approved drug
+(issue #3).
 
-What the model does do honestly is discriminate on **real, drug-specific chemistry** rather
-than on anything hardcoded: sotorasib's flags fall out of its actual computed descriptors
-(MW 560.6, logP 5.30) and its acrylamide warhead trips a genuine RDKit substructure match,
-while ivacaftor (1 violation, reversible) comes back clean — so the two readouts earn
-different probability-of-success deltas. The *inputs* are real; it is the *interpretation*
-of two of them that is over-claimed, and I would rather say that than let a chemist find it.
+The inputs are drug-specific rather than hardcoded: sotorasib's flags derive from its computed
+descriptors (MW 560.6, logP 5.30) and an RDKit substructure match on its acrylamide warhead,
+while ivacaftor (one violation, reversible) comes back clean, so the two readouts produce
+different PoS deltas. The inputs are real; the interpretation placed on two of them in the
+market model is not well founded, and is documented as such.
 
 > **† The CFTR ΔG is not a pocket-resolved affinity, and should not be read as one.**
 > The docking box is centroid-centered and capped at 40 Å. CFTR is a 1480-residue
@@ -379,22 +412,38 @@ so a registry-only corpus is skewed toward winners). Keep terminated and withdra
 Close the label loop with an **LLM classifier** over results sections and press releases, instead
 of `watchlist.json` enrichment.
 
-**5 · Validate before pricing**
-Does the estimate carry information about the outcome, *conditional on what was already
-knowable?* Score it against realized outcomes and check its **residual signal over two
-baselines** — consensus/the label, and a **genetics-only model**. A feature that merely restates
-the readout is worth nothing however scientific it looks, and a physics model that cannot beat a
-free Open Targets score is not worth running. With ~90 % base-rate attrition, "predict failure"
-is itself a strong naive baseline that must be cleared.
+**5 · Fit a calibrated P(success) — and respect the small-n trap**
+The goal is a **better-calibrated probability than the market's**, with the chemistry as one
+feature among many. The intuition "more features, more data" contains the trap: **the binding
+constraint is labels, not features.** Filter to *(small molecule, known target, resolvable
+structure, listed sponsor, material to market cap, honest outcome)* and you have **hundreds to
+low thousands** of clean examples — so expect to support **10–30 features**, with regularized
+logistic regression or gradient boosting beating anything deep. Piling on every RDKit descriptor
+produces a beautiful backtest and no alpha.
+- **Time-series CV, never random k-fold** — random folds leak the future, and drug development is
+  non-stationary.
+- **Test the cheap baseline first:** historical PoS by phase × indication, plus the Open Targets
+  genetic score, is a strong and nearly-free prior. **The chemistry must prove incremental IC over
+  it — it may not**, and that is worth knowing *before* building more physics.
+- Pre-register hypotheses; test 100 feature sets and one will "work."
+- **KPI is calibration, not accuracy** — Brier / log-loss and a calibration curve *against the
+  market's implied PoS*. The question is never "were we right?" but *"were we systematically
+  right where the market was wrong, by enough to pay the spread?"*
 
-**6 · Then price it**
-Recover the market's **implied** probability of success — from options around the catalyst, or by
-decomposing market cap against a risk-adjusted NPV — because the edge is
-`our P(success) − implied P(success)`, not the level of our own call. Trade the divergence. Scope
-the universe to where the trial is **material to enterprise value** (SMID-cap, single/lead-asset
-biotech); a Phase 1 asset is noise inside a large-cap market cap. This needs real
-**sponsor→ticker entity resolution** first (issue #7). Then either productionize an analyst's
-existing process with this as a new input, or fit a quantitative model on the corpus.
+**6 · Then price it — and remember the edge is breadth**
+Recover the market's **implied** probability — from options around the catalyst, or by decomposing
+market cap against a risk-adjusted NPV — because the edge is `our P(success) − implied P(success)`,
+not the level of our own call. Trade the divergence in **options** (a binary catalyst makes the
+stock bimodal; convex payoffs pay you for being right about the *probability*, not the sign), and
+size by the edge.
+
+By `IR ≈ IC × √breadth`, a modest edge applied 200–400× a year beats a brilliant one applied 15×.
+So **do not try to out-analyze a specialist on a marquee Phase 3** — the edge is a **coverage
+arbitrage** in the neglected tail of uncovered SMID-cap names. That requires real
+**sponsor→ticker entity resolution** (issue #7): breadth is the whole thesis, and a six-entry
+`tickers.json` is exactly what breadth is not. Model **slippage honestly** — SMID biotech options
+are illiquid and IV crush around a binary event is brutal; an edge that cannot be harvested at
+size is not a business.
 
 **Harden & ship**
 Retries/timeouts on `blocked` or hung sessions; CI (GitHub Actions: ruff + pytest) plus a nightly
@@ -405,19 +454,19 @@ Postgres instead of SQLite; a deployed service + watcher on a scheduled `/poll`.
 
 ## Known issues
 
-Open defects, ranked. These are things that are **wrong**, not merely simplified — the
-modelling simplifications are catalogued separately under
+Open defects, ranked. These are errors rather than simplifications; the modelling
+simplifications are catalogued separately under
 [Limitations](trial-impact-service/README.md#limitations--modeling-caveats), which also carries
-the full detail and proposed fix for every row below. The domain of validity is in
+the full detail and proposed fix for every row below. The domain of validity is set out in
 [Chemistry & biophysical scope](#chemistry--biophysical-scope).
 
-I found most of these by auditing my own code *after* the runs were published. There is a
-pattern in the top four, and it is the real lesson of the project: **each one is a place where
-a defensible local choice gets silently promoted into a stronger claim downstream.** A relative
-score becomes an absolute Kd. A drug-likeness heuristic becomes a toxicity penalty. A total
-concentration becomes target engagement. A tractable box becomes "the whole receptor." Nothing
-crashes and no test fails — the claim just quietly inflates as it moves down the pipeline. In a
-scientific pipeline, the dangerous failures are not the ones that throw.
+Most of these were found by auditing the code after the runs had been published. The first four
+share a structure worth noting: in each case a locally reasonable choice is treated as a
+stronger claim further down the pipeline. A relative score is converted into an absolute Kd. A
+drug-likeness heuristic is applied as a toxicity penalty. A total concentration is reported as
+target engagement. A computationally tractable search box is described as covering the receptor.
+None of these raise an error or fail a test — the estimate simply becomes less well-founded than
+its downstream use implies.
 
 **Status:** ○ open · ◑ mitigated, not fixed · ✅ fixed
 

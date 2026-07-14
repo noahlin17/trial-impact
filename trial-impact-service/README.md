@@ -333,9 +333,9 @@ addressed; ○ = documented, future work.)
   box did, which is worse, not better.
   **Mitigated, not fixed:** the code now logs a warning when the cap binds, and
   `test_docking_box_stops_covering_the_receptor_once_the_40A_cap_binds` pins the
-  behaviour. (The test it replaced asserted coverage on a ~10 Å toy receptor — the one
-  input where the cap can never trigger — so it passed while the property it named was
-  false in production. A test that can only pass is not a test.)
+  behaviour. (The test it replaced asserted coverage on a ~10 Å toy receptor — the one input
+  where the cap can never trigger — so it passed while the property it claimed to check was
+  false in production.)
   **The real fix** is cavity detection (fpocket / P2Rank) or a **drug-bound** structure
   (6OIM for KRAS/sotorasib) pinned per trial. Simply enlarging the box is *not* a fix: an
   uncapped CFTR box is ~2.4 M Å³, far past the volume where Vina's sampling is meaningful,
