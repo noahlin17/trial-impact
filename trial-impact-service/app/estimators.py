@@ -33,7 +33,6 @@ from .simulation import (
     fetch_ligand_smiles,
     kd_from_dg,
     ligand_descriptors,
-    resolve_fu,
     run_pkpd,
     run_simulation,
 )
@@ -125,7 +124,7 @@ class LigandEfficiencyBaseline:
     project is built to avoid.
     """
 
-    id = "ligand-efficiency-baseline@1"
+    id = "ligand-efficiency-baseline@2"
 
     def run(
         self,
@@ -161,28 +160,28 @@ class LigandEfficiencyBaseline:
 
             lo, hi = _BASELINE_DG_BOUNDS
             dg = min(hi, max(lo, -_LE_KCAL_PER_HEAVY_ATOM * heavy_atoms))
-            kd_nM = kd_from_dg(dg)
             result.binding_affinity_kcal_mol = round(dg, 3)
-            result.kd_nM = round(kd_nM, 3)
-
-            # Same free-drug occupancy treatment as the docking estimator, so the
-            # head-to-head compares like with like.
-            fu_value, fu_source = resolve_fu(drug, fu)
-            result.provenance["fu"] = fu_value
-            result.provenance["fu_source"] = fu_source
-            if fu_source == "unknown":
-                result.warnings.append(
-                    "no plasma fraction-unbound (fu) for this drug; occupancy is a "
-                    "TOTAL-drug upper bound (fu=1), not free-drug engagement"
-                )
-
-            pkpd = run_pkpd(
-                dose_mg=dose_mg, mol_weight=desc["mw"], kd_nM=kd_nM,
-                tissue=tissue, fu=fu_value,
+            # Like the docking estimator, this ΔG is not a calibrated affinity (it is an
+            # explicit size proxy), so no headline Kd is surfaced (issue #4).
+            result.kd_nM = None
+            result.provenance["vina_pseudo_kd_nM"] = round(kd_from_dg(dg), 3)
+            result.provenance["vina_pseudo_kd_note"] = (
+                "exp(ΔG/RT) of a heavy-atom size proxy; NOT an affinity."
             )
+            # This control never touches a structure and never docks into a pocket, so
+            # it makes no engagement claim at all — which is exactly the axis on which
+            # the docking estimator must beat it in the head-to-head.
+            result.binding_engagement = "no-structure"
+            result.provenance["engagement_note"] = (
+                "structure-free baseline: no pocket, no pose, no engagement claim"
+            )
+
+            # Exposure (cmax/auc) is Kd-independent; occupancy needs a Kd and is not
+            # reported (matches the docking estimator under issue #4).
+            pkpd = run_pkpd(dose_mg=dose_mg, mol_weight=desc["mw"], tissue=tissue)
             result.cmax_ng_ml = round(pkpd["cmax_ng_ml"], 3)
             result.auc_ng_h_ml = round(pkpd["auc_ng_h_ml"], 3)
-            result.target_occupancy_pct = round(pkpd["target_occupancy_pct"], 2)
+            result.target_occupancy_pct = None
 
             violations = sum(
                 [desc["mw"] > 500, desc["logp"] > 5, desc["hbd"] > 5, desc["hba"] > 10]

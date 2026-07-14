@@ -30,10 +30,10 @@
     "binding_affinity_kcal_mol": -7.404,
     "binding_affinity_sd_kcal_mol": 0.007,
     "replicates": 3,
-    "kd_nM": 6061.468,
+    "kd_nM": null,
     "cmax_ng_ml": 5015.482,
     "auc_ng_h_ml": 37341.375,
-    "target_occupancy_pct": 2.06,
+    "target_occupancy_pct": null,
     "covalent_flag": false,
     "confidence": 0.897,
     "provenance": {
@@ -59,8 +59,9 @@
         -7.397,
         -7.41
       ],
-      "fu": 0.01,
-      "fu_source": "curated (plasma protein binding)"
+      "vina_pseudo_kd_nM": 6064.747,
+      "vina_pseudo_kd_note": "exp(\u0394G/RT) of the Vina score; NOT a measured or calibrated affinity \u2014 Vina ranks by size/contact, not Kd (issue #4). Do not read as binding strength.",
+      "engagement_note": "docked into an experimentally-resolved binding site with a reproducible multi-seed pose (geometric engagement, not affinity)"
     },
     "docking_box": {
       "center": [
@@ -79,12 +80,13 @@
     },
     "warnings": [],
     "error": null,
-    "estimator": "vina-docking-pkpd@2",
+    "estimator": "vina-docking-pkpd@3",
     "code_patched": false,
     "patch_summary": null,
-    "druglikeness_flag": false
+    "druglikeness_flag": false,
+    "binding_engagement": "experimental-site"
   },
-  "commentary": "Trial NCT-VERIFY-002 \u2014 Vertex Pharmaceuticals (ivacaftor / CFTR): endpoint met.\nModelled probability-of-success delta: +0.38.\n  \u25b2 VRTX (Vertex Pharmaceuticals, sponsor): up / strong\n  \u25bc CRSP (CRISPR Therapeutics, competitor): down / moderate\n  \u25bc BLUE (bluebird bio, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
+  "commentary": "Trial NCT-VERIFY-002 \u2014 Vertex Pharmaceuticals (ivacaftor / CFTR): endpoint met.\nModelled probability-of-success delta: +0.52.\n  \u25b2 VRTX (Vertex Pharmaceuticals, sponsor): up / strong\n  \u25bc CRSP (CRISPR Therapeutics, competitor): down / moderate\n  \u25bc BLUE (bluebird bio, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
   "price_calls": [
     {
       "ticker": "VRTX",
@@ -92,7 +94,7 @@
       "role": "sponsor",
       "direction": "up",
       "magnitude": "strong",
-      "rationale": "Trial NCT-VERIFY-002 endpoint met. Docking \u0394G -7.404\u00b10.007 (n=3) kcal/mol (Kd 6061.468 nM). Peak target occupancy 2.06%. PoS delta +0.38."
+      "rationale": "Trial NCT-VERIFY-002 endpoint met. Docking score \u0394G -7.404\u00b10.007 (n=3) kcal/mol (relative, size-confounded \u2014 not an affinity; issue #4). Target engagement: experimental-site (geometry, not strength). PoS delta +0.52."
     },
     {
       "ticker": "CRSP",
@@ -111,8 +113,8 @@
       "rationale": "Second-order read-through: a up move for Vertex Pharmaceuticals on CFTR typically implies a down move for rivals."
     }
   ],
-  "created_at": "2026-07-14T14:38:12+00:00",
-  "updated_at": "2026-07-14T14:38:12+00:00",
+  "created_at": "2026-07-14T16:36:54+00:00",
+  "updated_at": "2026-07-14T16:36:54+00:00",
   "error_message": null,
   "alert_sent": 1
 }

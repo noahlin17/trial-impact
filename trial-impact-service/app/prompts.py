@@ -112,9 +112,12 @@ warhead against a curated covalent class (e.g. KRAS G12C) is tethered to the cla
 reactive cysteine; otherwise it uses a curated or auto-discovered drug-bound co-crystal
 box, then fpocket, then the blind centroid box — recording the tier in
 `docking_box.mode`. It docks with AutoDock Vina across a fixed seed set for the mean ΔG
-(kcal/mol) ± sd and Kd, then solves a 1-compartment PK/PD model in closed form (Bateman)
-for Cmax, AUC and free-drug target occupancy. The docked pose is NOT returned — only the
-scalars above go in the result line.
+(kcal/mol) ± sd. That ΔG is a **relative, size-confounded docking score, NOT a
+calibrated affinity** (issue #4), so it is reported as a geometric `binding_engagement`
+classification (did the ligand dock into an experimentally-resolved site with a
+reproducible pose) — no absolute Kd or Kd-derived occupancy is emitted. A 1-compartment
+PK/PD model (Bateman) still gives Cmax/AUC exposure. The docked pose is NOT returned —
+only the scalars above go in the result line.
 
 If a step fails (missing dependency, unavailable structure, docking error), debug
 and re-run until it produces a result. If the target has no experimental structure,
@@ -142,8 +145,10 @@ for readability — every value below is a placeholder):
 
 ```
 {RESULT_MARKER} {{"target": "{target}", "drug": "{drug}", "tissue": "{tissue}",
-  "binding_affinity_kcal_mol": <float>, "kd_nM": <float>, "cmax_ng_ml": <float>,
-  "auc_ng_h_ml": <float>, "target_occupancy_pct": <float>, "druglikeness_flag": <bool>,
+  "binding_affinity_kcal_mol": <float>, "kd_nM": null, "cmax_ng_ml": <float>,
+  "auc_ng_h_ml": <float>, "target_occupancy_pct": null,
+  "binding_engagement": "<experimental-site|predicted-pocket|no-site|...>",
+  "druglikeness_flag": <bool>,
   "covalent_flag": <bool>, "confidence": <float>, "estimator": "{estimator}",
   "provenance": {{"uniprot": "<accession the script resolved>",
                  "pdb_id": "<structure the script actually used>"}},

@@ -65,7 +65,7 @@
     <thead>
       <tr>
         <th>Trial</th><th>Sponsor / Drug / Target</th><th>Status</th>
-        <th>Binding (ΔG / Kd)</th><th>Occupancy</th><th>Price calls</th><th>Session</th>
+        <th>Docking ΔG (score)</th><th>Engagement</th><th>Price calls</th><th>Session</th>
       </tr>
     </thead>
     <tbody>
@@ -89,12 +89,12 @@
         <td>
           {% if e.sim_result and e.sim_result.binding_affinity_kcal_mol is not none %}
             {{ e.sim_result.binding_affinity_kcal_mol }} kcal/mol
-            <div class="muted">Kd {{ e.sim_result.kd_nM }} nM</div>
+            <div class="muted" title="Vina score is relative and size-confounded, not an affinity (issue #4)">relative score · not a Kd</div>
           {% else %}<span class="muted">—</span>{% endif %}
         </td>
         <td>
-          {% if e.sim_result and e.sim_result.target_occupancy_pct is not none %}
-            {{ e.sim_result.target_occupancy_pct }}%
+          {% if e.sim_result and e.sim_result.binding_engagement %}
+            {{ e.sim_result.binding_engagement }}
           {% else %}<span class="muted">—</span>{% endif %}
         </td>
         <td>

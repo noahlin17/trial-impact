@@ -47,11 +47,10 @@
   <div class="cards" id="cards"></div>
 
   <h2>Physics → price relationships</h2>
-  <p class="legend">Each point is one run (hover for drug/target). Red = drug-likeness flag (≥2 Lipinski violations; informational, not a safety signal).</p>
+  <p class="legend">Each point is one run (hover for drug/target). Red = drug-likeness flag (≥2 Lipinski violations; informational, not a safety signal). Docking ΔG is a <strong>relative, size-confounded score, not an affinity</strong> (issue #4): it is not converted to Kd and does not drive occupancy.</p>
   <div class="charts">
-    <div class="chart"><h3>Binding ΔG vs PoS delta</h3><div id="c_dg_pos"></div></div>
-    <div class="chart"><h3>Kd (log) vs target occupancy</h3><div id="c_kd_occ"></div></div>
-    <div class="chart"><h3>Target occupancy vs PoS delta</h3><div id="c_occ_pos"></div></div>
+    <div class="chart"><h3>Docking ΔG (relative score) vs PoS delta</h3><div id="c_dg_pos"></div></div>
+    <div class="chart"><h3>Geometric engagement (run count)</h3><div id="c_engagement"></div></div>
     <div class="chart"><h3>Distribution of PoS deltas</h3><div id="c_hist"></div></div>
   </div>
 
@@ -66,9 +65,8 @@
         <th data-key="target">Target</th>
         <th data-key="drug">Drug</th>
         <th data-key="phase">Phase</th>
-        <th data-key="dg">ΔG</th>
-        <th data-key="kd">Kd (nM)</th>
-        <th data-key="occupancy">Occ %</th>
+        <th data-key="dg">ΔG (score)</th>
+        <th data-key="engagement">Engagement</th>
         <th data-key="druglikeness">Drug-likeness</th>
         <th data-key="pos_delta">PoS Δ</th>
         <th data-key="sponsor_ticker">Call</th>
@@ -96,7 +94,7 @@
       const s = DATA.summary;
       const items = [
         ["Runs", s.analyzed], ["Mean ΔG", num(s.mean_dg, 2)],
-        ["Mean occ %", num(s.mean_occupancy, 1)], ["Drug-likeness rate", s.druglikeness_rate === null ? "—" : num(s.druglikeness_rate * 100, 0) + "%"],
+        ["Engagement rate", s.engagement_rate === null ? "—" : num(s.engagement_rate * 100, 0) + "%"], ["Drug-likeness rate", s.druglikeness_rate === null ? "—" : num(s.druglikeness_rate * 100, 0) + "%"],
         ["Mean PoS Δ", s.mean_pos_delta === null ? "—" : (s.mean_pos_delta > 0 ? "+" : "") + num(s.mean_pos_delta, 2)],
         ["Market-moving", s.market_moving],
       ];
@@ -121,9 +119,12 @@
       if (!p.length) { document.querySelector(".charts").innerHTML = '<p class="muted">No completed runs yet.</p>'; return; }
       const txt = p.map(d => `${d.target} × ${d.drug}`);
       const col = p.map(d => d.druglikeness ? "#a11f1f" : "#2a6df4");
-      scatter("c_dg_pos", p.map(d => d.dg), p.map(d => d.pos), txt, col, "ΔG (kcal/mol)", "PoS Δ", false);
-      scatter("c_kd_occ", p.map(d => d.kd), p.map(d => d.occ), txt, col, "Kd (nM)", "occupancy %", true);
-      scatter("c_occ_pos", p.map(d => d.occ), p.map(d => d.pos), txt, col, "occupancy %", "PoS Δ", false);
+      scatter("c_dg_pos", p.map(d => d.dg), p.map(d => d.pos), txt, col, "ΔG (kcal/mol, relative score)", "PoS Δ", false);
+      const eng = {};
+      p.forEach(d => { const k = d.engagement || "—"; eng[k] = (eng[k] || 0) + 1; });
+      Plotly.newPlot("c_engagement", [{ x: Object.keys(eng), y: Object.values(eng), type: "bar", marker: { color: "#2a6df4" } }],
+        { margin: { t: 6, r: 10, b: 80, l: 50 }, height: 260, xaxis: { title: "engagement" }, yaxis: { title: "runs" } },
+        { displayModeBar: false, responsive: true });
       Plotly.newPlot("c_hist", [{ x: p.map(d => d.pos), type: "histogram", marker: { color: "#2a6df4" } }],
         { margin: { t: 6, r: 10, b: 40, l: 50 }, height: 260, xaxis: { title: "PoS Δ" }, yaxis: { title: "count" } },
         { displayModeBar: false, responsive: true });
@@ -141,10 +142,10 @@
         <h3 style="margin:1rem 0 0.2rem">${t.target} × ${t.drug} <span class="muted" style="font-weight:400">· ${t.nct_id}</span>
           <span class="muted" style="font-weight:400;font-size:0.8rem">· ΔG spread ${num(t.dg_spread, 2)} · PoS spread ${num(t.pos_spread, 2)}</span></h3>
         <table>
-          <thead><tr><th>Estimator</th><th>ΔG</th><th>Kd (nM)</th><th>Occ %</th><th>Confidence</th><th>PoS Δ</th></tr></thead>
+          <thead><tr><th>Estimator</th><th>ΔG (score)</th><th>Engagement</th><th>Confidence</th><th>PoS Δ</th></tr></thead>
           <tbody>${t.arms.map(a => `
-            <tr><td><code>${a.estimator}</code></td><td>${num(a.dg, 2)}${a.dg_sd != null ? "±" + num(a.dg_sd, 2) : ""}</td><td>${num(a.kd, 0)}</td>
-              <td>${num(a.occ, 1)}</td><td>${num(a.confidence, 2)}</td>
+            <tr><td><code>${a.estimator}</code></td><td>${num(a.dg, 2)}${a.dg_sd != null ? "±" + num(a.dg_sd, 2) : ""}</td><td>${a.engagement ?? "—"}</td>
+              <td>${num(a.confidence, 2)}</td>
               <td>${a.pos > 0 ? "+" : ""}${num(a.pos, 2)}</td></tr>`).join("")}
           </tbody>
         </table>`).join("");
@@ -164,7 +165,7 @@
         <tr data-i="${i}" class="${selected === r.event_id ? "selected" : ""}">
           <td><strong>${r.target ?? "—"}</strong></td><td>${r.drug ?? "—"}</td>
           <td>${(r.phase || "—").replace("PHASE", "P")}</td>
-          <td>${num(r.dg, 2)}${r.dg_sd != null ? "±" + num(r.dg_sd, 2) : ""}</td><td>${num(r.kd, 0)}</td><td>${num(r.occupancy, 1)}</td>
+          <td>${num(r.dg, 2)}${r.dg_sd != null ? "±" + num(r.dg_sd, 2) : ""}</td><td>${r.engagement ?? "—"}</td>
           <td>${r.druglikeness ? "⚠︎" : "·"}</td>
           <td>${r.pos_delta > 0 ? "+" : ""}${num(r.pos_delta, 2)}</td>
           <td class="${r.direction}">${arrow(r.direction)} ${r.sponsor_ticker ?? "—"}</td>
@@ -194,7 +195,7 @@
             <div class="legend" style="margin-top:.4rem">UniProt ${prov.uniprot ?? "—"} · SMILES <code style="font-size:.7rem">${(prov.smiles ?? "").slice(0, 42)}${(prov.smiles ?? "").length > 42 ? "…" : ""}</code></div>
           </div>
           <div>
-            <div class="legend">PK/PD exposure (Bateman model): tissue concentration &amp; target occupancy over 48 h.</div>
+            <div class="legend">PK/PD exposure (Bateman model): tissue concentration over 48 h. Occupancy is shown only when a calibrated Kd exists — the docking estimator reports none (issue #4).</div>
             <div id="detail-pkpd" style="height:260px"></div>
           </div>
           <div>
@@ -217,13 +218,13 @@
       if (c) {
         Plotly.newPlot(pk, [
           { x: c.t_h, y: c.conc_ng_ml, name: "Conc (ng/mL)", mode: "lines", line: { color: "#2a6df4" } },
-          { x: c.t_h, y: c.occupancy_pct, name: "Occupancy (%)", yaxis: "y2", mode: "lines", line: { color: "#1c7a3e" } }
+          ...((c.occupancy_pct && c.occupancy_pct.length) ? [{ x: c.t_h, y: c.occupancy_pct, name: "Occupancy (%)", yaxis: "y2", mode: "lines", line: { color: "#1c7a3e" } }] : [])
         ], {
           margin: { t: 6, r: 50, b: 40, l: 50 }, height: 260, legend: { orientation: "h", y: 1.15 },
           xaxis: { title: "time (h)" }, yaxis: { title: "conc (ng/mL)" },
           yaxis2: { title: "occ %", overlaying: "y", side: "right", range: [0, 100] }
         }, { displayModeBar: false, responsive: true });
-      } else { pk.innerHTML = '<div class="legend" style="padding:1rem">curve unavailable (missing dose/MW/Kd)</div>'; }
+      } else { pk.innerHTML = '<div class="legend" style="padding:1rem">curve unavailable (missing dose/MW)</div>'; }
 
       // PoS reasoning waterfall
       const comps = d.pos_breakdown.components;

@@ -9,7 +9,7 @@ side plus the spread between them.
 
     python compare_estimators.py                       # KRAS x sotorasib, both estimators
     python compare_estimators.py --target CFTR --drug ivacaftor --tissue lung --dose 150
-    python compare_estimators.py --estimators vina-docking-pkpd@1 ligand-efficiency-baseline@1
+    python compare_estimators.py --estimators vina-docking-pkpd@3 ligand-efficiency-baseline@2
 """
 
 from __future__ import annotations

@@ -53,7 +53,11 @@ EVENT = {
     "dose_mg": 50,
 }
 
-# What the (faked) Devin simulation session "returns" — a decent binder, drug-like.
+# What the (faked) Devin simulation session "returns". The Vina score is a relative,
+# size-confounded docking score, not an affinity (issue #4): no absolute Kd and no
+# Kd-derived occupancy are surfaced; the uncalibrated exp(ΔG/RT) is kept in provenance
+# and engagement is a geometric claim. An AlphaFold model is a predicted structure, so
+# this run is not on an experimentally-resolved site.
 DELTA_G = -8.8
 SIM_RESULT = {
     "target": "ZORB1",
@@ -61,10 +65,11 @@ SIM_RESULT = {
     "tissue": "hepatic",
     "dose_mg": 50,
     "binding_affinity_kcal_mol": DELTA_G,
-    "kd_nM": round(kd_from_dg(DELTA_G), 2),
+    "kd_nM": None,
     "cmax_ng_ml": 318.5,
     "auc_ng_h_ml": 4120.0,
-    "target_occupancy_pct": 71.5,
+    "target_occupancy_pct": None,
+    "binding_engagement": "predicted-pocket",
     "druglikeness_flag": False,
     "confidence": 0.82,
     "provenance": {
@@ -72,6 +77,8 @@ SIM_RESULT = {
         "structure_source": "AlphaFold",
         "pdb_id": "AF-Q9FAKE1-F1",
         "smiles": "CC(=O)Nc1ccc(cc1)S(=O)(=O)N",
+        "vina_pseudo_kd_nM": round(kd_from_dg(DELTA_G), 2),
+        "vina_pseudo_kd_note": "exp(ΔG/RT) of the Vina score; NOT an affinity (issue #4).",
     },
 }
 
@@ -165,8 +172,8 @@ def main() -> int:
     stored = app.extensions["trial_impact"]["db"].get_event(
         make_event_id(EVENT["nct_id"], EVENT["event_type"]))
     print("\nStored simulation result:")
-    for k in ("binding_affinity_kcal_mol", "kd_nM", "cmax_ng_ml",
-              "target_occupancy_pct", "druglikeness_flag", "confidence"):
+    for k in ("binding_affinity_kcal_mol", "binding_engagement", "cmax_ng_ml",
+              "auc_ng_h_ml", "druglikeness_flag", "confidence"):
         print(f"  {k:26s} = {stored['sim_result'][k]}")
 
     print("\nShare-price calls:")

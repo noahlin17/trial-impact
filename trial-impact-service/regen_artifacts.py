@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
-"""Regenerate the committed results/ artifacts from the real pipeline.
+"""Regenerate the committed results/ artifacts, then rebuild the dashboards.
 
-Runs the *actual* committed estimator (real structure fetch, real AutoDock Vina
-docking across the pinned seed set, real PK/PD) for the two published trials, then
-drives each real ``sim_result`` through the real service path (market model, tickers,
-commentary, dashboards) via a scripted Devin transport. The physics is real and
-``code_patched: false``; only the Devin *transport* is stubbed, since this runs the
-committed source directly against the pinned requirements-sim.txt stack rather than in
-a hosted session. That is what makes the numbers reproducible-from-source verifiable.
+Two modes:
 
-    python regen_artifacts.py
+* ``--replay`` (default): rebuild each committed ``results/sim_*.json`` under the
+  current estimator semantics **without re-docking**. The docking ΔG / pose / box /
+  structure are unchanged (they came from the real pinned-seed Vina run); only the
+  *post-docking* transform is re-applied — which is exactly what issue #4 changed
+  (a Vina score is a relative, size-confounded docking score, so no absolute Kd and no
+  Kd-derived occupancy are surfaced; engagement is a geometric classification). This
+  avoids re-running Vina (and the structure-routing non-determinism that comes with it)
+  for a change that is purely post-docking.
+* ``--redock``: run the *actual* committed docking estimator end to end (needs the
+  canonical conda-lock ``trialsim`` sim env). Use only when a net-new docking proof is
+  required.
+
+Either way, each ``sim_result`` is driven through the real service path (market model,
+tickers, commentary, dashboards) via a scripted Devin transport; only the Devin
+*transport* is stubbed.
+
+    python regen_artifacts.py            # replay (no docking)
+    python regen_artifacts.py --redock   # real Vina (needs the trialsim env)
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -23,6 +35,12 @@ from app.db import Database, make_event_id
 from app.devin_client import SessionStatus
 from app.estimators import get_estimator
 from app.signing import SIGNATURE_HEADER, sign
+from app.simulation import (
+    VINA_ESTIMATOR_ID,
+    classify_engagement,
+    kd_from_dg,
+    run_pkpd,
+)
 
 SECRET = "regen-secret"
 RESULTS = Path(__file__).resolve().parent.parent / "results"
@@ -99,22 +117,84 @@ def _run_event(app, trial: dict) -> dict:
     return app.extensions["trial_impact"]["db"].get_event(eid)
 
 
-def main() -> int:
-    estimator = get_estimator("vina-docking-pkpd@2")
+def replay_at_current_semantics(old_sim: dict) -> dict:
+    """Rebuild a committed sim_result under the current (issue #4) semantics.
+
+    The docking outputs (ΔG, sd, replicates, seeds, pose box, structure) are copied
+    verbatim — NO re-docking. Only the post-docking transform is re-applied: the Vina
+    score is no longer turned into an absolute Kd or a Kd-derived occupancy; the
+    uncalibrated exp(ΔG/RT) value is kept in provenance for transparency, and a
+    geometric ``binding_engagement`` classification is added.
+    """
+    sim = dict(old_sim)
+    prov = dict(sim.get("provenance") or {})
+    dg = sim["binding_affinity_kcal_mol"]
+    sd = sim.get("binding_affinity_sd_kcal_mol")
+    mode = (sim.get("docking_box") or {}).get("mode")
+
+    prov["vina_pseudo_kd_nM"] = round(kd_from_dg(dg), 3)
+    prov["vina_pseudo_kd_note"] = (
+        "exp(ΔG/RT) of the Vina score; NOT a measured or calibrated affinity — "
+        "Vina ranks by size/contact, not Kd (issue #4). Do not read as binding strength."
+    )
+    engagement, note = classify_engagement(mode, dg, sd)
+    prov["engagement_note"] = note
+    # Occupancy/free-drug machinery is gone under issue #4; drop its provenance.
+    prov.pop("fu", None)
+    prov.pop("fu_source", None)
+    sim["provenance"] = prov
+    sim["kd_nM"] = None
+    sim["target_occupancy_pct"] = None
+    sim["binding_engagement"] = engagement
+
+    mw = (prov.get("descriptors") or {}).get("mw")
+    if mw:  # exposure is Kd-independent; recompute so it matches the current model
+        pk = run_pkpd(dose_mg=sim["dose_mg"], mol_weight=mw, tissue=sim["tissue"])
+        sim["cmax_ng_ml"] = round(pk["cmax_ng_ml"], 3)
+        sim["auc_ng_h_ml"] = round(pk["auc_ng_h_ml"], 3)
+    sim["estimator"] = VINA_ESTIMATOR_ID
+    return sim
+
+
+def _load_committed_sim(name: str) -> dict:
+    old = json.loads((RESULTS / f"sim_{name}.json").read_text())
+    return old["sim_result"]
+
+
+def build_sim_results(redock: bool) -> dict[str, dict] | None:
     sim_results: dict[str, dict] = {}
+    if redock:
+        estimator = get_estimator(VINA_ESTIMATOR_ID)
     for t in TRIALS:
-        print(f"── docking {t['target']} × {t['drug']} (real Vina, pinned seeds) ──")
-        res = estimator.run(
-            target=t["target"], drug=t["drug"], tissue=t["tissue"], dose_mg=t["dose"],
-        )
-        if res.error:
-            print(f"  FAILED: {res.error}")
-            return 1
-        sim_results[t["name"]] = res.to_dict()
-        print(f"  ΔG={res.binding_affinity_kcal_mol}±{res.binding_affinity_sd_kcal_mol}"
-              f"  Kd={res.kd_nM}  occ={res.target_occupancy_pct}%"
-              f"  {res.provenance['pdb_id']} ({res.provenance['structure_format']})"
-              f"  conf={res.confidence}")
+        if redock:
+            print(f"── docking {t['target']} × {t['drug']} (real Vina, pinned seeds) ──")
+            res = estimator.run(
+                target=t["target"], drug=t["drug"], tissue=t["tissue"], dose_mg=t["dose"],
+            )
+            if res.error:
+                print(f"  FAILED: {res.error}")
+                return None
+            sim = res.to_dict()
+        else:
+            print(f"── replaying {t['target']} × {t['drug']} (committed ΔG, no re-dock) ──")
+            sim = replay_at_current_semantics(_load_committed_sim(t["name"]))
+        sim_results[t["name"]] = sim
+        print(f"  ΔG={sim['binding_affinity_kcal_mol']}±{sim.get('binding_affinity_sd_kcal_mol')}"
+              f"  engagement={sim.get('binding_engagement')}"
+              f"  {sim['provenance']['pdb_id']}  conf={sim.get('confidence')}"
+              f"  estimator={sim['estimator']}")
+    return sim_results
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--redock", action="store_true",
+                        help="re-run real Vina (needs the trialsim env); default replays")
+    args = parser.parse_args(argv)
+
+    sim_results = build_sim_results(redock=args.redock)
+    if sim_results is None:
+        return 1
 
     # Per-trial: isolated DB so /status renders exactly one run per dashboard.
     for t in TRIALS:
