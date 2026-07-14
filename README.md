@@ -1,17 +1,63 @@
 # Trial Impact
 
-Turn a **clinical-trial readout** into a **share-price impact call** — by running a
-real biophysical simulation of the drug against its target and scoring the result.
+**A new data modality for trial-event investing: run real computational chemistry on
+every clinical-trial readout, and get back a number instead of a label.**
 
-When a trial posts results, the system spins up an isolated **[Devin](https://devin.ai)**
-session that does genuine **protein–ligand docking (AutoDock Vina) + PK/PD** in a
-sandbox, extracts the binding/exposure metrics, and a transparent market model
-emits directional calls for the sponsor and its publicly-traded competitors —
-surfaced on a dashboard with an interactive **3D view of the structure it docked
-against** (the pose itself is not returned — see Honest caveats).
+When a trial posts results, this spins up an isolated **[Devin](https://devin.ai)**
+session that does genuine **protein–ligand docking (AutoDock Vina) + PK/PD** against the
+drug and its target, and returns an independent, quantitative estimate of **binding
+affinity and implied target engagement** — computed from structure and chemistry, not
+from the sponsor's press release.
 
 > **Not investment advice.** Every output is an automated research signal for
 > informational purposes only; a disclaimer is attached to each assessment.
+
+---
+
+## The thesis
+
+Every desk watching a readout already gets a **label**: endpoint met or missed, positive
+or negative, however it is classified. That label is public within minutes, everyone has
+it, and it is priced almost immediately. It carries no independent view of whether the
+molecule *should* work.
+
+This produces a second, **orthogonal** input for the same event: an independent
+biophysical estimate of whether the drug engages its target, derived from the protein
+structure and the ligand chemistry. For each readout you get, *alongside* the
+classification, a **ΔG / Kd and a PK/PD-implied efficacy estimate** — a continuous
+quantity that can be:
+
+- **backtested** against realized outcomes and realized price moves, which a label cannot
+  be scored against in the same way;
+- fed into a pricing model as **its own feature**, one whose errors are uncorrelated with
+  the market's priors because it is computed from physics rather than from sentiment,
+  consensus, or the sponsor's framing;
+- accumulated into a **corpus**, so that with enough history the same signal supports
+  systematic strategies rather than one-off fundamental calls.
+
+The economics are the enabling part. Running structure-resolved chemistry per readout has
+historically meant a computational chemist on staff. An agent sandbox does it **per event,
+in minutes, at API cost** — with the customizability of a real scientist at your desk,
+scoped to whatever universe you point the watcher at (a therapeutic area, a sponsor set, a
+single competitive mechanism). That changes it from a research project into a **data feed**.
+
+**Where this actually stands.** Both halves of the pipeline — the chemistry and the market
+model — are real work, and both need substantially more sophistication and research
+refinement before this generates true alpha. The docking is blind and coarse; occupancy is
+computed from total rather than free drug; the market model is uncalibrated, rules-based,
+and not weighted by phase. These are documented in detail under
+[Known issues](#known-issues) and [Chemistry & biophysical scope](#chemistry--biophysical-scope)
+rather than glossed. **The claim here is not that the current numbers are tradeable.** The
+claim is that the *modality* is real, that the plumbing to produce it per event exists and
+is reproducible from source, and that the resulting quantity is the kind of thing that can
+be validated, calibrated, and priced.
+
+The market model in this repo is deliberately a **transparent, rules-based placeholder** —
+a glass box that shows how a physics estimate would flow into a directional view, not a
+serious pricing engine. The intended path is to run it long enough to build the corpus,
+then either **work with analysts to productionize their existing pricing and evaluation
+process** using this as a new input, or **use the accumulated data to fit a quantitative
+model outright** on a scientific dimension the market is not currently pricing.
 
 ---
 
@@ -35,17 +81,41 @@ Two independently-deployable services:
 | Directory | What it is |
 |-----------|-----------|
 | [`trial-impact-service/`](trial-impact-service/) | The Flask analysis service: trigger → orchestrate (Devin) → observe → reconcile, SQLite read model, market model, alerts, 3D dashboard. |
-| [`ctgov-watcher/`](ctgov-watcher/) | A tiny poller that diffs ClinicalTrials.gov v2 and emits signed webhooks (CT.gov has no native webhooks). |
+| [`ctgov-watcher/`](ctgov-watcher/) | A poller that diffs ClinicalTrials.gov v2 and emits signed webhooks (CT.gov has no native webhooks). **Scoped by configuration** — point it at a therapeutic area, a sponsor set, or a single competitive mechanism, and it only fires for that universe. This is what makes the feed targetable rather than a firehose. |
 
 Each has its own README with full detail.
 
 ### Why Devin
-The tissue/protein simulation is **real biophysics**, not a stub: fetch the target
-structure (UniProt → experimental PDB, else AlphaFold), fetch the ligand
-(PubChem → SMILES → RDKit 3D), dock with **AutoDock Vina** for a real ΔG, then solve
-the PK/PD model in **closed form** (Bateman) for tissue exposure and target occupancy.
-That needs a full sandbox that can `pip install` a heavy scientific stack, pull
-structures, and iterate on failures — one isolated Devin session per trial event.
+
+The simulation is **real biophysics**, not a stub: fetch the target structure
+(UniProt → experimental PDB, else AlphaFold), fetch the ligand (PubChem → SMILES →
+RDKit 3D), dock with **AutoDock Vina** for a real ΔG, then solve the PK/PD model in
+**closed form** (Bateman) for tissue exposure and target occupancy.
+
+That workload is the reason an agent sandbox is the right substrate rather than a
+convenience. It needs to `pip install` a heavy, fragile scientific stack (RDKit, Meeko,
+OpenBabel, Vina), pull structures from four different upstream APIs, and **iterate when
+any of them fails** — which they do, constantly, and in ways that are not knowable in
+advance (see the API-rot section below). A fixed container would have to anticipate every
+failure; a session can respond to one. That is precisely the "scientist at the desk"
+property, and it is what makes per-event structural chemistry cheap enough to run as a
+data feed instead of a research project. One isolated session per trial event keeps runs
+independently retryable and separately auditable.
+
+The tradeoff is that an agent will *also* fix things you did not want fixed — including
+the science. That is not hypothetical: it has happened twice here, and it is why the
+result contract carries a `code_patched` field. See
+[the result contract](trial-impact-service/README.md#the-result-contract-and-why-it-has-a-code_patched-field).
+
+### On the label
+
+The framing above assumes each event arrives with a **classification** (endpoint met /
+missed) that the physics estimate sits *alongside*. Today that label is supplied by
+per-trial enrichment (`watchlist.json`), **not** derived automatically —
+ClinicalTrials.gov does not expose met/missed in machine-readable form. An LLM classifier
+over the CT.gov results section and the sponsor's press release is the intended path and
+is tracked under [Next steps](#next-steps); it does not exist yet. The physics half of the
+pipeline is the part that is built.
 
 ---
 
@@ -54,6 +124,11 @@ structures, and iterate on failures — one isolated Devin session per trial eve
 Genuine outputs from live Devin sessions (see [`results/`](results/) for the raw JSON
 and the rendered dashboards — open the `.html` files in a browser). Docking is
 **seed-pinned**, so these reproduce: re-running a trial returns the same ΔG.
+
+**Read the physics columns as the product and the model call as scaffolding.** ΔG / Kd /
+occupancy are the net-new data modality — the quantity a pricing model would eventually
+consume as a feature. The `Model call` column is the transparent rules-based placeholder
+described above; it shows that the pipeline runs end to end, and it is not a trade.
 
 | Trial | Target × Drug | Structure | ΔG (kcal/mol) | Kd | Target occ. ‡ | Flags | Model call |
 |-------|---------------|-----------|---------------|----|-----------|-----|-----------|
@@ -268,13 +343,34 @@ cd trial-impact-service && pip install -r requirements-dev.txt && ruff check . &
   a separate affinity path for biologics (antibodies can't dock). Pin the sim
   environment (conda-lock); Vina's seed is already pinned, so ΔG now reproduces.
 
-**Make the market call credible**
-- Weight the probability-of-success delta by trial **phase** (Phase 1 ≪ Phase 3) and
-  by whether it's the sponsor's lead asset / its market-cap exposure.
-- Wire live quotes + market cap (no market-data client exists yet) and **backtest** calls
-  against historical biotech readouts to calibrate direction and magnitude.
-- Auto-derive `endpoint_outcome` (met/missed) from the CT.gov results section /
-  press releases via an LLM classifier, instead of watchlist enrichment.
+**Turn the signal into a priced feature** *(this is the path to alpha, and it is
+sequenced deliberately — none of it is worth doing until the science above is sound,
+because calibrating a model on a biased signal just launders the bias)*
+
+1. **Close the label loop.** Auto-derive `endpoint_outcome` (met/missed) from the CT.gov
+   results section and sponsor press releases with an **LLM classifier**, instead of
+   watchlist enrichment. Until this exists, the corpus cannot grow without a human in it,
+   which is the binding constraint on everything below.
+2. **Build the corpus.** Run the watcher, scoped to a universe, and accumulate
+   `(structure, chemistry, ΔG, Kd, occupancy, phase, outcome, realized price move)` per
+   readout. Backfill it over historical readouts — the physics is computable retroactively
+   for any past trial whose drug and target are known, so **the corpus does not have to be
+   accumulated in real time**, which is what makes a backtest feasible at all.
+3. **Validate the feature before pricing it.** Ask the only question that matters first:
+   *does the physics estimate carry information about the outcome, conditional on what the
+   market already knew?* Score ΔG/occupancy against realized outcomes and next-day moves,
+   and check its **residual correlation against the label and against consensus** — a
+   feature that merely restates the readout is worth nothing, however scientific it looks.
+4. **Then price it.** Two paths, and they are not exclusive: work with analysts to
+   **productionize their existing pricing and evaluation process** with this as a new
+   input, or fit a **quantitative model outright** on the accumulated corpus. Wire live
+   quotes and market cap (no market-data client exists yet), and weight the
+   probability-of-success delta by trial **phase** (Phase 1 ≪ Phase 3) and by the
+   sponsor's exposure to the asset.
+
+The rules-based market model in this repo is a **glass-box placeholder** for step 4 — it
+exists to show the shape of the pipeline end to end, not to be traded. Replacing it is the
+point, not a concession.
 
 **Harden & ship**
 - Stop *embedding* `simulation.py` in the prompt and have the session clone a **pinned
