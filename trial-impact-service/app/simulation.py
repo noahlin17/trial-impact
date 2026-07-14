@@ -418,17 +418,24 @@ _PK_CL = 10.0  # L/h  clearance
 
 
 def run_pkpd(
-    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str
+    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str, fu: float = 1.0
 ) -> dict[str, float]:
     """Summarise exposure + occupancy for a 1-compartment first-order-absorption model.
 
     The model has a closed-form (Bateman) solution, so no ODE solver is needed:
         C(t) = Dose·ka / (Vd·(ka−ke)) · (e^{−ke·t} − e^{−ka·t})   [µg/mL]
     No bioavailability term (F is implicitly 1), so oral exposure is flattered.
-    A tissue partition coefficient Kp scales the concentration reaching the target,
-    and occupancy uses the docked Kd:  occ(t) = C_nM / (C_nM + Kd).
+    A tissue partition coefficient Kp scales the concentration reaching the target.
+
+    Occupancy is driven by the **free** (unbound) concentration, since only unbound
+    drug engages the target:  occ(t) = C_free / (C_free + Kd),  C_free = fu · C_nM.
+    ``fu`` is the plasma fraction unbound; ``fu = 1.0`` reproduces the old total-drug
+    upper bound. ``cmax``/``auc`` remain **total** concentrations — they are exposure
+    measurements, not engagement.
     """
-    s = _pkpd_series(dose_mg=dose_mg, mol_weight=mol_weight, kd_nM=kd_nM, tissue=tissue)
+    s = _pkpd_series(
+        dose_mg=dose_mg, mol_weight=mol_weight, kd_nM=kd_nM, tissue=tissue, fu=fu
+    )
     return {
         "cmax_ng_ml": max(s["conc_ng_ml"]),
         "auc_ng_h_ml": _trapz(s["t_h"], s["conc_ng_ml"]),
@@ -437,10 +444,14 @@ def run_pkpd(
 
 
 def _pkpd_series(
-    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str,
+    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str, fu: float = 1.0,
     t_end: float = 48.0, n: int = 97,
 ) -> dict[str, list[float]]:
-    """Evaluate the Bateman exposure curve + occupancy on a time grid (stdlib only)."""
+    """Evaluate the Bateman exposure curve + (free-drug) occupancy on a time grid.
+
+    ``conc_ng_ml`` is the total tissue concentration; ``occupancy_pct`` uses only the
+    unbound fraction ``fu`` of it, because bound drug cannot engage the target.
+    """
     ka, vd, ke = _PK_KA, _PK_VD, _PK_CL / _PK_VD
     kp = _TISSUE_PARTITION.get((tissue or "plasma").lower(), 1.0)  # tissue:plasma ratio
     coef = dose_mg * ka / (vd * (ka - ke))  # µg/mL scale (ka != ke by construction)
@@ -451,9 +462,10 @@ def _pkpd_series(
         c_plasma = coef * (math.exp(-ke * t) - math.exp(-ka * t))  # µg/mL
         c_tissue = max(c_plasma, 0.0) * kp
         c_nM = (c_tissue / mol_weight) * 1e6
+        c_free_nM = fu * c_nM  # only unbound drug engages the target
         t_h.append(round(t, 3))
         conc_ng_ml.append(round(c_tissue * 1000.0, 4))  # µg/mL → ng/mL
-        occ_pct.append(round(100.0 * c_nM / (c_nM + kd_nM), 3))
+        occ_pct.append(round(100.0 * c_free_nM / (c_free_nM + kd_nM), 3))
     return {"t_h": t_h, "conc_ng_ml": conc_ng_ml, "occupancy_pct": occ_pct}
 
 
@@ -470,15 +482,51 @@ def pkpd_curve(sim_result: dict[str, Any], t_end: float = 48.0, n: int = 97):
     Pulls dose / MW / Kd / tissue out of a persisted ``sim_result`` and re-evaluates
     the same Bateman model. Returns ``None`` when a required field is missing.
     """
+    prov = sim_result.get("provenance") or {}
     kd = sim_result.get("kd_nM")
     dose = sim_result.get("dose_mg")
-    mw = ((sim_result.get("provenance") or {}).get("descriptors") or {}).get("mw")
+    mw = (prov.get("descriptors") or {}).get("mw")
     if not kd or not dose or not mw:
         return None
+    fu = prov.get("fu")
+    fu = 1.0 if fu is None else fu  # legacy artifacts predate fu → total-drug curve
     return _pkpd_series(
         dose_mg=dose, mol_weight=mw, kd_nM=kd,
-        tissue=sim_result.get("tissue") or "plasma", t_end=t_end, n=n,
+        tissue=sim_result.get("tissue") or "plasma", fu=fu, t_end=t_end, n=n,
     )
+
+
+# Plasma fraction unbound (fu = 1 − fraction bound to plasma protein). Only *unbound*
+# drug engages the target, so occupancy must be driven by the free concentration, not
+# the total (see run_pkpd). fu is a measured, drug-specific PK property — it cannot be
+# predicted reliably from structure — so it is treated as an explicit input. The values
+# below are literature plasma-protein-binding figures for drugs in the corpus; each
+# carries its source. When fu is neither supplied nor curated, the pipeline falls back
+# to fu = 1.0 (the old total-drug upper bound) and says so in a warning, rather than
+# inventing a number for an arbitrary drug.
+_PLASMA_FREE_FRACTION: dict[str, float] = {
+    "ivacaftor": 0.01,   # ~99% bound (FDA Kalydeco label, clinical pharmacology)
+    "sotorasib": 0.11,   # ~89% bound (FDA Lumakras label, clinical pharmacology)
+}
+
+# Clamp fu to a physical open interval: 0 would make occupancy identically zero and
+# 1 is "no protein binding". Nothing is truly 100% unbound or 100% bound.
+_FU_MIN, _FU_MAX = 1e-4, 1.0
+
+
+def resolve_fu(drug: str, fu_hint: float | None = None) -> tuple[float, str]:
+    """Resolve the plasma fraction-unbound ``fu`` for ``drug``.
+
+    Priority: an explicit ``fu_hint`` (clamped) > the curated table > unknown. When
+    unknown, returns ``(1.0, "unknown")`` so the caller reproduces the total-drug upper
+    bound *and* can flag that occupancy is not a free-drug engagement estimate.
+    """
+    if fu_hint is not None:
+        return min(_FU_MAX, max(_FU_MIN, float(fu_hint))), "input"
+    key = (drug or "").strip().lower()
+    if key in _PLASMA_FREE_FRACTION:
+        return _PLASMA_FREE_FRACTION[key], "curated (plasma protein binding)"
+    return 1.0, "unknown"
 
 
 # Rough tissue:plasma partition coefficients (Kp). Real QSP models fit these; the
@@ -510,8 +558,14 @@ def run_simulation(
     tissue: str = "plasma",
     dose_mg: float = 100.0,
     uniprot: str | None = None,
+    fu: float | None = None,
 ) -> SimResult:
-    """Run the full docking + PK/PD pipeline and return a :class:`SimResult`."""
+    """Run the full docking + PK/PD pipeline and return a :class:`SimResult`.
+
+    ``fu`` is the plasma fraction unbound used for free-drug occupancy; when ``None``
+    it is resolved from the curated table, falling back to 1.0 (total-drug upper bound)
+    for an unknown drug (with a warning).
+    """
     result = SimResult(
         target=target, drug=drug, tissue=tissue, dose_mg=dose_mg,
         estimator=VINA_ESTIMATOR_ID,
@@ -553,8 +607,19 @@ def run_simulation(
             result.kd_nM = round(kd_from_dg(dg), 3)
             _log(f"ΔG = {dg:.2f} kcal/mol  →  Kd = {result.kd_nM:.1f} nM")
 
+            # Free-drug occupancy: only the unbound fraction (fu) engages the target.
+            fu_value, fu_source = resolve_fu(drug, fu)
+            result.provenance["fu"] = fu_value
+            result.provenance["fu_source"] = fu_source
+            if fu_source == "unknown":
+                result.warnings.append(
+                    "no plasma fraction-unbound (fu) for this drug; occupancy is a "
+                    "TOTAL-drug upper bound (fu=1), not free-drug engagement"
+                )
+
             pkpd = run_pkpd(
-                dose_mg=dose_mg, mol_weight=desc["mw"], kd_nM=result.kd_nM, tissue=tissue
+                dose_mg=dose_mg, mol_weight=desc["mw"], kd_nM=result.kd_nM,
+                tissue=tissue, fu=fu_value,
             )
             result.cmax_ng_ml = round(pkpd["cmax_ng_ml"], 3)
             result.auc_ng_h_ml = round(pkpd["auc_ng_h_ml"], 3)
@@ -587,6 +652,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dose", type=float, default=100.0, help="Dose in mg")
     parser.add_argument("--uniprot", default=None, help="UniProt accession (skips lookup)")
     parser.add_argument(
+        "--fu",
+        type=float,
+        default=None,
+        help="Plasma fraction unbound for free-drug occupancy "
+        "(default: curated table, else 1.0 with a warning)",
+    )
+    parser.add_argument(
         "--estimator",
         default=VINA_ESTIMATOR_ID,
         help="Estimator id to run (default: the Vina docking pipeline)",
@@ -611,6 +683,7 @@ def main(argv: list[str] | None = None) -> int:
         tissue=args.tissue,
         dose_mg=args.dose,
         uniprot=args.uniprot,
+        fu=args.fu,
     )
     # The service parses this exact line out of the Devin session transcript.
     print(f"{RESULT_MARKER} {json.dumps(result.to_dict())}")

@@ -396,6 +396,56 @@ def test_pkpd_curve_shape():
     assert pkpd_curve({"kd_nM": 1}) is None  # missing dose / MW -> no curve
 
 
+# --- free-drug (fu) occupancy ------------------------------------------------ #
+def test_resolve_fu_priority_and_bounds():
+    from app.simulation import resolve_fu
+
+    # Explicit hint wins and is clamped to the physical open interval (0, 1].
+    assert resolve_fu("anything", 0.25) == (0.25, "input")
+    assert resolve_fu("anything", 5.0)[0] == 1.0
+    assert 0.0 < resolve_fu("anything", 0.0)[0] < 1e-3
+    # Curated table for a corpus drug; unknown drug falls back to the total-drug bound.
+    assert resolve_fu("ivacaftor")[0] == 0.01
+    assert resolve_fu("sotorasib")[1].startswith("curated")
+    assert resolve_fu("not-a-real-drug") == (1.0, "unknown")
+
+
+def test_occupancy_uses_free_drug_not_total():
+    """fu < 1 must lower occupancy; fu = 1 reproduces the old total-drug upper bound."""
+    from app.simulation import run_pkpd
+
+    kw = dict(dose_mg=150.0, mol_weight=392.5, kd_nM=738.2, tissue="lung")
+    total = run_pkpd(fu=1.0, **kw)["target_occupancy_pct"]
+    free = run_pkpd(fu=0.01, **kw)["target_occupancy_pct"]
+    assert free < total
+    # Ivacaftor (fu 0.01) corrects a ~95% total-drug bound down to ~15% engagement.
+    assert total > 90.0
+    assert 10.0 < free < 20.0
+
+
+def test_pkpd_curve_honours_stored_fu():
+    """The dashboard reconstruction reads fu from provenance (legacy runs -> 1.0)."""
+    from app.simulation import pkpd_curve
+
+    legacy = pkpd_curve(RICH_SIM)  # no provenance.fu -> total-drug curve
+    bound = pkpd_curve({**RICH_SIM, "provenance": {**RICH_SIM["provenance"], "fu": 0.05}})
+    assert max(bound["occupancy_pct"]) < max(legacy["occupancy_pct"])
+
+
+def test_fu_correction_flips_the_market_call():
+    """Ivacaftor's total-drug 94.5% is a 'strong' call; free-drug ~15% is 'moderate'."""
+    ev = {"nct_id": "NCT-VERIFY-002", "endpoint_outcome": "met",
+          "target": "CFTR", "drug": "ivacaftor"}
+    base_sim = {"binding_affinity_kcal_mol": -8.702, "kd_nM": 738.217,
+                "tox_flag": False, "confidence": 0.7}
+    total = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 94.54})
+    free = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 14.76})
+    assert total["occupancy_modifier"] == 0.15 and free["occupancy_modifier"] == -0.10
+    assert round(total["final"], 2) == 0.55 and round(free["final"], 2) == 0.34
+    assert market_model._magnitude(abs(total["final"])) == "strong"
+    assert market_model._magnitude(abs(free["final"])) == "moderate"
+
+
 # --- covalent-warhead detection ---------------------------------------------- #
 # SMILES inlined (no network). Skipped unless RDKit is present — it ships in
 # requirements-sim.txt and normally runs inside the Devin sandbox, not the web tier.
@@ -545,7 +595,7 @@ def test_cli_dispatches_through_the_estimator_registry(monkeypatch):
     class _Spy:
         id = "spy@1"
 
-        def run(self, *, target, drug, tissue, dose_mg, uniprot=None):
+        def run(self, *, target, drug, tissue, dose_mg, uniprot=None, fu=None):
             seen.update(target=target, drug=drug, estimator=self.id)
             return SimResult(target=target, drug=drug, tissue=tissue,
                              dose_mg=dose_mg, estimator=self.id)

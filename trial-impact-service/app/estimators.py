@@ -33,6 +33,7 @@ from .simulation import (
     fetch_ligand_smiles,
     kd_from_dg,
     ligand_descriptors,
+    resolve_fu,
     run_pkpd,
     run_simulation,
 )
@@ -63,6 +64,7 @@ class Estimator(Protocol):
         tissue: str = "plasma",
         dose_mg: float = 100.0,
         uniprot: str | None = None,
+        fu: float | None = None,
     ) -> SimResult: ...
 
 
@@ -84,9 +86,11 @@ class VinaDockingEstimator:
         tissue: str = "plasma",
         dose_mg: float = 100.0,
         uniprot: str | None = None,
+        fu: float | None = None,
     ) -> SimResult:
         result = run_simulation(
-            target=target, drug=drug, tissue=tissue, dose_mg=dose_mg, uniprot=uniprot
+            target=target, drug=drug, tissue=tissue, dose_mg=dose_mg,
+            uniprot=uniprot, fu=fu,
         )
         result.estimator = self.id
         return result
@@ -131,6 +135,7 @@ class LigandEfficiencyBaseline:
         tissue: str = "plasma",
         dose_mg: float = 100.0,
         uniprot: str | None = None,
+        fu: float | None = None,
     ) -> SimResult:
         result = SimResult(
             target=target, drug=drug, tissue=tissue, dose_mg=dose_mg, estimator=self.id
@@ -160,8 +165,20 @@ class LigandEfficiencyBaseline:
             result.binding_affinity_kcal_mol = round(dg, 3)
             result.kd_nM = round(kd_nM, 3)
 
+            # Same free-drug occupancy treatment as the docking estimator, so the
+            # head-to-head compares like with like.
+            fu_value, fu_source = resolve_fu(drug, fu)
+            result.provenance["fu"] = fu_value
+            result.provenance["fu_source"] = fu_source
+            if fu_source == "unknown":
+                result.warnings.append(
+                    "no plasma fraction-unbound (fu) for this drug; occupancy is a "
+                    "TOTAL-drug upper bound (fu=1), not free-drug engagement"
+                )
+
             pkpd = run_pkpd(
-                dose_mg=dose_mg, mol_weight=desc["mw"], kd_nM=kd_nM, tissue=tissue
+                dose_mg=dose_mg, mol_weight=desc["mw"], kd_nM=kd_nM,
+                tissue=tissue, fu=fu_value,
             )
             result.cmax_ng_ml = round(pkpd["cmax_ng_ml"], 3)
             result.auc_ng_h_ml = round(pkpd["auc_ng_h_ml"], 3)
