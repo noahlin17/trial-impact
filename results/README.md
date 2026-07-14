@@ -10,13 +10,20 @@ numbers came from `app/simulation.py` *as committed* — the session did not edi
 script to make the run work. (See "The result contract" in the service README for why
 that field exists and what it caught.)
 
+> **Estimator attribution.** These artifacts predate the `estimator` field and were
+> produced by the default docking pipeline (now `vina-docking-pkpd@1`); new runs stamp
+> that id onto every result. The head-to-head against the `ligand-efficiency-baseline@1`
+> **control** is not shown here — the baseline is a naive floor to beat, not a second
+> opinion, and running it does not re-validate these numbers. See "Estimators" in the
+> service README.
+
 | File | Trial | Result |
 |------|-------|--------|
 | `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, Phase 1, endpoint met | ΔG **−8.606** kcal/mol, Kd 862.6 nM, occupancy 97.6% ‡, tox flagged ‡, **covalent** (acrylamide warhead). Experimental structure **7VVB** (confidence 0.9). PoS **+0.475** → AMGN up / REGN, NVS down. |
 | `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, Phase 3, endpoint met | ΔG −8.702 kcal/mol †, Kd 738.2 nM, occupancy 94.5% ‡, clean, not covalent. **AlphaFold** model AF-P13569-F1 (confidence 0.7 — see below). PoS **+0.552** → VRTX up / CRSP, BLUE down. |
 | `dashboard_kras_7VVB.html` | ″ | Rendered `/status` with the 3D viewer. |
 | `dashboard_cftr_AF-P13569-F1.html` | ″ | Rendered `/status`; AlphaFold model rendered from AFDB. |
-| `analysis_dashboard.html` | both | Rendered `/analysis`: physics→price scatter, sortable table, and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). Open it and click a row. |
+| `analysis_dashboard.html` | both | Rendered `/analysis`: physics→price scatter, an estimator head-to-head (empty here — single-estimator corpus), sortable table, and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). Open it and click a row. |
 
 Each JSON holds the trial event, the resolved sponsor/competitor tickers, the full
 `sim_result` (binding, exposure, occupancy, tox/covalent flags, docking box,

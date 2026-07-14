@@ -21,6 +21,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 
 from . import db as db_module
 from . import market_model
+from .estimators import DEFAULT_ESTIMATOR_ID, REGISTRY
 from .prompts import build_simulation_prompt
 from .signing import SIGNATURE_HEADER, verify
 
@@ -66,8 +67,24 @@ def webhook_trial_update() -> Any:
     if not nct_id:
         return jsonify({"error": "missing 'nct_id'"}), 400
 
+    # Which estimator to run. Optional in the payload; absent means the default
+    # docking pipeline (so a plain watcher webhook behaves exactly as before). An
+    # explicit, unknown id is a client error, not a silently-swapped default.
+    requested_estimator = payload.get("estimator")
+    if requested_estimator and requested_estimator not in REGISTRY:
+        return jsonify(
+            {
+                "error": f"unknown estimator '{requested_estimator}'",
+                "known": sorted(REGISTRY),
+            }
+        ), 400
+    estimator_id = requested_estimator or DEFAULT_ESTIMATOR_ID
+
     sponsor = payload.get("sponsor") or ""
-    event_id = db_module.make_event_id(nct_id, event_type)
+    # Suffix the key with the estimator only when one was explicitly requested, so two
+    # estimators on the same trial get two rows (a storable head-to-head) while the
+    # default single-estimator path keeps the original <nct>:<event> key.
+    event_id = db_module.make_event_id(nct_id, event_type, requested_estimator)
 
     # Resolve the sponsor + competitors to tickers up front so they are visible on
     # the dashboard even before the simulation completes.
@@ -99,16 +116,32 @@ def webhook_trial_update() -> Any:
         )
         return jsonify({"error": "DEVIN_API_KEY not configured", "event": event}), 503
 
+    # Guard: refuse to launch an unpinned session. Without a commit the run is not
+    # reproducible from source and code_patched can't be verified — the very
+    # properties the pinned checkout exists to provide — so record it as failed and
+    # make it visible on /status rather than quietly running against a moving target.
+    if not cfg.sim_pinned:
+        event = db.upsert_new_event(
+            **common,
+            devin_session_id=None,
+            session_url=None,
+            status=db_module.STATUS_FAILED,
+            error_message="SIM_REPO_COMMIT not configured (unpinned run is not reproducible)",
+        )
+        return jsonify({"error": "SIM_REPO_COMMIT not configured", "event": event}), 503
+
     prompt = build_simulation_prompt(
         event={**payload, "sponsor": sponsor, "dose_mg": payload.get("dose_mg")},
         sim_repo_url=cfg.sim_repo_url,
+        sim_repo_commit=cfg.sim_repo_commit,
+        estimator=estimator_id,
     )
 
     try:
         created = ctx["devin"].create_session(
             prompt=prompt,
             title=f"Simulate {sponsor} {nct_id} ({payload.get('drug', '')})"[:200],
-            tags=["trial-impact", f"nct-{nct_id}", event_type],
+            tags=["trial-impact", f"nct-{nct_id}", event_type, f"est-{estimator_id}"],
         )
     except requests.RequestException as exc:
         event = db.upsert_new_event(

@@ -390,14 +390,18 @@ sound — calibrating a pricing model on a biased signal just launders the bias.
 argument is in [THESIS.md](THESIS.md); the per-issue fixes are in
 [Known issues](#known-issues) and [Limitations](trial-impact-service/README.md#limitations--modeling-caveats).
 
-**1 · Separate the harness from the estimator** *(highest leverage — it follows directly from
-the physics having no moat)*
-Vina should be one implementation, not the architecture. Define the estimator interface, add an
-`estimator` field to the result contract (a corpus spanning unattributed model versions is
-uninterpretable), and stop shipping `simulation.py` inside the prompt — clone a **pinned
-commit** instead, which also removes the 30k ceiling and retires `code_patched`'s self-report
-for something verifiable. Then run **two estimators head-to-head on the same trials**. That
-comparison, not any single model's output, is the product.
+**1 · Separate the harness from the estimator** ✅ *(done — it followed directly from the
+physics having no moat)*
+Vina is now **one implementation, not the architecture**. There is an explicit `Estimator`
+interface + registry (`app/estimators.py`), every result carries an `estimator` id (a corpus
+spanning unattributed model versions is uninterpretable), and the prompt no longer ships
+`simulation.py` — the session **clones a pinned commit** (`SIM_REPO_COMMIT`), which removed the
+30k ceiling and makes `code_patched` **verifiable against the commit** rather than self-reported.
+A trial can be run through **two estimators head-to-head** (`compare_estimators.py`, `/analysis`);
+that comparison, not any single model's output, is the product. **What this does *not* claim:**
+the second estimator is a deliberately naive *control* (a heavy-atom size proxy), not a rival
+physical model, and pinning buys reproducibility, not validity — the science in step 2 still
+stands. The next real estimator (co-folding / FEP / QSAR) is future work.
 
 **2 · Fix the science that blocks a forecast**
 - **Pocket-aware docking** (fpocket / P2Rank, or a drug-bound structure pinned per trial) — the
@@ -492,8 +496,8 @@ its downstream use implies.
 | 2 | **The blind docking box does not cover the receptor** — `min(extent + 8 Å, 40 Å)` centred on the centroid; the cap binds in *both* runs. Coverage: **KRAS 80 %, CFTR 19 %** | CFTR's ΔG is a dock into a central slab, **not a pocket-resolved affinity**. Reproduce with `python verify_docking_box.py`. Mitigated: warns when the cap binds; a characterization test pins the behaviour | ◑ |
 | 3 | **`tox_flag` is a drug-likeness heuristic priced as a safety signal** — it is ≥2 Lipinski violations, which predicts *oral absorption*, not toxicity | Charges **−0.15 PoS as if a safety finding had occurred**. It fires on sotorasib — an **approved** drug — because it is a large lipophilic oncology molecule | ○ |
 | 4 | **ΔG is documented as *relative* but consumed as *absolute*** — converted to `Kd = exp(ΔG/RT)` and branched on hard cutoffs (`Kd ≤ 100 nM`, `ΔG ≤ −9.0`) | The code and the docs disagree about what the number *is*. The conversion also uses 310.15 K where Vina's calibration assumes 298.15 K, making every Kd **~1.75× looser** | ○ |
-| 5 | **`simulation.py` is embedded in the prompt, and the budget is exhausted** — 29,950 / 30,000 chars, **50 spare** | The code **cannot afford another comment**. Hit the ceiling three times; a test guards it, so it fails loudly. Fix: clone a **pinned commit** — also retires `code_patched`'s self-report for something verifiable. **The next thing I would build** | ○ |
-| 6 | **The harness/estimator boundary is implied, not enforced** — `docking_box` is Vina-specific and there is **no `estimator` field** | A corpus spanning unattributed model versions is uninterpretable and any backtest over it is invalid. Same argument as `code_patched`, one level up | ○ |
+| 5 | **`simulation.py` was embedded in the prompt, exhausting the 30k budget** — once 29,991 / 30,000, event-dependent | **Fixed:** the session now **clones a pinned commit** (`SIM_REPO_COMMIT`) instead of embedding the source, so the ceiling is gone and `code_patched` is **verifiable against the commit**. New caveat: pinning buys reproducibility, not scientific validity | ✅ |
+| 6 | **The harness/estimator boundary was implied, not enforced** — `docking_box` Vina-specific, no `estimator` field | **Fixed:** explicit `Estimator` interface + registry (`app/estimators.py`), `estimator` id on every result, head-to-head in `/analysis`. New caveats: the shipped second estimator is a naive **control** (not a rival model), and `docking_box` is still a Vina-specific field | ✅ |
 | 7 | **Sponsor→ticker resolution is a hand-maintained 6-entry file** with hardcoded competitors | Real resolution is **entity resolution** (messy sponsor strings, listed parents, private/pre-IPO sponsors with no ticker and therefore no trade). **The system runs on a watchlist, not a universe** — the scaling claim is not yet earned | ○ |
 | 8 | **Webhook signature verification fails open** when `WATCHER_SHARED_SECRET` is unset | Accepts *any* caller's trial event, each of which spends a Devin session. Mitigated: logs a loud startup warning. Production should require the secret | ◑ |
 | 9 | **The box is computed over atoms that are not docked** — spans `ATOM`+`HETATM`, but the receptor is `ATOM`-only | Small in practice, wrong in principle. Not fixed alone: it moves the box, which changes ΔG, which would invalidate both artifacts. Fixed together with #2, in one re-run | ○ |

@@ -77,8 +77,58 @@ def relationships(events: list[dict[str, Any]]) -> dict[str, Any]:
             "occ": s.get("target_occupancy_pct"),
             "pos": round(market_model.pos_delta(e, s), 3),
             "tox": bool(s.get("tox_flag")),
+            "estimator": s.get("estimator"),
         })
     return {"points": points}
+
+
+def estimator_comparison(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """Head-to-head: trials that ran under more than one estimator.
+
+    The comparison is the point of the estimator interface, not any single model's
+    number. This groups completed runs by (trial, event) and, for every trial that was
+    scored by two or more estimators, lays their numbers side by side so a reader can
+    see where the models agree and — more usefully — where they diverge. A single
+    estimator on a trial produces no comparison and is omitted.
+    """
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for e in _completed(events):
+        s = e["sim_result"]
+        key = (e.get("nct_id") or "?", e.get("event_type") or "?")
+        grouped.setdefault(key, []).append(
+            {
+                "estimator": s.get("estimator") or "unknown",
+                "drug": e.get("drug"),
+                "target": e.get("target"),
+                "dg": s.get("binding_affinity_kcal_mol"),
+                "kd": s.get("kd_nM"),
+                "occ": s.get("target_occupancy_pct"),
+                "confidence": s.get("confidence"),
+                "pos": round(market_model.pos_delta(e, s), 3),
+            }
+        )
+
+    trials = []
+    for (nct_id, event_type), arms in sorted(grouped.items()):
+        distinct = {a["estimator"] for a in arms}
+        if len(distinct) < 2:
+            continue  # not a head-to-head — nothing to compare
+        arms_sorted = sorted(arms, key=lambda a: a["estimator"])
+        dgs = [a["dg"] for a in arms_sorted if a["dg"] is not None]
+        poss = [a["pos"] for a in arms_sorted if a["pos"] is not None]
+        trials.append(
+            {
+                "nct_id": nct_id,
+                "event_type": event_type,
+                "drug": arms_sorted[0]["drug"],
+                "target": arms_sorted[0]["target"],
+                "arms": arms_sorted,
+                # Spread across estimators: how much the choice of model moved the number.
+                "dg_spread": round(max(dgs) - min(dgs), 3) if len(dgs) > 1 else None,
+                "pos_spread": round(max(poss) - min(poss), 3) if len(poss) > 1 else None,
+            }
+        )
+    return {"trials": trials}
 
 
 def run_detail(e: dict[str, Any]) -> dict[str, Any]:
@@ -126,6 +176,7 @@ def build_payload(events: list[dict[str, Any]]) -> dict[str, Any]:
             "pos_delta": round(market_model.pos_delta(e, s), 3),
             "direction": call["direction"] if call else "flat",
             "magnitude": call["magnitude"] if call else "flat",
+            "estimator": s.get("estimator"),
             "pdb_id": prov.get("pdb_id"),
             "structure_source": prov.get("structure_source"),
             "uniprot": prov.get("uniprot"),
@@ -134,5 +185,6 @@ def build_payload(events: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "summary": corpus_summary(events),
         "relationships": relationships(events),
+        "comparison": estimator_comparison(events),
         "runs": rows,
     }

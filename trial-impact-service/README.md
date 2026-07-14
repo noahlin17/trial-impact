@@ -54,11 +54,36 @@ stack, pull structures, and iterate on failures — exactly what a Devin session
 One session per event keeps runs isolated, independently retryable, and observable
 (the same design the pipeline uses throughout).
 
-`app/simulation.py` is the canonical, CLI-runnable pipeline; Devin clones the repo
-(`SIM_REPO_URL`), installs `requirements-sim.txt`, runs it, and reports back a
-single `SIM_RESULT_JSON:` line the service parses.
+`app/simulation.py` is the canonical, CLI-runnable pipeline. Devin **clones a pinned
+commit** (`SIM_REPO_URL` @ `SIM_REPO_COMMIT`), installs `requirements-sim.txt`, runs
+the selected estimator (`python -m app.simulation --estimator <id>`), and reports back
+a single `SIM_RESULT_JSON:` line the service parses. The source is **cloned, not
+embedded** in the prompt — so the prompt no longer grows with the pipeline (the old
+30k-character ceiling is gone) and every run names the exact commit it came from.
 
-### The result contract (and why it has a `code_patched` field)
+### Estimators: one interface, many models (Vina is not the architecture)
+
+The docking + PK/PD pipeline is *one* estimator, not the system. An **`Estimator`**
+(`app/estimators.py`) is anything that turns `(target, drug, tissue, dose)` into a
+`SimResult` and carries a stable `id` (`name@version`); the harness — trigger, sandbox,
+result contract, reproducibility, corpus — is model-agnostic. Two ship today:
+
+| Estimator id | What it is |
+|---|---|
+| `vina-docking-pkpd@1` | The real structure-based docking + PK/PD pipeline (the default). |
+| `ligand-efficiency-baseline@1` | A deliberately naive, **structure-free control**: ΔG ≈ 0.3 kcal/mol × heavy-atom count, run through the same PK/PD model. Not a physical model — a floor the docking must beat to justify its cost. Reported at low confidence and flagged in `warnings`. |
+
+The **comparison is the product**, not any single model's number: `/analysis` shows an
+estimator head-to-head for any trial scored by more than one estimator (and
+`compare_estimators.py` runs a trial through several at once). Two estimators agreeing
+is *not* evidence the science is right — the baseline is a control, not a second opinion.
+
+### The result contract (and why it has `estimator` + `code_patched` fields)
+
+Every result names the model that produced it (`estimator`) — a corpus that mixes model
+versions without recording which one made each number is uninterpretable, and a
+head-to-head is impossible without it. So `estimator` is part of the contract, not
+metadata.
 
 A Devin session is an *agent*, not a runner: when a step fails it will fix it and
 carry on. That is exactly what you want for `pip install` problems — and exactly what
@@ -71,8 +96,10 @@ have produced them.
 
 So the contract makes divergence *loud*: the session must set `code_patched: true` and
 `patch_summary` if it modified the script, and a patched run is surfaced on `/status`
-as **not reproducible from source**. A plausible number is not a correct number, and a
-number you cannot regenerate is not a result.
+as **not reproducible from source**. Because the run is now pinned to `SIM_REPO_COMMIT`,
+that self-report is also **independently verifiable** — a reviewer can diff the session
+against the exact commit — rather than trusted on the agent's word. A plausible number
+is not a correct number, and a number you cannot regenerate is not a result.
 
 ---
 
@@ -84,8 +111,9 @@ app/
   config.py         # 12-factor config from environment variables
   db.py             # SQLite data-access layer (single `trial_events` table, no ORM)
   signing.py        # HMAC-SHA256 sign/verify (shared with the watcher)
-  prompts.py        # builds the simulation task each Devin session receives
+  prompts.py        # builds the simulation task each Devin session receives (clone pinned commit)
   simulation.py     # REAL physics: docking (Vina) + closed-form PK/PD. Runs in Devin.
+  estimators.py     # Estimator interface + registry: Vina pipeline + labelled baseline control
   devin_client.py   # Devin API client + SIM_RESULT_JSON extraction + status mapping
   market_model.py   # PoS delta → directional price calls + commentary (the "model")
   alerts.py         # Slack + email fan-out for market-moving readouts
@@ -100,6 +128,7 @@ requirements.txt    # web-service deps (Flask, requests, gunicorn)
 requirements-sim.txt# heavy sim deps (rdkit, meeko, vina, openbabel, numpy) — installed by Devin
 simulate_trial.py   # fires signed trial-event payloads (stand-in for the watcher)
 run_real.py         # fire ONE real trial event end to end (creates a real Devin session)
+compare_estimators.py  # race one trial through 2+ estimators head-to-head (real sessions)
 demo_e2e.py         # offline walkthrough of the whole pipeline (fakes Devin; no API key)
 poll_watch.py       # poll in-flight sessions until they settle
 verify_docking_box.py  # measures what fraction of the receptor the docking box contains
@@ -152,7 +181,10 @@ for any market-moving readout.
 ### Run the real physics locally (optional)
 ```bash
 pip install -r requirements-sim.txt
+# default docking estimator:
 python -m app.simulation --target KRAS --drug sotorasib --tissue tumor --dose 960 --json-only
+# pick an estimator explicitly (see `app/estimators.py` for ids):
+python -m app.simulation --target KRAS --drug sotorasib --estimator ligand-efficiency-baseline@1 --json-only
 ```
 
 ---
@@ -180,6 +212,9 @@ python -m app.simulation --target KRAS --drug sotorasib --tissue tumor --dose 96
 }
 ```
 Signed with `X-CTGov-Signature: sha256=<hmac>` when `WATCHER_SHARED_SECRET` is set.
+An optional `"estimator": "<id>"` selects which estimator runs (default: the docking
+pipeline); an explicit id also lets the same trial be stored under two estimators for
+a head-to-head. An unknown id is a `400`.
 
 ---
 
@@ -189,7 +224,8 @@ Signed with `X-CTGov-Signature: sha256=<hmac>` when `WATCHER_SHARED_SECRET` is s
 |----------|----------|---------|---------|
 | `DEVIN_API_KEY` | yes | — | Authenticates Devin API calls. |
 | `WATCHER_SHARED_SECRET` | recommended | — | HMAC secret; when set, webhook signatures are enforced. |
-| `SIM_REPO_URL` | no | `…/trial-impact-service` | Repo Devin clones to run the simulation. |
+| `SIM_REPO_URL` | no | `…/trial-impact` | Repo Devin clones to run the simulation. |
+| `SIM_REPO_COMMIT` | **yes (real runs)** | — | Exact commit Devin checks out. Empty = *not configured*: the webhook refuses to launch an unpinned (unverifiable) session. `run_real.py`/`compare_estimators.py` fall back to local `git HEAD`. |
 | `SLACK_WEBHOOK_URL` | no | — | Slack alerts on market-movers. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `EMAIL_FROM` / `EMAIL_TO` | no | — | Email alerts. |
 | `TICKERS_PATH` | no | `tickers.json` | Sponsor→ticker/competitor map. |
@@ -422,22 +458,37 @@ addressed; ○ = documented, future work.)
   section / press releases would close the loop.
 
 ### Architecture & operations
-- **The prompt embeds `simulation.py`, and the budget is exhausted** ○ — **the most
-  operationally urgent issue.** The whole source ships inside Devin's 30,000-character prompt
-  and currently uses **29,950 of it — 50 characters spare.** It has hit the ceiling three
-  times; `test_simulation_prompt_fits_devin_limit` guards it, so it fails loudly rather than
-  silently, but the budget is now tight enough that **the code cannot afford another comment.**
-  **Fix:** stop embedding the source and have the session clone a **pinned commit**. That
-  removes the ceiling *and* makes "which code produced this number?" answerable by
-  construction — retiring `code_patched`'s self-report in favour of something verifiable.
-- **The harness/estimator boundary is implied, not enforced** ○ — the long-term thesis is that
-  the *estimator* (Vina today; a co-folding affinity model or proprietary QSAR tomorrow) is a
-  swappable plugin, and the *harness* (trigger, sandbox, result contract, reproducibility,
-  corpus, backtest) is model-agnostic. Most of the contract already generalises — but
-  `docking_box` is Vina-specific, and there is **no `estimator` field recording which model
-  produced a number**, which makes a corpus spanning model versions uninterpretable and any
-  backtest over it invalid. Same argument as `code_patched`, one level up. **Fix:** define the
-  estimator interface explicitly and add `estimator` to the result contract.
+- **The prompt embedded `simulation.py`, exhausting the 30k budget** ✅ — the whole source
+  used to ship inside Devin's 30,000-character prompt (once **29,991 of 30,000 — 9 spare**,
+  and event-dependent), and it had hit the ceiling repeatedly. The session now **clones a
+  pinned commit** (`SIM_REPO_COMMIT`) and runs from that checkout, so the prompt is a few kB
+  regardless of pipeline size and the ceiling is gone. As a bonus, "which code produced this
+  number?" is now answerable by construction: a run is pinned to a commit, so `code_patched`
+  is **verifiable** (diff the session against the commit) rather than merely self-reported.
+  `MAX_PROMPT_CHARS` remains only as a cheap guard against future prompt bloat.
+- **The harness/estimator boundary is now explicit** ✅ — the estimator (Vina today; a
+  co-folding affinity model or proprietary QSAR tomorrow) is a swappable plugin behind the
+  `Estimator` interface (`app/estimators.py`), and the harness (trigger, sandbox, result
+  contract, reproducibility, corpus) is model-agnostic. Every result now carries an
+  **`estimator` id** so a corpus spanning model versions stays interpretable, and `/analysis`
+  runs a head-to-head. **Still open:** `docking_box` remains a Vina-specific field on the
+  shared contract (harmless but not generalised), and the interface is not yet exercised by a
+  *second real physical model* — only the docking pipeline and a naive control (below).
+- **The second estimator is a control, not a rival model** ○ — `ligand-efficiency-baseline@1`
+  is a size proxy (ΔG ≈ 0.3 kcal/mol × heavy-atom count), deliberately naive. It exists so the
+  head-to-head has a floor to beat; it is **not** a validated affinity method and its ΔG must
+  never be read as one (it is low-confidence and flagged in `warnings`). Two estimators
+  agreeing is **not** evidence the physics is correct — a real head-to-head needs a second
+  *physical* estimator (co-folding / FEP / QSAR), which is future work.
+- **Pinning improves reproducibility, not validity** ○ — `SIM_REPO_COMMIT` makes a run
+  reproducible-from-source and makes `code_patched` verifiable, but it does nothing for the
+  scientific caveats above (occupancy, ΔG-as-absolute, docking box, PK constants all stand).
+  A run can be perfectly reproducible and still scientifically wrong. (Note this is distinct
+  from **structure** pinning — the resolved `pdb_id` is still chosen at run time; see above.)
+- **One Devin session per estimator** ○ — a head-to-head launches an independent real session
+  per estimator, so cost and failure modes scale with the number of estimators, and the arms
+  can fail independently (one completes, another blocks). `/analysis` only shows a comparison
+  once **more than one** estimator has completed for a trial.
 
 ### Security & operations
 - **Webhook signature verification fails open** ◑ — `signature_required` is

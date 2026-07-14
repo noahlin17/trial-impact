@@ -55,6 +55,10 @@
     <div class="chart"><h3>Distribution of PoS deltas</h3><div id="c_hist"></div></div>
   </div>
 
+  <h2>Estimator head-to-head <span class="muted" style="font-weight:400;font-size:0.85rem">(trials scored by more than one estimator)</span></h2>
+  <p class="legend">The comparison is the product, not any single model's number. Spread = how much the choice of estimator moved the result for the same trial.</p>
+  <div id="comparison"></div>
+
   <h2>Runs <span class="muted" style="font-weight:400;font-size:0.85rem">(click a row to inspect)</span></h2>
   <table id="runs">
     <thead>
@@ -123,6 +127,27 @@
       Plotly.newPlot("c_hist", [{ x: p.map(d => d.pos), type: "histogram", marker: { color: "#2a6df4" } }],
         { margin: { t: 6, r: 10, b: 40, l: 50 }, height: 260, xaxis: { title: "PoS Δ" }, yaxis: { title: "count" } },
         { displayModeBar: false, responsive: true });
+    }
+
+    // ---- estimator head-to-head ----
+    function comparison() {
+      const trials = (DATA.comparison && DATA.comparison.trials) || [];
+      const host = document.getElementById("comparison");
+      if (!trials.length) {
+        host.innerHTML = '<p class="muted">No head-to-head yet — run a trial through a second estimator (see the README) to compare.</p>';
+        return;
+      }
+      host.innerHTML = trials.map(t => `
+        <h3 style="margin:1rem 0 0.2rem">${t.target} × ${t.drug} <span class="muted" style="font-weight:400">· ${t.nct_id}</span>
+          <span class="muted" style="font-weight:400;font-size:0.8rem">· ΔG spread ${num(t.dg_spread, 2)} · PoS spread ${num(t.pos_spread, 2)}</span></h3>
+        <table>
+          <thead><tr><th>Estimator</th><th>ΔG</th><th>Kd (nM)</th><th>Occ %</th><th>Confidence</th><th>PoS Δ</th></tr></thead>
+          <tbody>${t.arms.map(a => `
+            <tr><td><code>${a.estimator}</code></td><td>${num(a.dg, 2)}</td><td>${num(a.kd, 0)}</td>
+              <td>${num(a.occ, 1)}</td><td>${num(a.confidence, 2)}</td>
+              <td>${a.pos > 0 ? "+" : ""}${num(a.pos, 2)}</td></tr>`).join("")}
+          </tbody>
+        </table>`).join("");
     }
 
     // ---- table ----
@@ -223,7 +248,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-      cards(); charts(); renderTable();
+      cards(); charts(); comparison(); renderTable();
     });
   </script>
 </body>

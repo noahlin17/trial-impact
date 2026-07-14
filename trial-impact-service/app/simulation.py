@@ -49,6 +49,11 @@ _BODY_TEMP_K = 310.15
 
 _HTTP_TIMEOUT = 30
 
+# Identifier for the docking estimator implemented in this module. Stamped onto every
+# SimResult it produces so the result is attributable. Bump the version when a change
+# would move the numbers (a new scoring function, a different box strategy, etc.).
+VINA_ESTIMATOR_ID = "vina-docking-pkpd@1"
+
 
 def _log(msg: str) -> None:
     """Human-readable progress goes to stderr; stdout is reserved for the result."""
@@ -75,12 +80,18 @@ class SimResult:
     docking_box: dict[str, Any] | None = None
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
+    # Which estimator produced this result (e.g. "vina-docking-pkpd@1"). A corpus that
+    # mixes model versions without recording which one produced each number is
+    # uninterpretable — and a head-to-head comparison is impossible — so the estimator
+    # id is part of the result contract, not metadata. Set by the estimator that ran.
+    estimator: str | None = None
     # Set by the *session*, not by this code: true if the agent had to modify this
     # script to get the run to complete. A patched run's numbers did not come from the
     # code in this repo, so it is not reproducible from source and must say so — see
     # "Result contract" in the README. Silent divergence has bitten us twice (a
     # PubChem schema change and an mmCIF-only structure), which is why it is a field
-    # and not a convention.
+    # and not a convention. With a pinned-commit checkout (see prompts.py) the honest
+    # value is verifiable against the commit, rather than resting on self-report alone.
     code_patched: bool = False
     patch_summary: str | None = None
 
@@ -501,7 +512,10 @@ def run_simulation(
     uniprot: str | None = None,
 ) -> SimResult:
     """Run the full docking + PK/PD pipeline and return a :class:`SimResult`."""
-    result = SimResult(target=target, drug=drug, tissue=tissue, dose_mg=dose_mg)
+    result = SimResult(
+        target=target, drug=drug, tissue=tissue, dose_mg=dose_mg,
+        estimator=VINA_ESTIMATOR_ID,
+    )
     try:
         with tempfile.TemporaryDirectory() as workdir:
             accession = resolve_uniprot(target, uniprot)
@@ -573,13 +587,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dose", type=float, default=100.0, help="Dose in mg")
     parser.add_argument("--uniprot", default=None, help="UniProt accession (skips lookup)")
     parser.add_argument(
+        "--estimator",
+        default=VINA_ESTIMATOR_ID,
+        help="Estimator id to run (default: the Vina docking pipeline)",
+    )
+    parser.add_argument(
         "--json-only",
         action="store_true",
         help="Print only the SIM_RESULT_JSON line on stdout",
     )
     args = parser.parse_args(argv)
 
-    result = run_simulation(
+    # Dispatch through the estimator registry so the harness is model-agnostic: the
+    # docking pipeline is one implementation behind the Estimator interface, not the
+    # architecture. Imported here (not at module load) to avoid an import cycle —
+    # estimators.py imports the primitives defined above.
+    from .estimators import get_estimator
+
+    estimator = get_estimator(args.estimator)
+    result = estimator.run(
         target=args.target,
         drug=args.drug,
         tissue=args.tissue,

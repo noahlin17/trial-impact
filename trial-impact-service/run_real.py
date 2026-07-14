@@ -15,13 +15,32 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import time
 from pathlib import Path
 
 from app import create_app
 from app.config import Config
 from app.db import Database, make_event_id
+from app.estimators import DEFAULT_ESTIMATOR_ID, list_estimators
 from app.signing import SIGNATURE_HEADER, sign
+
+
+def resolve_commit() -> str:
+    """The commit a real session should check out: SIM_REPO_COMMIT, else local HEAD.
+
+    A run must be pinned to be reproducible (the service refuses otherwise), so if the
+    operator hasn't set SIM_REPO_COMMIT we fall back to this checkout's HEAD.
+    """
+    env = os.environ.get("SIM_REPO_COMMIT", "").strip()
+    if env:
+        return env
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip()
+    except (subprocess.SubprocessError, OSError):
+        return ""
 
 
 def load_dotenv(path: str = ".env") -> None:
@@ -46,6 +65,11 @@ def main() -> int:
     ap.add_argument("--phase", default="PHASE1")
     ap.add_argument("--outcome", default="met")
     ap.add_argument("--sponsor", default="Amgen")
+    ap.add_argument(
+        "--estimator", default=DEFAULT_ESTIMATOR_ID,
+        choices=list_estimators(),
+        help="Estimator the session runs (default: the Vina docking pipeline)",
+    )
     ap.add_argument("--watch", action="store_true", help="Poll until terminal")
     ap.add_argument("--interval", type=int, default=30)
     ap.add_argument("--max-min", type=int, default=40)
@@ -53,11 +77,18 @@ def main() -> int:
 
     load_dotenv()
     os.environ["DATABASE_PATH"] = os.environ.get("DEMO_DB", "./real_run.db")
+    # Pin the run to a commit so the session's checkout is reproducible; the service
+    # refuses to launch otherwise. Falls back to this checkout's HEAD.
+    os.environ.setdefault("SIM_REPO_COMMIT", resolve_commit())
     cfg = Config.from_env()
     print(f"Devin key configured: {cfg.devin_configured} "
           f"(base {cfg.devin_api_base})")
+    print(f"Estimator: {args.estimator}   pinned commit: {cfg.sim_repo_commit or '(none)'}")
     if not cfg.devin_configured:
         print("→ No DEVIN_API_KEY — set it in .env; a real session cannot start.")
+        return 2
+    if not cfg.sim_pinned:
+        print("→ No SIM_REPO_COMMIT and could not resolve git HEAD; cannot pin the run.")
         return 2
 
     app = create_app(cfg, db=Database(cfg.database_path))
@@ -69,6 +100,7 @@ def main() -> int:
         "drug": args.drug, "target": args.target, "tissue": args.tissue,
         "phase": args.phase, "overall_status": "COMPLETED",
         "endpoint_outcome": args.outcome, "dose_mg": args.dose,
+        "estimator": args.estimator,
     }
     print("\n── Firing webhook (REAL Devin session will be created) ──")
     print(json.dumps(payload, indent=2))
@@ -89,7 +121,7 @@ def main() -> int:
 
     event = body["event"]
     print(f"\n✔ REAL Devin session: {event['session_url']}")
-    eid = make_event_id(args.nct, "results_posted")
+    eid = make_event_id(args.nct, "results_posted", args.estimator)
 
     if not args.watch:
         print("\nRun with --watch to poll until it finishes, or hit POST /poll.")

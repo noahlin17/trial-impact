@@ -115,6 +115,9 @@ def main() -> int:
     cfg = Config(
         devin_api_key="demo", devin_api_base="http://devin.demo",
         sim_repo_url="https://github.com/noahlin17/trial-impact-service",
+        # A placeholder commit so the (scripted) session can be launched; a real run
+        # sets SIM_REPO_COMMIT to an actual commit so the checkout is reproducible.
+        sim_repo_commit="0000000000000000000000000000000000000000",
         watcher_shared_secret=SECRET,
         slack_webhook_url="", smtp_host="", smtp_port=587, smtp_user="",
         smtp_password="", email_from="", email_to="",

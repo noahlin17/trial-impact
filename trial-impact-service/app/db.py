@@ -42,8 +42,17 @@ def _utcnow_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def make_event_id(nct_id: str, event_type: str) -> str:
-    """Deterministic primary key for a (trial, event-kind) pair."""
+def make_event_id(
+    nct_id: str, event_type: str, estimator: str | None = None
+) -> str:
+    """Deterministic primary key for a (trial, event-kind[, estimator]) tuple.
+
+    ``estimator`` is appended only when supplied, so the same trial run through two
+    estimators lands in two rows (that is what makes a head-to-head comparison
+    storable) while a single-estimator run keeps the original ``<nct>:<event>`` key.
+    """
+    if estimator:
+        return f"{nct_id}:{event_type}:{estimator}"
     return f"{nct_id}:{event_type}"
 
 
