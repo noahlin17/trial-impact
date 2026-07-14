@@ -549,6 +549,19 @@ described as covering the receptor (#2). (A fourth — a total concentration rep
 engagement — was #1, now fixed by the free-drug correction.) None of these raise an error or fail
 a test — the estimate simply becomes less well-founded than its downstream use implies.
 
+**The design invariant.** These are all the same species of defect, and naming it makes it a
+principle rather than a checklist: *no quantity may be consumed downstream as a stronger claim than
+the step that produced it can support.* Read that way, several of this project's clearest decisions
+are one invariant applied, and belong in the design from the outset rather than found afterward:
+the **preclinical / Phase 1 scope** (the physics answers a Phase 1 question, so it is not consumed
+as a Phase 2/3 efficacy claim — see [Trial phase](#trial-phase--the-preclinical--phase-1-scope));
+the **no-call gate** (a ΔG is an *input* to a probability, so a trial with no clinical readout
+yields no directional call — [THESIS §3.1](THESIS.md)); the **free-drug occupancy** correction
+(total drug is not engaged drug, #1); and the **estimator/harness split** (Vina is one
+implementation, not "the model"). The open rows below — #4 (relative score read as absolute Kd) and
+#3 (drug-likeness read as toxicity) — are exactly where the invariant is *still* violated; that is
+what makes them defects to fix rather than acceptable simplifications, not merely items on a list.
+
 **Status:** ○ open · ◑ mitigated, not fixed · ✅ fixed
 
 | # | Issue | Impact | |

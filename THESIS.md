@@ -107,12 +107,17 @@ On that view, scoring readouts is not the product. It is how the training set ge
 
 ### 3.1 The seam
 
-The market model currently gates every physics modifier on `has_readout`: with no clinical
-result, it returns no call. This was a bug fix — the earlier version emitted a directional
-call from chemistry alone, on trials that had reported nothing.
+The market model gates every physics modifier on `has_readout`: with no clinical result it
+returns no call. This is a founding contract, not a patch — **the chemistry is an *input* to a
+probability estimate, never a standalone directional call.** A ΔG is not evidence that a stock
+should move; only a clinical readout (or, later, a calibrated forecast) is entitled to a
+directional call, and the physics enters as one term inside it. An early build violated this
+invariant — it emitted a directional call from chemistry alone on trials that had reported
+nothing — and the fact that that read as a *bug* is the point: the no-call gate is the correct
+behaviour falling out of the design, not a special case bolted on.
 
-That gate is where a predictive model would attach. At present, "no readout" correctly means
-"no call." A predictive version would replace that refusal with a forecast, and would only be
+That gate is also where a predictive model would attach. At present, "no readout" means "no
+call." A predictive version would replace that refusal with a forecast, and would only be
 entitled to do so once the underlying estimates are good enough to stand without a clinical
 result behind them. They are not currently.
 
