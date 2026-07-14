@@ -448,6 +448,10 @@ def select_binding_site(
     """Pick structure + docking box by chemistry/target class (see module docstring)."""
     warnings: list[str] = []
     entry = resolve_target_class(target)
+    # When a *curated* route fails at the structure level and we fall through to a
+    # different structure, this records what we intended so the degradation is queryable
+    # in provenance (``curated_route_degraded``), not just a warning string (issue #10).
+    intended_route: str | None = None
 
     # Tier A/covalent — curated covalent class + a tetherable warhead. Once the curated
     # holo resolves and its reactive residue is located, the router *commits to that
@@ -472,6 +476,7 @@ def select_binding_site(
             center, size = residue_box(pdb_path, chain, resnum)
         except Exception as exc:  # noqa: BLE001 — structure unusable: this is the ONLY
             # covalent failure allowed to change the structure, and it is recorded loudly.
+            intended_route = f"covalent-tethered (curated holo {entry.holo_pdb})"
             warnings.append(
                 f"curated covalent holo {entry.holo_pdb} is unusable ({exc}); falling "
                 "through to a different structure — result is NOT the curated covalent route"
@@ -522,6 +527,7 @@ def select_binding_site(
                 warnings=warnings,
             )
         except Exception as exc:  # noqa: BLE001
+            intended_route = f"holo-ligand (curated {entry.holo_pdb})"
             warnings.append(f"curated holo box unavailable ({exc}); trying discovery")
 
     # Tier B — auto-discovered co-crystal (reversible drugs only; adducts won't match).
@@ -541,7 +547,8 @@ def select_binding_site(
                     {"structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt,
                      "structure_sha256": structure_checksum(pdb_path)},
                     center, size, "holo-ligand (discovered)",
-                    box_provenance={"co_crystal_ligand": code, "discovered": True},
+                    box_provenance={"co_crystal_ligand": code, "discovered": True,
+                                    **_degraded(intended_route)},
                     warnings=warnings,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -554,12 +561,26 @@ def select_binding_site(
         center, size = pocket
         return DockingSite(pdb_path, prov, center, size, "fpocket",
                            box_provenance={"pocket_source": "fpocket",
-                                           "caveat": "geometric ranking, not proven site"},
+                                           "caveat": "geometric ranking, not proven site",
+                                           **_degraded(intended_route)},
                            warnings=warnings)
     center, size = compute_docking_box(pdb_path)
     return DockingSite(
         pdb_path, prov, [round(c, 3) for c in center], [round(s, 3) for s in size],
         "blind", box_provenance={"caveat": "centroid box; searches a central slab of a "
-                                 "large receptor, not a resolved pocket"},
+                                 "large receptor, not a resolved pocket",
+                                 **_degraded(intended_route)},
         warnings=warnings,
     )
+
+
+def _degraded(intended_route: str | None) -> dict[str, Any]:
+    """Provenance marking a curated route that fell through to a *different* structure.
+
+    Empty when nothing degraded, so the fields only appear when a curated covalent/holo
+    route failed at the structure level and a lower tier picked a different PDB — making
+    the degradation queryable (``curated_route_degraded``), not just a warning string.
+    """
+    if intended_route is None:
+        return {}
+    return {"curated_route_degraded": True, "intended_route": intended_route}

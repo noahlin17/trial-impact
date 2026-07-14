@@ -406,13 +406,18 @@ def compute_docking_box(pdb_path: str) -> tuple[list[float], list[float]]:
     "exhaustive" — on a large target this silently docks an arbitrary sub-volume. A fix
     needs pocket detection (fpocket / P2Rank) or a drug-bound structure pinned per
     trial. See "Docking box" under Limitations in the README.
+
+    The box spans only ``ATOM`` records so it matches what is actually docked: the
+    receptor prep (:func:`prepare_receptor_pdbqt`) is ``ATOM``-only, so including
+    ``HETATM`` (waters/ions/co-crystal ligands) would center the box on atoms absent
+    from the docked receptor (#9).
     """
     import numpy as np  # lazy
 
     coords = []
     with open(pdb_path) as fh:
         for line in fh:
-            if line.startswith(("ATOM", "HETATM")):
+            if line.startswith("ATOM"):
                 coords.append(
                     (float(line[30:38]), float(line[38:46]), float(line[46:54]))
                 )

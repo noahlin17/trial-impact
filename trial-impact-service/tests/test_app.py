@@ -796,24 +796,25 @@ def _holo_pdb(n_ligand_atoms=8):
     return "".join(out)
 
 
-def test_docking_box_is_blind_not_ligand_centered(tmp_path):
+def test_docking_box_is_blind_and_spans_only_docked_atoms(tmp_path):
     """``compute_docking_box`` is the **Tier-D fallback** (blind, centroid-centered) box,
     used only when no curated/discovered co-crystal and no fpocket pocket is available
-    (see ``app.binding_site``). The default path is now pocket-aware; this asserts the
-    fallback still behaves as documented — enclosing every atom on a small receptor
-    rather than parking on an arbitrary ligand.
+    (see ``app.binding_site``). It now spans only ``ATOM`` records — matching what the
+    receptor prep actually docks — so it no longer stretches onto the co-crystal ligand,
+    waters, or ions (which are ``HETATM`` and are stripped before docking; issue #9).
     """
     pytest.importorskip("numpy")
     from app.simulation import compute_docking_box
 
     p = tmp_path / "holo.pdb"
-    p.write_text(_holo_pdb())
+    p.write_text(_holo_pdb())          # protein ATOMs at x=0; HETATM ligand at x=10
     center, size = compute_docking_box(str(p))
 
     lo, hi = center[0] - size[0] / 2, center[0] + size[0] / 2
-    assert lo <= 0.0 and hi >= 10.0     # spans protein (x=0) *and* ligand (x=10)
-    assert size != [22.5, 22.5, 22.5]   # not the reverted ligand-centered box
-    assert max(size) < 40.0             # the cap is NOT what produced this coverage
+    assert lo <= 0.0 <= hi              # encloses the protein (x=0)
+    assert hi < 10.0                    # but NOT the HETATM ligand at x=10 (#9)
+    assert center[0] == pytest.approx(0.0, abs=1e-6)  # centroid of ATOM records only
+    assert max(size) < 40.0            # the cap is NOT what produced this coverage
 
 
 def test_docking_box_stops_covering_the_receptor_once_the_40A_cap_binds(tmp_path):
@@ -1120,6 +1121,35 @@ def test_covalent_tether_prep_failure_stays_on_curated_structure(tmp_path, monke
     assert any("structure unchanged" in w for w in site.warnings)
     # Structure checksum is recorded (not enforced) so drift is observable across runs.
     assert len(site.structure_prov["structure_sha256"]) == 64
+
+
+def test_curated_route_structure_failure_marks_degradation(tmp_path, monkeypatch):
+    """A *structure-level* curated failure that falls through to a different PDB must be
+    queryable in provenance, not just a warning string (issue #10, 'fail loud')."""
+    pytest.importorskip("rdkit")
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+    from app.simulation import embed_ligand
+
+    def _cannot_fetch(pdb_id, wd):
+        raise RuntimeError("RCSB 503 for curated holo")
+
+    recep = tmp_path / "af.pdb"
+    recep.write_text(_reversible_holo_pdb())
+    monkeypatch.setattr(bs, "_fetch_experimental_pdb", _cannot_fetch)
+    monkeypatch.setattr(
+        bs, "fetch_structure",
+        lambda uni, wd: (str(recep), {"structure_source": "AlphaFold", "pdb_id": f"AF-{uni}-F1"}),
+    )
+    monkeypatch.setattr(bs, "fpocket_box", lambda pdb, wd: None)
+
+    site = bs.select_binding_site(
+        target="KRAS", uniprot="P01116", smiles="C=CC(=O)Nc1ccccc1",
+        mol=embed_ligand("C=CC(=O)Nc1ccccc1"), covalent=True, workdir=str(tmp_path),
+    )
+    assert site.mode == "blind"                                   # fell through
+    assert site.box_provenance["curated_route_degraded"] is True  # ...and says so
+    assert "covalent-tethered" in site.box_provenance["intended_route"]
 
 
 def test_discover_holo_ranks_by_pocket_quality_not_id_order(monkeypatch):
