@@ -458,37 +458,24 @@ addressed; ○ = documented, future work.)
   section / press releases would close the loop.
 
 ### Architecture & operations
-- **The prompt embedded `simulation.py`, exhausting the 30k budget** ✅ — the whole source
-  used to ship inside Devin's 30,000-character prompt (once **29,991 of 30,000 — 9 spare**,
-  and event-dependent), and it had hit the ceiling repeatedly. The session now **clones a
-  pinned commit** (`SIM_REPO_COMMIT`) and runs from that checkout, so the prompt is a few kB
-  regardless of pipeline size and the ceiling is gone. As a bonus, "which code produced this
-  number?" is now answerable by construction: a run is pinned to a commit, so `code_patched`
-  is **verifiable** (diff the session against the commit) rather than merely self-reported.
-  `MAX_PROMPT_CHARS` remains only as a cheap guard against future prompt bloat.
-- **The harness/estimator boundary is now explicit** ✅ — the estimator (Vina today; a
-  co-folding affinity model or proprietary QSAR tomorrow) is a swappable plugin behind the
-  `Estimator` interface (`app/estimators.py`), and the harness (trigger, sandbox, result
-  contract, reproducibility, corpus) is model-agnostic. Every result now carries an
-  **`estimator` id** so a corpus spanning model versions stays interpretable, and `/analysis`
-  runs a head-to-head. **Still open:** `docking_box` remains a Vina-specific field on the
-  shared contract (harmless but not generalised), and the interface is not yet exercised by a
-  *second real physical model* — only the docking pipeline and a naive control (below).
-- **The second estimator is a control, not a rival model** ○ — `ligand-efficiency-baseline@1`
-  is a size proxy (ΔG ≈ 0.3 kcal/mol × heavy-atom count), deliberately naive. It exists so the
-  head-to-head has a floor to beat; it is **not** a validated affinity method and its ΔG must
-  never be read as one (it is low-confidence and flagged in `warnings`). Two estimators
-  agreeing is **not** evidence the physics is correct — a real head-to-head needs a second
-  *physical* estimator (co-folding / FEP / QSAR), which is future work.
-- **Pinning improves reproducibility, not validity** ○ — `SIM_REPO_COMMIT` makes a run
-  reproducible-from-source and makes `code_patched` verifiable, but it does nothing for the
-  scientific caveats above (occupancy, ΔG-as-absolute, docking box, PK constants all stand).
-  A run can be perfectly reproducible and still scientifically wrong. (Note this is distinct
-  from **structure** pinning — the resolved `pdb_id` is still chosen at run time; see above.)
+> The harness/estimator split and the pinned-commit checkout (former issues #5/#6) are
+> **done** — see [Estimators](#estimators-one-interface-many-models-vina-is-not-the-architecture)
+> for how they work. The residual open caveats they introduced are below.
+
+- **The shipped second estimator is a control, not a rival model** ○ —
+  `ligand-efficiency-baseline@1` is a heavy-atom size proxy (ΔG ≈ 0.3 kcal/mol × atom),
+  deliberately naive: a floor for docking to beat, **not** a validated affinity method (its ΔG
+  is low-confidence and flagged in `warnings`). So two estimators agreeing is **not** evidence
+  the physics is right — a real head-to-head still needs a second *physical* estimator
+  (co-folding / FEP / QSAR), and `docking_box` remains a Vina-specific field on the shared
+  contract until one exists.
+- **Pinning buys reproducibility, not validity** ○ — `SIM_REPO_COMMIT` makes a run
+  reproducible-from-source and `code_patched` verifiable, but does nothing for the scientific
+  caveats above (occupancy, ΔG-as-absolute, docking box, PK constants all stand), and is
+  distinct from **structure** pinning — the resolved `pdb_id` is still chosen at run time.
 - **One Devin session per estimator** ○ — a head-to-head launches an independent real session
-  per estimator, so cost and failure modes scale with the number of estimators, and the arms
-  can fail independently (one completes, another blocks). `/analysis` only shows a comparison
-  once **more than one** estimator has completed for a trial.
+  per estimator, so cost and failure modes scale with the count and arms can fail independently;
+  `/analysis` shows a comparison only once **more than one** estimator has completed for a trial.
 
 ### Security & operations
 - **Webhook signature verification fails open** ◑ — `signature_required` is

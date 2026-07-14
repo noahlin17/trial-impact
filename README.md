@@ -390,18 +390,13 @@ sound — calibrating a pricing model on a biased signal just launders the bias.
 argument is in [THESIS.md](THESIS.md); the per-issue fixes are in
 [Known issues](#known-issues) and [Limitations](trial-impact-service/README.md#limitations--modeling-caveats).
 
-**1 · Separate the harness from the estimator** ✅ *(done — it followed directly from the
-physics having no moat)*
-Vina is now **one implementation, not the architecture**. There is an explicit `Estimator`
-interface + registry (`app/estimators.py`), every result carries an `estimator` id (a corpus
-spanning unattributed model versions is uninterpretable), and the prompt no longer ships
-`simulation.py` — the session **clones a pinned commit** (`SIM_REPO_COMMIT`), which removed the
-30k ceiling and makes `code_patched` **verifiable against the commit** rather than self-reported.
-A trial can be run through **two estimators head-to-head** (`compare_estimators.py`, `/analysis`);
-that comparison, not any single model's output, is the product. **What this does *not* claim:**
-the second estimator is a deliberately naive *control* (a heavy-atom size proxy), not a rival
-physical model, and pinning buys reproducibility, not validity — the science in step 2 still
-stands. The next real estimator (co-folding / FEP / QSAR) is future work.
+**1 · Separate the harness from the estimator** ✅ *(done — [#2](https://github.com/noahlin17/trial-impact/pull/2))*
+Vina is now one implementation behind an `Estimator` interface, every result carries an
+`estimator` id, and the session clones a pinned commit instead of embedding `simulation.py`, so
+runs are head-to-head-able (`compare_estimators.py`, `/analysis`). The shipped second estimator
+is a deliberately naive *control*, not a rival model, and pinning buys reproducibility, not
+validity — so the science in step 2 still stands, and a real second estimator (co-folding / FEP /
+QSAR) remains future work.
 
 **2 · Fix the science that blocks a forecast**
 - **Pocket-aware docking** (fpocket / P2Rank, or a drug-bound structure pinned per trial) — the
@@ -496,15 +491,19 @@ its downstream use implies.
 | 2 | **The blind docking box does not cover the receptor** — `min(extent + 8 Å, 40 Å)` centred on the centroid; the cap binds in *both* runs. Coverage: **KRAS 80 %, CFTR 19 %** | CFTR's ΔG is a dock into a central slab, **not a pocket-resolved affinity**. Reproduce with `python verify_docking_box.py`. Mitigated: warns when the cap binds; a characterization test pins the behaviour | ◑ |
 | 3 | **`tox_flag` is a drug-likeness heuristic priced as a safety signal** — it is ≥2 Lipinski violations, which predicts *oral absorption*, not toxicity | Charges **−0.15 PoS as if a safety finding had occurred**. It fires on sotorasib — an **approved** drug — because it is a large lipophilic oncology molecule | ○ |
 | 4 | **ΔG is documented as *relative* but consumed as *absolute*** — converted to `Kd = exp(ΔG/RT)` and branched on hard cutoffs (`Kd ≤ 100 nM`, `ΔG ≤ −9.0`) | The code and the docs disagree about what the number *is*. The conversion also uses 310.15 K where Vina's calibration assumes 298.15 K, making every Kd **~1.75× looser** | ○ |
-| 5 | **`simulation.py` was embedded in the prompt, exhausting the 30k budget** — once 29,991 / 30,000, event-dependent | **Fixed:** the session now **clones a pinned commit** (`SIM_REPO_COMMIT`) instead of embedding the source, so the ceiling is gone and `code_patched` is **verifiable against the commit**. New caveat: pinning buys reproducibility, not scientific validity | ✅ |
-| 6 | **The harness/estimator boundary was implied, not enforced** — `docking_box` Vina-specific, no `estimator` field | **Fixed:** explicit `Estimator` interface + registry (`app/estimators.py`), `estimator` id on every result, head-to-head in `/analysis`. New caveats: the shipped second estimator is a naive **control** (not a rival model), and `docking_box` is still a Vina-specific field | ✅ |
 | 7 | **Sponsor→ticker resolution is a hand-maintained 6-entry file** with hardcoded competitors | Real resolution is **entity resolution** (messy sponsor strings, listed parents, private/pre-IPO sponsors with no ticker and therefore no trade). **The system runs on a watchlist, not a universe** — the scaling claim is not yet earned | ○ |
 | 8 | **Webhook signature verification fails open** when `WATCHER_SHARED_SECRET` is unset | Accepts *any* caller's trial event, each of which spends a Devin session. Mitigated: logs a loud startup warning. Production should require the secret | ◑ |
 | 9 | **The box is computed over atoms that are not docked** — spans `ATOM`+`HETATM`, but the receptor is `ATOM`-only | Small in practice, wrong in principle. Not fixed alone: it moves the box, which changes ΔG, which would invalidate both artifacts. Fixed together with #2, in one re-run | ○ |
 | 10 | **Structure choice is not pinned** — whatever PDBe/SIFTS ranks first *at run time* | A re-run could dock a **different structure**. Also a **look-ahead leakage vector** for any backtest (see [THESIS.md](THESIS.md)) | ○ |
 | 11 | **Reported precision exceeds real precision** — one pinned seed, reported to 3 decimals, when the pre-pin spread was 0.19 kcal/mol (**~36 % in Kd**) | `cmax_ng_ml` is also a *tissue* concentration, not plasma Cmax; AUC is AUC(0–48 h). Fix: N replicates with derived seeds → mean ± sd → feed the sd into `confidence` | ○ |
 
-**Fixed this round, kept on the record:** the AlphaFold fallback URL was stale and *every*
+**Completed:** **#5** (`simulation.py` embedded in the prompt / 30k ceiling) and **#6** (harness
+and estimator entangled) are resolved in [#2](https://github.com/noahlin17/trial-impact/pull/2) —
+the session now clones a pinned commit and Vina is one estimator behind an interface. The design
+lives under [Estimators](trial-impact-service/README.md#estimators-one-interface-many-models-vina-is-not-the-architecture);
+the residual caveats (control ≠ validated model, reproducibility ≠ validity) are in Limitations.
+
+**Fixed earlier, kept on the record:** the AlphaFold fallback URL was stale and *every*
 fallback 404'd; Vina ran with `seed=0`, which it reads as *random*, so repeat runs drifted; a
 tox flag on an `unknown`-outcome trial scored −0.1425, cleared the 0.10 alert threshold and
 emitted a directional call on chemistry with **no clinical readout** behind it (and `unknown`
