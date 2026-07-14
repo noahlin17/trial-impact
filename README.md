@@ -260,7 +260,7 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 | Interaction | | Where it stands |
 |---|---|---|
 | **Reversible non-covalent binding** — H-bonds, hydrophobic contact, vdW, electrostatics | ✅ | Exactly what Vina's empirical function scores. This is the only interaction class the ΔG is actually valid for. Ivacaftor is the clean case. |
-| **Covalent inhibitors** | ◑ | **Detected and flagged, but still scored reversibly.** An RDKit SMARTS match catches acrylamide/acrylate, halo-acetamide, vinyl sulfone, boronic acid/ester and epoxide warheads. Vina cannot model bond formation, so the irreversible contribution to potency is simply missing and ΔG is systematically understated — which is precisely the sotorasib gap the validation section below found. The flag is provenance for a human reader; the market model does not consume it. Needs the Meeko/AutoDock reactive protocol or CovDock. |
+| **Covalent inhibitors** | ◑ | **Detected and flagged, but still scored reversibly.** An RDKit SMARTS match catches acrylamide/acrylate, halo-acetamide, vinyl sulfone, boronic acid/ester and epoxide warheads. Vina scores non-covalent interactions and has no representation of bond formation, so the irreversible contribution to potency is missing and ΔG should be expected to understate a covalent binder's affinity. That is a documented property of the scoring function — note that the two runs in this repo do **not** demonstrate it, and the section below explains why they cannot. The flag is provenance for a human reader; the market model does not consume it. Needs the Meeko/AutoDock reactive protocol or CovDock. |
 | **Metal coordination** (zinc proteases, metalloenzymes) | ○ | Vina handles metal centers poorly without specific parameterization. A zinc-binding drug's affinity would be badly underestimated. |
 | **Allosteric & cryptic pockets** | ○ | A blind box will not reliably find a cryptic pocket that is closed in the apo structure. Needs a holo structure or induced-fit/MD sampling. |
 | **Halogen bonding, explicit bridging waters** | ○ | Not modeled. The receptor is stripped of waters before docking. |
@@ -316,30 +316,46 @@ upstream API. See the service README.
 
 ---
 
-## Validating the physics: checking predictions against real data
+## Checking the predictions against literature — and why this is not validation
 
-The two results above aren't just self-consistent outputs — I checked them against
-published data on each drug's real binding behavior after the runs completed,
-rather than assuming a plausible-looking number was a correct one (see the
-prompt-echo bug above for why that habit matters here).
+After the runs completed I compared both results against published binding data for each
+drug. Both predictions come out weaker than the reported real-world potency, which is the
+expected direction for blind docking.
 
-Both predictions come out weaker than real-world affinity — expected, since blind
-docking is a coarse approximation. But the *size* of the gap tracks the underlying
-chemistry in a way that isn't random: ivacaftor, a genuinely reversible binder, is
-off by a margin that's normal for blind docking. Sotorasib is off by a much larger
-margin — and sotorasib's real potency comes from forming a permanent covalent bond
-to its target, a mechanism AutoDock Vina has no way to model, since Vina only scores
-reversible, non-covalent binding.
+**I originally drew a stronger conclusion than the data supports, and have withdrawn it.**
+The earlier version of this section argued that the *size* of the gap tracked the chemistry:
+ivacaftor, a reversible binder, was off by a margin typical of blind docking, while sotorasib
+was off by considerably more — and sotorasib's potency depends on forming a covalent bond,
+which Vina cannot model. The conclusion drawn was that the model's errors were mechanistically
+explicable rather than arbitrary.
 
-That structure matters more than either number alone: the model's errors are
-mechanistically explicable, not arbitrary. It also points directly at the fix — a
-covalent-docking-aware tool for covalent inhibitors, or explicitly scoping v1 to
-non-covalent mechanisms and flagging covalent drugs as out-of-scope until that's
-added.
+That inference does not survive the later audit of the docking box, for three reasons.
 
-I did not adjust the pipeline, prompts, or reported numbers after finding this —
-the results table shows the raw model output; this is an honest post-hoc check
-against literature, not a correction folded back in.
+- **The variables are not separable.** There are two data points and at least three factors
+  differing between them: covalency, docking-box coverage, and whether the structure was
+  experimental or predicted. A difference between two observations cannot be attributed to one
+  of three uncontrolled variables.
+- **The confound runs against the argument.** Ivacaftor was used as the clean reference case,
+  but it is the run whose box contains only **19%** of the receptor and misses the known binding
+  site, and whose structure is a **predicted** AlphaFold model (confidence 0.7). Sotorasib's run
+  used an **experimental** structure (confidence 0.9) with **80%** box coverage. The case treated
+  as the reliable baseline is in fact the less reliable of the two numbers.
+- **The comparison is not like-for-like.** A docking-derived Kd is not directly comparable to a
+  cellular IC50 or a functional EC50, which is what much of the published potency data reports.
+
+**What survives is a property of the method, not a result from these runs.** AutoDock Vina scores
+non-covalent interactions and has no representation of bond formation, so it will systematically
+understate the potency of covalent inhibitors. That is a documented characteristic of the scoring
+function and stands on its own. It is not evidence produced by this pipeline, and two runs cannot
+demonstrate it.
+
+**What actual validation would require:** a panel of drugs with known affinities, with the
+confounds held fixed — comparable box quality and comparable structure provenance across the
+panel — and a balance of covalent and non-covalent mechanisms, evaluated against binding data of
+the same type. That is a real piece of work and has not been done here.
+
+No numbers, prompts or pipeline behaviour were adjusted in response to any of this. The results
+table reports the raw model output.
 
 ---
 
