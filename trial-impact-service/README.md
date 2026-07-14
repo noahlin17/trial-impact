@@ -44,11 +44,11 @@ The pipeline has four stages, each isolated into its own module:
 ### Why Devin runs the simulation
 
 The tissue/protein simulation is **real biophysics**, not a stub: fetch the target
-structure (UniProt → experimental PDB, else AlphaFold), fetch the ligand
-(PubChem → SMILES → RDKit 3D), dock with **AutoDock Vina** for a real binding free
-energy ΔG (the scalar only — the pose is *not* returned; see Limitations), then solve
-the PK/PD model in **closed form**
-(Bateman) for tissue exposure and target occupancy. That needs a full sandbox that
+structure (UniProt → experimental PDB or mmCIF, else AlphaFold), fetch the ligand
+(PubChem → SMILES → RDKit 3D), dock with **AutoDock Vina** across a fixed seed set for a real
+binding free energy ΔG reported as mean ± sd (the scalar only — the pose is *not* returned; see
+Limitations), then solve the PK/PD model in **closed form**
+(Bateman) for tissue exposure and **free-drug** target occupancy. That needs a full sandbox that
 can `pip install` a heavy scientific
 stack, pull structures, and iterate on failures — exactly what a Devin session is.
 One session per event keeps runs isolated, independently retryable, and observable
@@ -90,9 +90,9 @@ carry on. That is exactly what you want for `pip install` problems — and exact
 you do **not** want for the science, because a session that quietly edits
 `simulation.py` reports numbers that did not come from the code in this repo. Two real
 cases bit us: PubChem renamed the SMILES property (`CanonicalSMILES` →
-`ConnectivitySMILES`/`SMILES`), and a cryo-EM structure was mmCIF-only. Both times the
-run "succeeded" with plausible values, and both times the committed code could not
-have produced them.
+`ConnectivitySMILES`/`SMILES`), and a cryo-EM structure was mmCIF-only (that mmCIF gap is
+now fixed natively — see Limitations). Both times the run "succeeded" with plausible values,
+and both times the committed code could not have produced them.
 
 So the contract makes divergence *loud*: the session must set `code_patched: true` and
 `patch_summary` if it modified the script, and a patched run is surfaced on `/status`
@@ -248,27 +248,30 @@ addressed; ○ = documented, future work.)
 - **Docking is fast & approximate** ○ — AutoDock Vina is an empirical scoring
   function, not a rigorous binding free-energy method. FEP / MM-GBSA are more
   accurate but far heavier; ΔG here is a *relative* signal, not a measured affinity.
-- **Occupancy is computed from *total* drug, not *free* drug** ○ — **the most serious
-  defect in the pharmacology; [issue #1](../README.md#known-issues).** `_pkpd_series`
-  evaluates `occ = C / (C + Kd)` on the total tissue concentration. Only **unbound** drug
-  engages a target (the free-drug hypothesis), and there is **no fraction-unbound (`fu`)
-  term anywhere in the pipeline**. For a highly protein-bound drug the error is enormous,
-  not marginal:
+- **Occupancy uses *free* drug, not *total* drug** ✅ — [issue #1](../README.md#known-issues),
+  retired. `_pkpd_series` now evaluates `occ = C_free / (C_free + Kd)` with `C_free = fu · C`,
+  where `fu` is the plasma fraction unbound — only **unbound** drug engages a target (the
+  free-drug hypothesis). `fu` is resolved by `resolve_fu(drug, fu_hint)`: an explicit caller
+  hint (clamped) > a small curated plasma-protein-binding table > unknown. An **unknown** drug
+  falls back to `fu = 1.0` **and appends a warning**, reproducing the old total-drug upper bound
+  rather than silently pretending 1.0 is measured; the resolved value and its source are stored
+  in `provenance.fu` / `provenance.fu_source`. Exposure metrics (Cmax, AUC) still use **total**
+  concentration — they are total-drug quantities. Both estimators share the same `fu`-aware
+  PK/PD, and legacy artifacts without a stored `fu` reconstruct at `fu = 1.0`.
 
-  | Run | Published occupancy | Corrected for plasma protein binding |
+  | Run | Total-drug occupancy (old) | Free-drug occupancy (now) |
   |---|---|---|
-  | KRAS × sotorasib (fu ≈ 0.11, ~89% bound) | 97.6% | **~81%** |
-  | CFTR × ivacaftor (fu ≈ 0.01, >99% bound) | 94.5% | **~15%** |
+  | KRAS × sotorasib (fu 0.11, ~89% bound) | 97.6% | **73.9%** |
+  | CFTR × ivacaftor (fu 0.01, >99% bound) | 94.5% | **6.7%** |
 
-  And it is **load-bearing on a published market call**: occupancy feeds `pos_breakdown`,
-  so at ~15% ivacaftor crosses the `occ < 30` branch, its **+0.15 engagement bonus becomes
-  a −0.10 penalty**, the PoS delta falls 0.552 → 0.340, and the VRTX call downgrades from
-  `strong` to `moderate`. Every reported occupancy should be read as a **total-drug upper
-  bound**, not as target engagement.
-  **Fix:** an `fu` term per drug via enrichment (same mechanism as `endpoint_outcome`),
-  defaulting to 1.0. **Why not yet:** it changes occupancy, PoS *and* the market call for
-  both published runs, so both artifacts must be re-run for `code_patched: false` to keep
-  meaning anything. Documented rather than quietly patched.
+  Occupancy feeds `pos_breakdown`, so ivacaftor now crosses the `occ < 30` branch: its **+0.15
+  engagement bonus becomes a −0.10 penalty**. The VRTX call nonetheless stays `strong` in the
+  regenerated corpus — because native mmCIF support (below) raised CFTR's confidence 0.7 → 0.874
+  and the resulting PoS (0.37) still clears the `strong` threshold — so this fix changed the
+  occupancy contribution's *sign*, not the headline magnitude this time.
+  **Caveat:** the curated `fu` table is small (a per-drug enrichment path, same mechanism as
+  `endpoint_outcome`, is the general fix), and the free-drug correction does **not** repair the
+  generic PK model (single-dose, one-compartment, F ≈ 1) it sits on top of.
 - **`tox_flag` is a drug-likeness heuristic, not a toxicity model** ○ —
   [issue #3](../README.md#known-issues). It is `≥2 Lipinski Rule-of-5 violations`
   (`mw>500, logp>5, hbd>5, hba>10`). Ro5 predicts **oral absorption and permeability**; it
@@ -320,20 +323,23 @@ addressed; ○ = documented, future work.)
   pin the resolved `pdb_id` per trial in the enrichment file and reuse it on re-runs.
   Ranking by resolution/coverage also means the chosen structure **need not contain
   the drug** — see the docking-box entry above.
-- **`fetch_structure` cannot read mmCIF** ○ — it downloads `…/{pdb_id}.pdb` only. Many
-  modern cryo-EM structures are **mmCIF-only** and 404 on the legacy `.pdb` endpoint
-  (typically *because* they are too large for the legacy format), so the experimental
-  path is simply unavailable for them and the run degrades to a predicted model. The
-  `pdb → cif` fallback that exists today is in the **3D viewer only**. A proper fix
-  wants a native mmCIF parser (gemmi) rather than a cif→pdb conversion, since
-  converting an oversized structure back into PDB columns risks silently truncating
-  it; `prepare_receptor_pdbqt` and `compute_docking_box` also both assume fixed-column
-  PDB text. Deferred for that reason.
-  **Consequence for the recorded CFTR run:** `9MXL` / `structure_source: RCSB` /
-  confidence 0.9 is **not reproducible from this source tree** — `9MXL.pdb` 404s, so
-  the Devin session must have worked around it inside its sandbox. That is a failed
-  result contract (the stored number did not come from this code), and it is the
-  strongest argument for pinning the sim to a hash of `simulation.py`.
+- **`fetch_structure` reads mmCIF natively** ✅ — it downloads `…/{pdb_id}.pdb` first and, on a
+  404, **falls back to `…/{pdb_id}.cif` and converts it with `gemmi`** (`_cif_to_pdb`:
+  `read_structure` → `setup_entities` → `write_pdb`) *before* degrading to AlphaFold. Many modern
+  cryo-EM structures are **mmCIF-only** and 404 on the legacy `.pdb` endpoint (typically *because*
+  they are too large for the legacy format); they now dock as real experimental structures.
+  `provenance.structure_format` records `"pdb"` vs `"mmCIF"`. Experimental structures are still
+  preferred over AlphaFold; AlphaFold remains the fallback only when RCSB has neither a PDB nor an
+  mmCIF file.
+  **Consequence for the recorded CFTR run:** `9MXL` is mmCIF-only (`9MXL.pdb` 404s), so it used
+  to degrade to the AlphaFold model at confidence 0.7. It now converts via gemmi and docks the
+  **real 9MXL cryo-EM structure at confidence 0.874** (`structure_source: RCSB`,
+  `structure_format: mmCIF`) — reproducible from this source tree.
+  **Caveat:** this fixes *which* structure is docked, not *where* the box sits — 9MXL still only
+  gets ~26% box coverage (see the docking-box entry below). `gemmi.write_pdb` re-emits
+  fixed-column PDB text, which `prepare_receptor_pdbqt` and `compute_docking_box` consume as
+  before; a very large complex that overflows PDB columns would still need a mmCIF-native receptor
+  path, which is future work.
 - **AlphaFold fallback URL was pinned to a stale version** ✅ — AFDB stamps a model
   version into the filename (`…-F1-model_v6.pdb`) and bumps it over time. The code
   hardcoded `v4`, which AFDB has since rolled past, so **every** AlphaFold fallback
@@ -359,8 +365,8 @@ addressed; ○ = documented, future work.)
 
   | Structure | Real extent | Atoms inside the 40 Å box |
   |---|---|---|
-  | KRAS `7VVB` | 56 × 55 × 44 Å | **80%** |
-  | CFTR `AF-P13569-F1` | 139 × 117 × 147 Å | **19%** |
+  | KRAS `7VVB` (experimental) | 56 × 55 × 44 Å | **~80%** |
+  | CFTR `9MXL` (experimental cryo-EM, mmCIF) | 67 × 70 × 135 Å (docked chain) | **~26%** |
 
   CFTR is a 1480-residue membrane protein and ivacaftor binds at the TM1/TM6 interface,
   not the centroid — so **that ΔG is a dock into an arbitrary sub-volume**, and the
@@ -401,18 +407,23 @@ addressed; ○ = documented, future work.)
   small and fixed-size no matter what the physics produces.
 - **Docking runs were non-deterministic** ✅ — `run_vina` passed `seed=0`, which Vina
   interprets as *"choose a random seed"*, so repeat runs of the same drug/target drifted
-  (ΔG −8.42 / −8.59 / −8.59 for sotorasib–KRAS). Now pinned to a fixed seed. Reproducible
-  numbers are a precondition for the result contract meaning anything.
-- **Reported precision exceeds real precision** ○ — pinning the seed made runs *reproducible*;
-  it did not make them *accurate*, and it conceals the variance rather than removing it. The
-  pre-pin spread was 0.19 kcal/mol, which through `Kd = exp(ΔG/RT)` is a **~36 % swing in Kd**
-  (857 → 1167 nM) — yet ΔG is reported to three decimals (`−8.606`) when the method's own
-  reproducibility is ±0.1. Two of those three decimals are noise. Relatedly, `cmax_ng_ml` is a
-  **tissue** concentration (`Kp`-scaled), not the plasma Cmax the name implies, and AUC is
-  AUC(0–48 h), not AUC(0–∞). **Fix:** run N replicates with derived seeds (42, 43, …) — the
-  seed *set* stays fixed, so runs remain bit-reproducible, but you get mean ± sd. Then feed the
-  sd into `confidence`, which already scales the PoS delta, so physics uncertainty would
-  propagate into the market call instead of being hidden by it.
+  (ΔG −8.42 / −8.59 / −8.59 for sotorasib–KRAS). Now pinned to a fixed seed *set* (42, 43, 44)
+  and reported as mean ± sd (below). Reproducible numbers are a precondition for the result
+  contract meaning anything.
+- **Reported precision now reflects seed variability** ✅ — [issue #11](../README.md#known-issues),
+  core retired. Pinning a single seed made runs reproducible but concealed the sampling variance
+  and still reported ΔG to three decimals. `run_vina(seed=…)` now docks across a **deterministic
+  seed set** (`_derive_seeds` → 42, 43, 44; the *set* is fixed, so runs stay bit-reproducible),
+  and `dock_replicates` → `summarize_dg` returns mean ΔG, sample sd and n. The result carries
+  `binding_affinity_kcal_mol` (mean), `binding_affinity_sd_kcal_mol` and `replicates`; **Kd is
+  derived from the mean ΔG** (`Kd = exp(mean(ΔG)/RT)`); and the sd feeds `_dg_noise_penalty`
+  (0.5·sd, capped at 0.2) into `confidence`, so docking noise propagates into the PoS delta
+  instead of being hidden by it. The observed spread here is small (0.010 / 0.052 kcal/mol).
+  **Caveats:** this measures **sampling noise only** — not model bias, box placement, or
+  scoring-function error, which dominate and re-seeding cannot see; the cost is linear in seed
+  count (3× the docking time); and `cmax_ng_ml` remains a **tissue** concentration (`Kp`-scaled),
+  not plasma Cmax, with AUC over 0–48 h. The structure-free baseline does **not** get replicate
+  semantics — it is deterministic, so its sd is `None`.
 
 ### Market model
 - **Uncalibrated, hand-tuned** ○ — deterministic and fully inspectable: the PoS

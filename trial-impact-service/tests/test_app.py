@@ -396,6 +396,151 @@ def test_pkpd_curve_shape():
     assert pkpd_curve({"kd_nM": 1}) is None  # missing dose / MW -> no curve
 
 
+# --- free-drug (fu) occupancy ------------------------------------------------ #
+def test_resolve_fu_priority_and_bounds():
+    from app.simulation import resolve_fu
+
+    # Explicit hint wins and is clamped to the physical open interval (0, 1].
+    assert resolve_fu("anything", 0.25) == (0.25, "input")
+    assert resolve_fu("anything", 5.0)[0] == 1.0
+    assert 0.0 < resolve_fu("anything", 0.0)[0] < 1e-3
+    # Curated table for a corpus drug; unknown drug falls back to the total-drug bound.
+    assert resolve_fu("ivacaftor")[0] == 0.01
+    assert resolve_fu("sotorasib")[1].startswith("curated")
+    assert resolve_fu("not-a-real-drug") == (1.0, "unknown")
+
+
+def test_occupancy_uses_free_drug_not_total():
+    """fu < 1 must lower occupancy; fu = 1 reproduces the old total-drug upper bound."""
+    from app.simulation import run_pkpd
+
+    kw = dict(dose_mg=150.0, mol_weight=392.5, kd_nM=738.2, tissue="lung")
+    total = run_pkpd(fu=1.0, **kw)["target_occupancy_pct"]
+    free = run_pkpd(fu=0.01, **kw)["target_occupancy_pct"]
+    assert free < total
+    # Ivacaftor (fu 0.01) corrects a ~95% total-drug bound down to ~15% engagement.
+    assert total > 90.0
+    assert 10.0 < free < 20.0
+
+
+def test_pkpd_curve_honours_stored_fu():
+    """The dashboard reconstruction reads fu from provenance (legacy runs -> 1.0)."""
+    from app.simulation import pkpd_curve
+
+    legacy = pkpd_curve(RICH_SIM)  # no provenance.fu -> total-drug curve
+    bound = pkpd_curve({**RICH_SIM, "provenance": {**RICH_SIM["provenance"], "fu": 0.05}})
+    assert max(bound["occupancy_pct"]) < max(legacy["occupancy_pct"])
+
+
+def test_fu_correction_flips_the_market_call():
+    """Ivacaftor's total-drug 94.5% is a 'strong' call; free-drug ~15% is 'moderate'."""
+    ev = {"nct_id": "NCT-VERIFY-002", "endpoint_outcome": "met",
+          "target": "CFTR", "drug": "ivacaftor"}
+    base_sim = {"binding_affinity_kcal_mol": -8.702, "kd_nM": 738.217,
+                "tox_flag": False, "confidence": 0.7}
+    total = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 94.54})
+    free = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 14.76})
+    assert total["occupancy_modifier"] == 0.15 and free["occupancy_modifier"] == -0.10
+    assert round(total["final"], 2) == 0.55 and round(free["final"], 2) == 0.34
+    assert market_model._magnitude(abs(total["final"])) == "strong"
+    assert market_model._magnitude(abs(free["final"])) == "moderate"
+
+
+# --- multi-seed docking: mean +/- sd instead of one draw --------------------- #
+def test_summarize_dg_mean_sd_and_single_draw():
+    from app.simulation import summarize_dg
+
+    s = summarize_dg([-8.4, -8.6, -8.8])
+    assert round(s["dg_mean"], 3) == -8.6
+    assert s["dg_sd"] is not None and s["dg_sd"] > 0
+    assert s["n"] == 3 and s["energies"] == [-8.4, -8.6, -8.8]
+    # A single draw has no measurable spread.
+    assert summarize_dg([-8.6])["dg_sd"] is None
+    with pytest.raises(ValueError):
+        summarize_dg([])
+
+
+def test_derive_seeds_deterministic():
+    from app.simulation import _derive_seeds
+
+    assert _derive_seeds(3) == [42, 43, 44]  # reproducible from _VINA_SEED
+    assert _derive_seeds(0) == [42]  # never docks zero times
+
+
+def test_dg_noise_penalty_is_bounded_and_monotone():
+    from app.simulation import _dg_noise_penalty
+
+    assert _dg_noise_penalty(None) == 0.0
+    assert _dg_noise_penalty(0.0) == 0.0
+    assert _dg_noise_penalty(0.2) == pytest.approx(0.1)
+    assert _dg_noise_penalty(10.0) == 0.2  # capped
+
+
+def test_rationale_reports_dg_uncertainty():
+    ev = {"nct_id": "NCT-X", "endpoint_outcome": "met", "target": "KRAS"}
+    with_sd = {"binding_affinity_kcal_mol": -8.6, "binding_affinity_sd_kcal_mol": 0.12,
+               "replicates": 3, "kd_nM": 862.6, "target_occupancy_pct": 81.0}
+    without = {"binding_affinity_kcal_mol": -8.6, "kd_nM": 862.6,
+               "target_occupancy_pct": 81.0}
+    assert "-8.6±0.12 (n=3)" in market_model._sponsor_rationale(ev, with_sd, 0.475)
+    assert "±" not in market_model._sponsor_rationale(ev, without, 0.475)
+
+
+# --- mmCIF structures (gemmi) ------------------------------------------------- #
+def test_fetch_experimental_prefers_pdb_then_falls_back_to_mmcif(tmp_path, monkeypatch):
+    """Legacy .pdb wins; when it 404s the mmCIF is fetched and converted via gemmi."""
+    import requests
+
+    from app import simulation
+
+    # Happy path: the legacy .pdb exists -> used directly, no conversion.
+    monkeypatch.setattr(simulation, "_download", lambda url, dest: open(dest, "w").write("X"))
+    path, fmt = simulation._fetch_experimental_pdb("7VVB", str(tmp_path))
+    assert fmt == "pdb" and path.endswith("7VVB.pdb")
+
+    # mmCIF-only: .pdb 404s, so the .cif is fetched and converted.
+    fetched = []
+
+    def only_cif(url, dest):
+        fetched.append(url)
+        if url.endswith(".pdb"):
+            raise requests.HTTPError("404 Not Found")
+        open(dest, "w").write("cif")
+
+    monkeypatch.setattr(simulation, "_download", only_cif)
+    monkeypatch.setattr(simulation, "_cif_to_pdb", lambda c, p: open(p, "w").write("PDB"))
+    path, fmt = simulation._fetch_experimental_pdb("9MXL", str(tmp_path))
+    assert fmt == "mmCIF"
+    assert any(u.endswith("9MXL.pdb") for u in fetched)  # tried legacy first
+    assert any(u.endswith("9MXL.cif") for u in fetched)  # then mmCIF
+
+
+def test_cif_to_pdb_conversion(tmp_path):
+    """gemmi reads an mmCIF and writes ATOM records the receptor prep can parse."""
+    gemmi = pytest.importorskip("gemmi")
+    from app.simulation import _cif_to_pdb
+
+    st = gemmi.Structure()
+    st.name = "TEST"
+    model = gemmi.Model("1")
+    chain = gemmi.Chain("A")
+    res = gemmi.Residue()
+    res.name, res.seqid = "ALA", gemmi.SeqId("1")
+    atom = gemmi.Atom()
+    atom.name, atom.element, atom.pos = "CA", gemmi.Element("C"), gemmi.Position(1, 2, 3)
+    res.add_atom(atom)
+    chain.add_residue(res)
+    model.add_chain(chain)
+    st.add_model(model)
+
+    cif = tmp_path / "x.cif"
+    st.make_mmcif_document().write_file(str(cif))
+    pdb = tmp_path / "x.pdb"
+    _cif_to_pdb(str(cif), str(pdb))
+    text = pdb.read_text()
+    assert "ATOM" in text and " CA " in text and "ALA" in text
+
+
 # --- covalent-warhead detection ---------------------------------------------- #
 # SMILES inlined (no network). Skipped unless RDKit is present — it ships in
 # requirements-sim.txt and normally runs inside the Devin sandbox, not the web tier.
@@ -545,7 +690,7 @@ def test_cli_dispatches_through_the_estimator_registry(monkeypatch):
     class _Spy:
         id = "spy@1"
 
-        def run(self, *, target, drug, tissue, dose_mg, uniprot=None):
+        def run(self, *, target, drug, tissue, dose_mg, uniprot=None, fu=None):
             seen.update(target=target, drug=drug, estimator=self.id)
             return SimResult(target=target, drug=drug, tissue=tissue,
                              dose_mg=dose_mg, estimator=self.id)

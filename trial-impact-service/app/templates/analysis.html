@@ -143,7 +143,7 @@
         <table>
           <thead><tr><th>Estimator</th><th>ΔG</th><th>Kd (nM)</th><th>Occ %</th><th>Confidence</th><th>PoS Δ</th></tr></thead>
           <tbody>${t.arms.map(a => `
-            <tr><td><code>${a.estimator}</code></td><td>${num(a.dg, 2)}</td><td>${num(a.kd, 0)}</td>
+            <tr><td><code>${a.estimator}</code></td><td>${num(a.dg, 2)}${a.dg_sd != null ? "±" + num(a.dg_sd, 2) : ""}</td><td>${num(a.kd, 0)}</td>
               <td>${num(a.occ, 1)}</td><td>${num(a.confidence, 2)}</td>
               <td>${a.pos > 0 ? "+" : ""}${num(a.pos, 2)}</td></tr>`).join("")}
           </tbody>
@@ -164,7 +164,7 @@
         <tr data-i="${i}" class="${selected === r.event_id ? "selected" : ""}">
           <td><strong>${r.target ?? "—"}</strong></td><td>${r.drug ?? "—"}</td>
           <td>${(r.phase || "—").replace("PHASE", "P")}</td>
-          <td>${num(r.dg, 2)}</td><td>${num(r.kd, 0)}</td><td>${num(r.occupancy, 1)}</td>
+          <td>${num(r.dg, 2)}${r.dg_sd != null ? "±" + num(r.dg_sd, 2) : ""}</td><td>${num(r.kd, 0)}</td><td>${num(r.occupancy, 1)}</td>
           <td>${r.tox ? "⚠︎" : "·"}</td>
           <td>${r.pos_delta > 0 ? "+" : ""}${num(r.pos_delta, 2)}</td>
           <td class="${r.direction}">${arrow(r.direction)} ${r.sponsor_ticker ?? "—"}</td>

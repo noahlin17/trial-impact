@@ -36,6 +36,7 @@ import argparse
 import json
 import math
 import os
+import statistics
 import sys
 import tempfile
 from dataclasses import asdict, dataclass, field
@@ -69,6 +70,13 @@ class SimResult:
     tissue: str
     dose_mg: float
     binding_affinity_kcal_mol: float | None = None
+    # Docking is stochastic: the same input drifts run-to-run unless the sampler's seed
+    # is pinned. Reporting a single seed to three decimals overstates precision, so the
+    # docking estimator now docks across several seeds and reports the mean ΔG here plus
+    # its standard deviation below. ``None`` when a single draw was taken (or for the
+    # structure-free baseline, which does not dock and has no sampling noise).
+    binding_affinity_sd_kcal_mol: float | None = None
+    replicates: int | None = None
     kd_nM: float | None = None
     cmax_ng_ml: float | None = None
     auc_ng_h_ml: float | None = None
@@ -137,10 +145,11 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
         resp = requests.get(url, timeout=_HTTP_TIMEOUT)
         if resp.ok and resp.json().get(uniprot):
             pdb_id = resp.json()[uniprot][0]["pdb_id"].upper()
-            pdb_path = os.path.join(workdir, f"{pdb_id}.pdb")
-            _download(f"https://files.rcsb.org/download/{pdb_id}.pdb", pdb_path)
-            _log(f"using experimental structure {pdb_id}")
-            return pdb_path, {"structure_source": "RCSB", "pdb_id": pdb_id}
+            pdb_path, fmt = _fetch_experimental_pdb(pdb_id, workdir)
+            _log(f"using experimental structure {pdb_id} (source format: {fmt})")
+            return pdb_path, {
+                "structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt,
+            }
     except (requests.RequestException, KeyError, IndexError, ValueError) as exc:
         _log(f"experimental structure lookup failed ({exc}); trying AlphaFold")
 
@@ -148,7 +157,42 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
     af_path = os.path.join(workdir, f"AF-{uniprot}.pdb")
     _download(_alphafold_pdb_url(uniprot), af_path)
     _log(f"using AlphaFold model AF-{uniprot}-F1")
-    return af_path, {"structure_source": "AlphaFold", "pdb_id": f"AF-{uniprot}-F1"}
+    return af_path, {
+        "structure_source": "AlphaFold", "pdb_id": f"AF-{uniprot}-F1",
+        "structure_format": "pdb",
+    }
+
+
+def _fetch_experimental_pdb(pdb_id: str, workdir: str) -> tuple[str, str]:
+    """Fetch an experimental structure as a ``.pdb`` file; return (path, source_format).
+
+    Prefers the legacy PDB file, but large modern structures (big cryo-EM complexes)
+    are **mmCIF-only** — ``files.rcsb.org/download/<id>.pdb`` 404s for them — which used
+    to force a degrade to the AlphaFold model. When the legacy file is missing, download
+    the mmCIF and convert it to PDB with gemmi, so a real experimental structure is used
+    instead of a predicted one. The receptor prep and box only read ATOM/HETATM records,
+    which survive the conversion.
+    """
+    pdb_path = os.path.join(workdir, f"{pdb_id}.pdb")
+    try:
+        _download(f"https://files.rcsb.org/download/{pdb_id}.pdb", pdb_path)
+        return pdb_path, "pdb"
+    except requests.RequestException as exc:
+        _log(f"{pdb_id}.pdb unavailable ({exc}); fetching mmCIF and converting via gemmi")
+
+    cif_path = os.path.join(workdir, f"{pdb_id}.cif")
+    _download(f"https://files.rcsb.org/download/{pdb_id}.cif", cif_path)
+    _cif_to_pdb(cif_path, pdb_path)
+    return pdb_path, "mmCIF"
+
+
+def _cif_to_pdb(cif_path: str, pdb_path: str) -> None:
+    """Convert an mmCIF structure to PDB using gemmi (first model, standard records)."""
+    import gemmi  # lazy — ships in requirements-sim.txt, like the rest of the stack
+
+    structure = gemmi.read_structure(cif_path)
+    structure.setup_entities()
+    structure.write_pdb(pdb_path)
 
 
 # AlphaFold DB stamps a model version into the filename (…-F1-model_v6.pdb) and bumps
@@ -377,9 +421,22 @@ def compute_docking_box(pdb_path: str) -> tuple[list[float], list[float]]:
 # if the source rolls a new seed each time.
 _VINA_SEED = 42
 
+# Number of seeds docked per run. A single pinned seed is reproducible but its ΔG still
+# lands somewhere in the sampler's run-to-run spread, so reporting it to three decimals
+# claims a precision the method does not have. Docking a small fixed set of seeds lets
+# the pipeline report a mean ± sd instead of one draw (see issue #11). The seeds are
+# derived deterministically from _VINA_SEED, so the *set* — and therefore the mean — is
+# still reproducible from source.
+_VINA_REPLICATES = 3
 
-def run_vina(receptor_pdbqt: str, ligand_pdbqt: str, box) -> float:
-    """Dock and return the best pose's binding free energy ΔG (kcal/mol).
+
+def _derive_seeds(replicates: int) -> list[int]:
+    """Deterministic seed set for the replicate docks (reproducible from source)."""
+    return [_VINA_SEED + i for i in range(max(1, replicates))]
+
+
+def run_vina(receptor_pdbqt: str, ligand_pdbqt: str, box, seed: int = _VINA_SEED) -> float:
+    """Dock once at ``seed`` and return the best pose's binding free energy ΔG (kcal/mol).
 
     Only the scalar ΔG is returned. The top pose is *not* transported back: it is ~8 KB
     of PDB text, and embedding it in the single-line SIM_RESULT_JSON contract made the
@@ -389,12 +446,51 @@ def run_vina(receptor_pdbqt: str, ligand_pdbqt: str, box) -> float:
     from vina import Vina  # lazy
 
     center, size = box
-    v = Vina(sf_name="vina", cpu=os.cpu_count() or 1, seed=_VINA_SEED)
+    v = Vina(sf_name="vina", cpu=os.cpu_count() or 1, seed=seed)
     v.set_receptor(receptor_pdbqt)
     v.set_ligand_from_file(ligand_pdbqt)
     v.compute_vina_maps(center=center, box_size=size)
     v.dock(exhaustiveness=8, n_poses=5)
     return float(v.energies(n_poses=1)[0][0])
+
+
+def dock_replicates(
+    receptor_pdbqt: str, ligand_pdbqt: str, box, replicates: int = _VINA_REPLICATES
+) -> dict[str, Any]:
+    """Dock across ``replicates`` seeds and summarise the ΔG distribution.
+
+    Returns the mean ΔG (the point estimate), its standard deviation (sampling noise),
+    the seed set, and the per-seed energies — see :func:`summarize_dg`.
+    """
+    seeds = _derive_seeds(replicates)
+    energies = [run_vina(receptor_pdbqt, ligand_pdbqt, box, seed=s) for s in seeds]
+    summary = summarize_dg(energies)
+    summary["seeds"] = seeds
+    return summary
+
+
+def summarize_dg(energies: list[float]) -> dict[str, Any]:
+    """Mean / sd / n of a list of per-seed ΔG values (pure; unit-tested without Vina)."""
+    if not energies:
+        raise ValueError("no docking energies to summarise")
+    n = len(energies)
+    return {
+        "dg_mean": statistics.fmean(energies),
+        # Sample sd needs ≥2 points; a single draw has no measurable spread.
+        "dg_sd": statistics.stdev(energies) if n > 1 else None,
+        "n": n,
+        "energies": [round(e, 3) for e in energies],
+    }
+
+
+# Confidence penalty for docking noise: a tight ΔG spread costs nothing, but a spread
+# approaching ~0.4 kcal/mol (≈ 2× the drift seen for sotorasib pre-pinning) halves the
+# best-case structure bonus. Capped so noise alone cannot drive confidence to the floor.
+def _dg_noise_penalty(dg_sd: float | None) -> float:
+    """Map a ΔG standard deviation (kcal/mol) to a confidence penalty in [0, 0.2]."""
+    if not dg_sd:
+        return 0.0
+    return min(0.2, 0.5 * dg_sd)
 
 
 def kd_from_dg(dg_kcal_mol: float) -> float:
@@ -418,17 +514,24 @@ _PK_CL = 10.0  # L/h  clearance
 
 
 def run_pkpd(
-    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str
+    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str, fu: float = 1.0
 ) -> dict[str, float]:
     """Summarise exposure + occupancy for a 1-compartment first-order-absorption model.
 
     The model has a closed-form (Bateman) solution, so no ODE solver is needed:
         C(t) = Dose·ka / (Vd·(ka−ke)) · (e^{−ke·t} − e^{−ka·t})   [µg/mL]
     No bioavailability term (F is implicitly 1), so oral exposure is flattered.
-    A tissue partition coefficient Kp scales the concentration reaching the target,
-    and occupancy uses the docked Kd:  occ(t) = C_nM / (C_nM + Kd).
+    A tissue partition coefficient Kp scales the concentration reaching the target.
+
+    Occupancy is driven by the **free** (unbound) concentration, since only unbound
+    drug engages the target:  occ(t) = C_free / (C_free + Kd),  C_free = fu · C_nM.
+    ``fu`` is the plasma fraction unbound; ``fu = 1.0`` reproduces the old total-drug
+    upper bound. ``cmax``/``auc`` remain **total** concentrations — they are exposure
+    measurements, not engagement.
     """
-    s = _pkpd_series(dose_mg=dose_mg, mol_weight=mol_weight, kd_nM=kd_nM, tissue=tissue)
+    s = _pkpd_series(
+        dose_mg=dose_mg, mol_weight=mol_weight, kd_nM=kd_nM, tissue=tissue, fu=fu
+    )
     return {
         "cmax_ng_ml": max(s["conc_ng_ml"]),
         "auc_ng_h_ml": _trapz(s["t_h"], s["conc_ng_ml"]),
@@ -437,10 +540,14 @@ def run_pkpd(
 
 
 def _pkpd_series(
-    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str,
+    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str, fu: float = 1.0,
     t_end: float = 48.0, n: int = 97,
 ) -> dict[str, list[float]]:
-    """Evaluate the Bateman exposure curve + occupancy on a time grid (stdlib only)."""
+    """Evaluate the Bateman exposure curve + (free-drug) occupancy on a time grid.
+
+    ``conc_ng_ml`` is the total tissue concentration; ``occupancy_pct`` uses only the
+    unbound fraction ``fu`` of it, because bound drug cannot engage the target.
+    """
     ka, vd, ke = _PK_KA, _PK_VD, _PK_CL / _PK_VD
     kp = _TISSUE_PARTITION.get((tissue or "plasma").lower(), 1.0)  # tissue:plasma ratio
     coef = dose_mg * ka / (vd * (ka - ke))  # µg/mL scale (ka != ke by construction)
@@ -451,9 +558,10 @@ def _pkpd_series(
         c_plasma = coef * (math.exp(-ke * t) - math.exp(-ka * t))  # µg/mL
         c_tissue = max(c_plasma, 0.0) * kp
         c_nM = (c_tissue / mol_weight) * 1e6
+        c_free_nM = fu * c_nM  # only unbound drug engages the target
         t_h.append(round(t, 3))
         conc_ng_ml.append(round(c_tissue * 1000.0, 4))  # µg/mL → ng/mL
-        occ_pct.append(round(100.0 * c_nM / (c_nM + kd_nM), 3))
+        occ_pct.append(round(100.0 * c_free_nM / (c_free_nM + kd_nM), 3))
     return {"t_h": t_h, "conc_ng_ml": conc_ng_ml, "occupancy_pct": occ_pct}
 
 
@@ -470,15 +578,51 @@ def pkpd_curve(sim_result: dict[str, Any], t_end: float = 48.0, n: int = 97):
     Pulls dose / MW / Kd / tissue out of a persisted ``sim_result`` and re-evaluates
     the same Bateman model. Returns ``None`` when a required field is missing.
     """
+    prov = sim_result.get("provenance") or {}
     kd = sim_result.get("kd_nM")
     dose = sim_result.get("dose_mg")
-    mw = ((sim_result.get("provenance") or {}).get("descriptors") or {}).get("mw")
+    mw = (prov.get("descriptors") or {}).get("mw")
     if not kd or not dose or not mw:
         return None
+    fu = prov.get("fu")
+    fu = 1.0 if fu is None else fu  # legacy artifacts predate fu → total-drug curve
     return _pkpd_series(
         dose_mg=dose, mol_weight=mw, kd_nM=kd,
-        tissue=sim_result.get("tissue") or "plasma", t_end=t_end, n=n,
+        tissue=sim_result.get("tissue") or "plasma", fu=fu, t_end=t_end, n=n,
     )
+
+
+# Plasma fraction unbound (fu = 1 − fraction bound to plasma protein). Only *unbound*
+# drug engages the target, so occupancy must be driven by the free concentration, not
+# the total (see run_pkpd). fu is a measured, drug-specific PK property — it cannot be
+# predicted reliably from structure — so it is treated as an explicit input. The values
+# below are literature plasma-protein-binding figures for drugs in the corpus; each
+# carries its source. When fu is neither supplied nor curated, the pipeline falls back
+# to fu = 1.0 (the old total-drug upper bound) and says so in a warning, rather than
+# inventing a number for an arbitrary drug.
+_PLASMA_FREE_FRACTION: dict[str, float] = {
+    "ivacaftor": 0.01,   # ~99% bound (FDA Kalydeco label, clinical pharmacology)
+    "sotorasib": 0.11,   # ~89% bound (FDA Lumakras label, clinical pharmacology)
+}
+
+# Clamp fu to a physical open interval: 0 would make occupancy identically zero and
+# 1 is "no protein binding". Nothing is truly 100% unbound or 100% bound.
+_FU_MIN, _FU_MAX = 1e-4, 1.0
+
+
+def resolve_fu(drug: str, fu_hint: float | None = None) -> tuple[float, str]:
+    """Resolve the plasma fraction-unbound ``fu`` for ``drug``.
+
+    Priority: an explicit ``fu_hint`` (clamped) > the curated table > unknown. When
+    unknown, returns ``(1.0, "unknown")`` so the caller reproduces the total-drug upper
+    bound *and* can flag that occupancy is not a free-drug engagement estimate.
+    """
+    if fu_hint is not None:
+        return min(_FU_MAX, max(_FU_MIN, float(fu_hint))), "input"
+    key = (drug or "").strip().lower()
+    if key in _PLASMA_FREE_FRACTION:
+        return _PLASMA_FREE_FRACTION[key], "curated (plasma protein binding)"
+    return 1.0, "unknown"
 
 
 # Rough tissue:plasma partition coefficients (Kp). Real QSP models fit these; the
@@ -510,8 +654,14 @@ def run_simulation(
     tissue: str = "plasma",
     dose_mg: float = 100.0,
     uniprot: str | None = None,
+    fu: float | None = None,
 ) -> SimResult:
-    """Run the full docking + PK/PD pipeline and return a :class:`SimResult`."""
+    """Run the full docking + PK/PD pipeline and return a :class:`SimResult`.
+
+    ``fu`` is the plasma fraction unbound used for free-drug occupancy; when ``None``
+    it is resolved from the curated table, falling back to 1.0 (total-drug upper bound)
+    for an unknown drug (with a warning).
+    """
     result = SimResult(
         target=target, drug=drug, tissue=tissue, dose_mg=dose_mg,
         estimator=VINA_ESTIMATOR_ID,
@@ -548,13 +698,38 @@ def run_simulation(
                 "mode": "blind",
             }
 
-            dg = run_vina(receptor_pdbqt, ligand_pdbqt, box)
+            # Dock across a fixed seed set and report the mean ΔG ± sd, not one draw.
+            # The replicate count is part of the model definition (bumping it would bump
+            # the estimator version), so it is a pipeline constant, not a caller knob.
+            dock = dock_replicates(receptor_pdbqt, ligand_pdbqt, box)
+            dg = dock["dg_mean"]
             result.binding_affinity_kcal_mol = round(dg, 3)
+            result.binding_affinity_sd_kcal_mol = (
+                round(dock["dg_sd"], 3) if dock["dg_sd"] is not None else None
+            )
+            result.replicates = dock["n"]
+            result.provenance["vina_seeds"] = dock["seeds"]
+            result.provenance["dg_replicates"] = dock["energies"]
             result.kd_nM = round(kd_from_dg(dg), 3)
-            _log(f"ΔG = {dg:.2f} kcal/mol  →  Kd = {result.kd_nM:.1f} nM")
+            sd_txt = "" if dock["dg_sd"] is None else f" ± {dock['dg_sd']:.2f}"
+            _log(
+                f"ΔG = {dg:.2f}{sd_txt} kcal/mol (n={dock['n']})  →  "
+                f"Kd = {result.kd_nM:.1f} nM"
+            )
+
+            # Free-drug occupancy: only the unbound fraction (fu) engages the target.
+            fu_value, fu_source = resolve_fu(drug, fu)
+            result.provenance["fu"] = fu_value
+            result.provenance["fu_source"] = fu_source
+            if fu_source == "unknown":
+                result.warnings.append(
+                    "no plasma fraction-unbound (fu) for this drug; occupancy is a "
+                    "TOTAL-drug upper bound (fu=1), not free-drug engagement"
+                )
 
             pkpd = run_pkpd(
-                dose_mg=dose_mg, mol_weight=desc["mw"], kd_nM=result.kd_nM, tissue=tissue
+                dose_mg=dose_mg, mol_weight=desc["mw"], kd_nM=result.kd_nM,
+                tissue=tissue, fu=fu_value,
             )
             result.cmax_ng_ml = round(pkpd["cmax_ng_ml"], 3)
             result.auc_ng_h_ml = round(pkpd["auc_ng_h_ml"], 3)
@@ -566,9 +741,13 @@ def run_simulation(
             )
             result.tox_flag = violations >= 2
 
-            # Confidence: experimental structure > predicted; full run > fallbacks.
+            # Confidence: experimental structure > predicted; full run > fallbacks;
+            # and noisier docking (larger ΔG spread across seeds) is less trustworthy.
             base = 0.9 if prov["structure_source"] == "RCSB" else 0.7
-            result.confidence = round(max(0.3, base - 0.05 * len(result.warnings)), 3)
+            noise_penalty = _dg_noise_penalty(result.binding_affinity_sd_kcal_mol)
+            result.confidence = round(
+                max(0.3, base - 0.05 * len(result.warnings) - noise_penalty), 3
+            )
     except Exception as exc:  # noqa: BLE001 — surface any pipeline failure as data
         result.error = f"{type(exc).__name__}: {exc}"
         _log(f"simulation failed: {result.error}")
@@ -586,6 +765,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tissue", default="plasma", help="Tissue of interest")
     parser.add_argument("--dose", type=float, default=100.0, help="Dose in mg")
     parser.add_argument("--uniprot", default=None, help="UniProt accession (skips lookup)")
+    parser.add_argument(
+        "--fu",
+        type=float,
+        default=None,
+        help="Plasma fraction unbound for free-drug occupancy "
+        "(default: curated table, else 1.0 with a warning)",
+    )
     parser.add_argument(
         "--estimator",
         default=VINA_ESTIMATOR_ID,
@@ -611,6 +797,7 @@ def main(argv: list[str] | None = None) -> int:
         tissue=args.tissue,
         dose_mg=args.dose,
         uniprot=args.uniprot,
+        fu=args.fu,
     )
     # The service parses this exact line out of the Devin session transcript.
     print(f"{RESULT_MARKER} {json.dumps(result.to_dict())}")

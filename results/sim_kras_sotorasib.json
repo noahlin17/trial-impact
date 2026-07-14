@@ -1,100 +1,116 @@
 {
-  "alert_sent": 1,
-  "commentary": "Trial NCT-REAL-0001 \u2014 Amgen (sotorasib / KRAS): endpoint met.\nModelled probability-of-success delta: +0.47.\n  \u25b2 AMGN (Amgen, sponsor): up / strong\n  \u25bc REGN (Regeneron, competitor): down / moderate\n  \u25bc NVS (Novartis, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
+  "event_id": "NCT-REAL-0001:results_posted",
+  "nct_id": "NCT-REAL-0001",
+  "sponsor": "Amgen",
+  "drug": "sotorasib",
+  "target": "KRAS",
+  "tissue": "tumor",
+  "phase": "PHASE1",
+  "event_type": "results_posted",
+  "endpoint_outcome": "met",
+  "sponsor_ticker": "AMGN",
   "competitor_tickers": [
     {
-      "name": "Regeneron",
-      "ticker": "REGN"
+      "ticker": "REGN",
+      "name": "Regeneron"
     },
     {
-      "name": "Novartis",
-      "ticker": "NVS"
+      "ticker": "NVS",
+      "name": "Novartis"
     }
   ],
-  "created_at": "2026-07-13T21:23:34+00:00",
-  "devin_session_id": "devin-07e22c562ced4ed7b427efec03db3a23",
-  "drug": "sotorasib",
-  "endpoint_outcome": "met",
-  "error_message": null,
-  "event_id": "NCT-REAL-0001:results_posted",
-  "event_type": "results_posted",
-  "nct_id": "NCT-REAL-0001",
-  "phase": "PHASE1",
-  "price_calls": [
-    {
-      "direction": "up",
-      "magnitude": "strong",
-      "name": "Amgen",
-      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking \u0394G -8.606 kcal/mol (Kd 862.641 nM). Peak target occupancy 97.55%. Structural tox flag raised. PoS delta +0.47.",
-      "role": "sponsor",
-      "ticker": "AMGN"
-    },
-    {
-      "direction": "down",
-      "magnitude": "moderate",
-      "name": "Regeneron",
-      "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals.",
-      "role": "competitor",
-      "ticker": "REGN"
-    },
-    {
-      "direction": "down",
-      "magnitude": "moderate",
-      "name": "Novartis",
-      "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals.",
-      "role": "competitor",
-      "ticker": "NVS"
-    }
-  ],
-  "session_url": "https://app.devin.ai/sessions/07e22c562ced4ed7b427efec03db3a23",
+  "devin_session_id": "local-pinned-stack-regen",
+  "session_url": "",
+  "status": "completed",
   "sim_result": {
-    "auc_ng_h_ml": 143390.88,
-    "binding_affinity_kcal_mol": -8.606,
+    "target": "KRAS",
+    "drug": "sotorasib",
+    "tissue": "tumor",
+    "dose_mg": 960.0,
+    "binding_affinity_kcal_mol": -8.336,
+    "binding_affinity_sd_kcal_mol": 0.01,
+    "replicates": 3,
+    "kd_nM": 1336.854,
     "cmax_ng_ml": 19259.451,
-    "code_patched": false,
-    "confidence": 0.9,
+    "auc_ng_h_ml": 143390.88,
+    "target_occupancy_pct": 73.87,
+    "tox_flag": true,
     "covalent_flag": true,
+    "confidence": 0.895,
+    "provenance": {
+      "uniprot": "P01116",
+      "structure_source": "RCSB",
+      "pdb_id": "7VVB",
+      "structure_format": "pdb",
+      "smiles": "C[C@H]1CN(CCN1C2=NC(=O)N(C3=NC(=C(C=C32)F)C4=C(C=CC=C4F)O)C5=C(C=CN=C5C(C)C)C)C(=O)C=C",
+      "descriptors": {
+        "mw": 560.605,
+        "logp": 5.296,
+        "hbd": 1,
+        "hba": 6,
+        "tpsa": 102.23
+      },
+      "vina_seeds": [
+        42,
+        43,
+        44
+      ],
+      "dg_replicates": [
+        -8.346,
+        -8.335,
+        -8.327
+      ],
+      "fu": 0.11,
+      "fu_source": "curated (plasma protein binding)"
+    },
     "docking_box": {
       "center": [
         -19.192,
         40.956,
         -3.009
       ],
-      "mode": "blind",
       "size": [
         40.0,
         40.0,
         40.0
-      ]
+      ],
+      "mode": "blind"
     },
-    "dose_mg": 960.0,
-    "drug": "sotorasib",
+    "warnings": [],
     "error": null,
-    "kd_nM": 862.641,
-    "patch_summary": null,
-    "provenance": {
-      "descriptors": {
-        "hba": 6,
-        "hbd": 1,
-        "logp": 5.296,
-        "mw": 560.605,
-        "tpsa": 102.23
-      },
-      "pdb_id": "7VVB",
-      "smiles": "C[C@H]1CN(CCN1C2=NC(=O)N(C3=NC(=C(C=C32)F)C4=C(C=CC=C4F)O)C5=C(C=CN=C5C(C)C)C)C(=O)C=C",
-      "structure_source": "RCSB",
-      "uniprot": "P01116"
-    },
-    "target": "KRAS",
-    "target_occupancy_pct": 97.55,
-    "tissue": "tumor",
-    "tox_flag": true,
-    "warnings": []
+    "estimator": "vina-docking-pkpd@1",
+    "code_patched": false,
+    "patch_summary": null
   },
-  "sponsor": "Amgen",
-  "sponsor_ticker": "AMGN",
-  "status": "completed",
-  "target": "KRAS",
-  "tissue": "tumor",
-  "updated_at": "2026-07-13T21:28:35+00:00"
+  "commentary": "Trial NCT-REAL-0001 \u2014 Amgen (sotorasib / KRAS): endpoint met.\nModelled probability-of-success delta: +0.47.\n  \u25b2 AMGN (Amgen, sponsor): up / strong\n  \u25bc REGN (Regeneron, competitor): down / moderate\n  \u25bc NVS (Novartis, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
+  "price_calls": [
+    {
+      "ticker": "AMGN",
+      "name": "Amgen",
+      "role": "sponsor",
+      "direction": "up",
+      "magnitude": "strong",
+      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking \u0394G -8.336\u00b10.01 (n=3) kcal/mol (Kd 1336.854 nM). Peak target occupancy 73.87%. Structural tox flag raised. PoS delta +0.47."
+    },
+    {
+      "ticker": "REGN",
+      "name": "Regeneron",
+      "role": "competitor",
+      "direction": "down",
+      "magnitude": "moderate",
+      "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals."
+    },
+    {
+      "ticker": "NVS",
+      "name": "Novartis",
+      "role": "competitor",
+      "direction": "down",
+      "magnitude": "moderate",
+      "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals."
+    }
+  ],
+  "created_at": "2026-07-14T05:49:41+00:00",
+  "updated_at": "2026-07-14T05:49:41+00:00",
+  "error_message": null,
+  "alert_sent": 1
 }

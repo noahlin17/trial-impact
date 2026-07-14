@@ -267,7 +267,10 @@ def _sponsor_rationale(event: dict[str, Any], sim: dict[str, Any] | None, delta:
         dg = sim.get("binding_affinity_kcal_mol")
         occ = sim.get("target_occupancy_pct")
         if dg is not None:
-            parts.append(f"Docking ΔG {dg} kcal/mol (Kd {sim.get('kd_nM')} nM).")
+            sd = sim.get("binding_affinity_sd_kcal_mol")
+            n = sim.get("replicates")
+            dg_txt = f"{dg}" if sd is None else f"{dg}±{sd} (n={n})"
+            parts.append(f"Docking ΔG {dg_txt} kcal/mol (Kd {sim.get('kd_nM')} nM).")
         if occ is not None:
             parts.append(f"Peak target occupancy {occ}%.")
         if sim.get("tox_flag"):
