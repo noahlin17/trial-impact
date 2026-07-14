@@ -41,16 +41,55 @@ in minutes, at API cost** — with the customizability of a real scientist at yo
 scoped to whatever universe you point the watcher at (a therapeutic area, a sponsor set, a
 single competitive mechanism). That changes it from a research project into a **data feed**.
 
+### The uncomfortable part: the physics is not the moat
+
+That same sentence cuts the other way, and it is worth stating before anyone else does.
+**A signal's value decays with the cost of reproducing it** — and the cost here is nearly
+zero. AutoDock Vina is free and fifteen years old. RDKit, the PDB, AlphaFold DB, PubChem and
+Open Targets are all free. An agent wrote this pipeline in days; that is not a hypothetical,
+it is this repo's git history. If everyone can compute a ΔG for every trial, **ΔG is in the
+price.** The cheapness that makes the modality *viable* is the same property that erodes its
+*edge*. Running docking and tox sims ahead of a readout is, on its own, a commodity — and it
+should be assumed to commoditize further.
+
+So the estimator is not the asset. Three things plausibly are:
+
+| | Why it could be durable |
+|---|---|
+| **The labeled, point-in-time corpus** | Models commoditize; data does not. `(trial design → physics → genetics → outcome → realized move)`, with failure labels reconstructed from press releases and 8-Ks **because the registry systematically under-reports negatives**. That work is slow, unglamorous and hard to copy. The difficulty *is* the moat. |
+| **The translation to price** | P(success) → the market's *implied* P(success) → sizing. This is finance IP and depends on your own capital and execution; it does not commoditize the way an open-source scoring function does. |
+| **The evaluation harness** | A new bio-AI model lands every quarter. The edge does not belong to whoever *has* a model — it belongs to whoever can evaluate a new one against a labeled financial corpus, point-in-time, in a week. |
+
+**That last row is what this repository actually is.** The docking is a *plugin*, and a
+deliberately commodity one: it is the reference implementation and the control, not the
+source of edge. Everything around it — the event trigger, the isolated compute sandbox, the
+strict result contract, the reproducible-from-source guarantee, the corpus, the backtest — is
+**model-agnostic**. Swap Vina for a co-folding affinity model, a proprietary QSAR, or an
+internal fine-tune, and the rest of the system does not change. The `SIM_RESULT_JSON` contract
+already describes *an estimate with provenance*, not *a docking run*.
+
+This is the honest pitch: **not "docking generates alpha," but "here is the infrastructure to
+find out what does."** If proprietary bio-AI models or novel outcome-prediction and pricing
+techniques can produce genuine alpha here — and that is a real question, worth investigating
+in earnest rather than asserting — then the thing you need first is a rig that can test them
+against realized outcomes without fooling you. That rig is the contribution.
+
+One caution I would apply to my own thesis: *"we will have a proprietary model"* is the
+**weakest** of the three rows. You are unlikely to out-model the frontier labs, a licensed
+model is not proprietary to you, and a model moat depreciates on roughly a twelve-month lag as
+the open-source frontier catches up. The durable version of "proprietary model" is a
+**fine-tune on proprietary data** — which routes straight back to the corpus.
+
 **Where this actually stands.** Both halves of the pipeline — the chemistry and the market
-model — are real work, and both need substantially more sophistication and research
-refinement before this generates true alpha. The docking is blind and coarse; occupancy is
-computed from total rather than free drug; the market model is uncalibrated, rules-based,
-and not weighted by phase. These are documented in detail under
-[Known issues](#known-issues) and [Chemistry & biophysical scope](#chemistry--biophysical-scope)
-rather than glossed. **The claim here is not that the current numbers are tradeable.** The
-claim is that the *modality* is real, that the plumbing to produce it per event exists and
-is reproducible from source, and that the resulting quantity is the kind of thing that can
-be validated, calibrated, and priced.
+model — are real work, and both are **placeholders meant to be refined and replaced** on the
+way to true alpha. The docking is blind and coarse; occupancy is computed from total rather
+than free drug; the market model is uncalibrated, rules-based, and not weighted by phase.
+These are documented in detail under [Known issues](#known-issues) and
+[Chemistry & biophysical scope](#chemistry--biophysical-scope) rather than glossed.
+**The claim here is not that the current numbers are tradeable, and not that docking is an
+edge.** The claim is that the *modality* is real, that the plumbing to produce it per event
+exists and is reproducible from source, and that the resulting quantity is the kind of thing
+that can be validated, calibrated and priced — by a better model than this one.
 
 Both the chemistry and the market mechanics in this repo are **placeholders to be refined
 and replaced, not foundations to be built on.** The market model in particular is a
@@ -477,6 +516,21 @@ cd trial-impact-service && pip install -r requirements-dev.txt && ruff check . &
   like CFTR's 9MXL stop falling back to a predicted model. Then MM-GBSA rescoring, and
   a separate affinity path for biologics (antibodies can't dock). Pin the sim
   environment (conda-lock); Vina's seed is already pinned, so ΔG now reproduces.
+
+**Make the estimator pluggable** — the highest-leverage architectural change, and the one
+that follows directly from the physics having no moat
+- Formalize the boundary between the **harness** (trigger, sandbox, result contract,
+  reproducibility, corpus, backtest) and the **estimator** (whatever computes the numbers).
+  Vina is one implementation; a co-folding affinity model (Boltz-2, Chai), a proprietary
+  QSAR, or an internal fine-tune should be **drop-in alternatives**, not rewrites.
+  `SIM_RESULT_JSON` already describes *an estimate with provenance* rather than *a docking
+  run*, so the contract mostly generalizes already — what does not is `simulation.py`, which
+  is Vina-specific and currently shipped as one monolith inside the prompt.
+- Add an `estimator` field to the result contract and record **which model produced which
+  number**. Without it, a corpus built across model versions is uninterpretable and any
+  backtest over it is invalid — the same argument as `code_patched`, one level up.
+- Then run **two estimators head-to-head on the same trials** and compare them against
+  realized outcomes. That comparison — not any single model's output — is the actual product.
 
 **Add the axis the physics cannot see** — the prerequisite for any pre-readout forecast
 (see [The endgame](#the-endgame-forecasting-the-readout-not-reacting-to-it))
