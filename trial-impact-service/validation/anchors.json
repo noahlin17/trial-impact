@@ -1,0 +1,16 @@
+{
+  "description": "Curated reference anchors for the scoring-validation experiment. Every affinity is a real, citable number (median Ki/Kd) from the ChEMBL activity API (standard_type in {Ki, Kd}, standard_units = nM); pKd = -log10(Kd*1e-9). None are invented. Selection principle: reversible, drug-like, near-neutral, single defined pocket in one well-behaved docking regime (ATP-competitive kinase hinge binders + one clean soluble-enzyme inhibitor), matching the project's oncology domain. Deliberately consistent, not maximally broad.",
+  "affinity_source": "ChEMBL activity API (https://www.ebi.ac.uk/chembl/), median of Ki/Kd measurements in nM.",
+  "target_query_note": "target = gene symbol used for structure resolution (KDR = VEGFR2, F10 = FXa).",
+  "anchors": [
+    {"target": "ABL1", "drug": "dasatinib",   "chembl": "CHEMBL1421",   "n": 24, "kd_nM": 0.08, "pkd": 10.09},
+    {"target": "F10",  "drug": "rivaroxaban", "chembl": "CHEMBL198362", "n": 7,  "kd_nM": 0.40, "pkd": 9.40},
+    {"target": "EGFR", "drug": "erlotinib",   "chembl": "CHEMBL553",    "n": 42, "kd_nM": 0.77, "pkd": 9.11},
+    {"target": "EGFR", "drug": "gefitinib",   "chembl": "CHEMBL939",    "n": 47, "kd_nM": 1.40, "pkd": 8.85},
+    {"target": "EGFR", "drug": "lapatinib",   "chembl": "CHEMBL554",    "n": 48, "kd_nM": 2.80, "pkd": 8.55},
+    {"target": "KDR",  "drug": "sunitinib",   "chembl": "CHEMBL535",    "n": 11, "kd_nM": 2.90, "pkd": 8.54},
+    {"target": "ABL1", "drug": "nilotinib",   "chembl": "CHEMBL255863", "n": 18, "kd_nM": 14.5, "pkd": 7.84},
+    {"target": "ABL1", "drug": "imatinib",    "chembl": "CHEMBL941",    "n": 37, "kd_nM": 44.0, "pkd": 7.36}
+  ],
+  "scope_limitation": "Every anchor is a potent approved drug (pKd 7.36-10.09); there are no clean, well-dockable weak binders in this set (the obvious weak candidates - fragments, GPCR ligands, charged/covalent chemistry - are cases where docking scores are unreliable). The affinity range is therefore compressed relative to the ligand-size range, which is precisely why size confounds the scores. Extending to a reliable weak, well-dockable anchor is documented follow-up work."
+}

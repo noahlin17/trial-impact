@@ -1,0 +1,30 @@
+{
+  "n": 8,
+  "predictors": {
+    "heavy-atoms (size baseline)": {
+      "rho_pkd": -0.524,
+      "ci95": [
+        -0.81,
+        0.43
+      ],
+      "rho_size": null
+    },
+    "Vina  (-dG)": {
+      "rho_pkd": -0.238,
+      "ci95": [
+        -0.83,
+        0.62
+      ],
+      "rho_size": 0.452
+    },
+    "MM-GBSA (-dG)": {
+      "rho_pkd": -0.238,
+      "ci95": [
+        -0.93,
+        0.62
+      ],
+      "rho_size": 0.405
+    }
+  },
+  "verdict": "No predictor ranks cross-target affinity: all rho <= 0 with CIs spanning zero, and both docking scores track ligand size. Neither Vina nor single-snapshot MM-GBSA earns a binding-strength claim."
+}

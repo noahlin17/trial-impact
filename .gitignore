@@ -18,5 +18,9 @@ venv/
 # Session-local sim toolchain (micromamba env, prototypes) — never commit (multi-GB)
 .tooling/
 
+# Scoring-validation intermediates (receptor PDBs, PDBQT, docked poses); the
+# self-contained results/ (scores.json + figure) are committed instead.
+trial-impact-service/validation/work/
+
 # OS / editor
 .DS_Store

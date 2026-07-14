@@ -313,7 +313,18 @@ addressed; ○ = documented, future work.)
   `predicted-pocket` / `no-site` / `no-structure` / `failed`), gated on a reproducible multi-seed
   pose (sd ≤ 0.75). A cross-target relative binding *band* is deliberately **not** shipped (it
   would be size-in-disguise). Recovering a real strength signal needs a different scorer class
-  (gnina CNN rescoring / MM-GBSA / FEP) — future work, added as a new estimator, not faked now.
+  (gnina CNN rescoring / MM-GBSA / FEP) — added as a new estimator, not faked now.
+- **A physics rescorer (MM-GBSA) was tested and also failed — so no strength estimator ships** ✅ —
+  the natural next move was to rescore the docked poses with single-snapshot MM-GBSA (OpenMM /
+  ff14SB / GAFF-2.11 / OBC2 implicit solvent, ligand minimized in a rigid receptor), which adds the
+  electrostatics + desolvation terms Vina omits. Validated on the **same 8 anchors** (see
+  [`validation/`](validation/README.md)): MM-GBSA does **not** beat Vina and does **not** rank
+  measured affinity — Spearman ρ(MM-GBSA, pKd) = **−0.24** (95% CI [−0.93, +0.62]) vs ρ(Vina) =
+  −0.24, and both still track ligand size (ρ ≈ +0.4). Applying the same discipline used on Vina, the
+  cheap MM-GBSA is **not shipped as a binding-strength estimator** (that would repeat issue #4's
+  overclaim). The honest conclusion: cross-target affinity ranking needs either a congeneric
+  same-target series or far more expensive sampling (explicit-solvent MM-GBSA ensembles / FEP) —
+  documented, not forced. Regenerate with `make validate`.
 - **Generic PK constants** ○ — `ka`, `Vd`, `CL` are fixed physiological placeholders
   and `Kp` is order-of-magnitude, not drug-specific. There is also **no bioavailability
   term** (`F` is implicitly 1), which flatters oral exposure, and `cmax_ng_ml` is a
