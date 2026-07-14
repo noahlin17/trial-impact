@@ -367,6 +367,16 @@ addressed; ○ = documented, future work.)
   interprets as *"choose a random seed"*, so repeat runs of the same drug/target drifted
   (ΔG −8.42 / −8.59 / −8.59 for sotorasib–KRAS). Now pinned to a fixed seed. Reproducible
   numbers are a precondition for the result contract meaning anything.
+- **Reported precision exceeds real precision** ○ — pinning the seed made runs *reproducible*;
+  it did not make them *accurate*, and it conceals the variance rather than removing it. The
+  pre-pin spread was 0.19 kcal/mol, which through `Kd = exp(ΔG/RT)` is a **~36 % swing in Kd**
+  (857 → 1167 nM) — yet ΔG is reported to three decimals (`−8.606`) when the method's own
+  reproducibility is ±0.1. Two of those three decimals are noise. Relatedly, `cmax_ng_ml` is a
+  **tissue** concentration (`Kp`-scaled), not the plasma Cmax the name implies, and AUC is
+  AUC(0–48 h), not AUC(0–∞). **Fix:** run N replicates with derived seeds (42, 43, …) — the
+  seed *set* stays fixed, so runs remain bit-reproducible, but you get mean ± sd. Then feed the
+  sd into `confidence`, which already scales the PoS delta, so physics uncertainty would
+  propagate into the market call instead of being hidden by it.
 
 ### Market model
 - **Uncalibrated, hand-tuned** ○ — deterministic and fully inspectable: the PoS
@@ -394,9 +404,40 @@ addressed; ○ = documented, future work.)
 - **Naive competitor read-through** ○ — competitors are assumed to move opposite the
   sponsor, one magnitude bucket softer. Real read-through depends on mechanism /
   target overlap and modality, not just "is a competitor."
+- **Sponsor→ticker resolution is a hand-maintained 6-entry file** ○ — `tickers.json` maps six
+  sponsors (amgen, regeneron, vertex, moderna, biogen, lilly) to a ticker plus a **hardcoded
+  competitor list**. Any claim about pointing the watcher at a therapeutic area, or building a
+  corpus across the trial universe, runs straight into this file. Real resolution is an
+  **entity-resolution problem**, not a lookup: CT.gov sponsor strings are messy and
+  inconsistent, sponsors are frequently subsidiaries of a listed parent, **many are private or
+  pre-IPO** (no ticker — and therefore no trade), and licensed or partnered assets sit with a
+  different economic owner than the sponsor. The competitor map is worse, because "who is a
+  competitor" is a modelling judgment rather than a fact. **Fix:** an entity-resolution step
+  (sponsor string → legal entity → listed parent → ticker) with explicit handling for private
+  sponsors, and competitors derived from target/mechanism overlap rather than hardcoded.
+  **Until then the system runs on a watchlist, not a universe** — the demo is honest, the
+  scaling claim is not yet earned.
 - **`endpoint_outcome` not auto-derived** ○ — met/missed is supplied via enrichment
   (`watchlist.json`), not parsed from CT.gov. An LLM classifier over the results
   section / press releases would close the loop.
+
+### Architecture & operations
+- **The prompt embeds `simulation.py`, and the budget is exhausted** ○ — **the most
+  operationally urgent issue.** The whole source ships inside Devin's 30,000-character prompt
+  and currently uses **29,950 of it — 50 characters spare.** It has hit the ceiling three
+  times; `test_simulation_prompt_fits_devin_limit` guards it, so it fails loudly rather than
+  silently, but the budget is now tight enough that **the code cannot afford another comment.**
+  **Fix:** stop embedding the source and have the session clone a **pinned commit**. That
+  removes the ceiling *and* makes "which code produced this number?" answerable by
+  construction — retiring `code_patched`'s self-report in favour of something verifiable.
+- **The harness/estimator boundary is implied, not enforced** ○ — the long-term thesis is that
+  the *estimator* (Vina today; a co-folding affinity model or proprietary QSAR tomorrow) is a
+  swappable plugin, and the *harness* (trigger, sandbox, result contract, reproducibility,
+  corpus, backtest) is model-agnostic. Most of the contract already generalises — but
+  `docking_box` is Vina-specific, and there is **no `estimator` field recording which model
+  produced a number**, which makes a corpus spanning model versions uninterpretable and any
+  backtest over it invalid. Same argument as `code_patched`, one level up. **Fix:** define the
+  estimator interface explicitly and add `estimator` to the result contract.
 
 ### Security & operations
 - **Webhook signature verification fails open** ◑ — `signature_required` is
