@@ -13,12 +13,13 @@ atoms that fall inside the box Vina would have searched.
 
 The two published results measure as:
 
-    KRAS  (7VVB, experimental)    ~80% of receptor atoms inside the box
-    CFTR  (AF-P13569-F1, predicted)  ~19%
+    KRAS  (7VVB, experimental)       ~80% of receptor atoms inside the box
+    CFTR  (9MXL, experimental cryo-EM)  ~26%
 
 CFTR is a 1480-residue membrane protein and ivacaftor binds at the TM1/TM6
 interface, not the centroid — so its ΔG is a dock into an arbitrary central
-slab, not a pocket. See "Docking box" under Limitations in README.md.
+slab, not a pocket, *even though 9MXL is now a real experimental structure*
+(mmCIF, fetched via gemmi). See "Docking box" under Limitations in README.md.
 
 Note the box is computed over ATOM *and* HETATM records while the receptor that
 is actually docked is ATOM-only (`prepare_receptor_pdbqt` drops waters and

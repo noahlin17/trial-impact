@@ -4,7 +4,12 @@
 # Devin session, which installs this file. Keeping them separate keeps the Flask
 # image small and fast to build.
 rdkit==2024.3.5
-meeko==0.6.0
+# meeko 0.6.0 (the historical pin) is no longer available from PyPI, so ligand prep
+# now runs meeko 0.7.1. This is deliberate toolchain drift: absolute ΔG values differ
+# slightly from the pre-0.7.1 artifacts. See results/README.md.
+meeko==0.7.1
+# scipy is a hard runtime dependency of meeko 0.7.1 (not pulled in automatically here).
+scipy==1.13.1
 vina==1.2.5
 openbabel-wheel==3.1.1.20
 numpy==1.26.4

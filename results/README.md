@@ -1,65 +1,98 @@
 # Results
 
-Artifacts from two **real** Devin simulation sessions — real structures, a real
-AutoDock Vina docking run, a real PK/PD solve. The `.json`
-files are the exact records the service stored; open the `.html` files in a browser for
-the interactive 3D structure, the PK/PD curve, and the price calls.
+Artifacts from two **real** runs of the committed pipeline — a real structure fetch, a
+real AutoDock Vina docking run (now **three seeds**, reported as mean ± sd), a real
+PK/PD solve with a **free-drug** occupancy correction. The `.json` files are the exact
+records the service stored; open the `.html` files in a browser for the interactive 3D
+structure, the PK/PD curve, and the price calls.
 
 Every run below satisfies the result contract: **`code_patched: false`**, meaning the
-numbers came from `app/simulation.py` *as committed* — the session did not edit the
-script to make the run work. (See "The result contract" in the service README for why
-that field exists and what it caught.)
+numbers came from `app/simulation.py` *as committed* — the run did not edit the script to
+make it work. (See "The result contract" in the service README for why that field exists
+and what it caught.)
 
-> **Estimator attribution.** These artifacts predate the `estimator` field and were
-> produced by the default docking pipeline (now `vina-docking-pkpd@1`); new runs stamp
-> that id onto every result. The head-to-head against the `ligand-efficiency-baseline@1`
+> **How these were regenerated.** They were produced by running the committed pipeline
+> directly against the pinned `requirements-sim.txt` stack (`regen_artifacts.py`), not in
+> a hosted Devin session — so the physics is real and verifiable-from-source, and only the
+> Devin *transport* is stubbed. `devin_session_id` therefore reads `local-pinned-stack-regen`.
+> Reproduce with `python regen_artifacts.py` (or `run_real.py` for a live session).
+
+> **Toolchain note (why ΔG shifted from earlier figures).** The historical pin
+> `meeko==0.6.0` is no longer published on PyPI, so the ligand-prep step now runs
+> `meeko==0.7.1` (+ its `scipy` dependency); `gemmi==0.6.6` was added for mmCIF. Vina,
+> RDKit, Open Babel and NumPy are unchanged. Different Meeko releases protonate/prepare
+> the ligand slightly differently, so the absolute ΔG here differs from pre-regeneration
+> numbers. This is expected toolchain drift, not a code change — the pipeline logic is the
+> same, and the new stack is what `requirements-sim.txt` now pins.
+
+> **Estimator attribution.** These are the default docking pipeline, `vina-docking-pkpd@1`
+> (stamped onto every result). The head-to-head against the `ligand-efficiency-baseline@1`
 > **control** is not shown here — the baseline is a naive floor to beat, not a second
 > opinion, and running it does not re-validate these numbers. See "Estimators" in the
 > service README.
 
 | File | Trial | Result |
 |------|-------|--------|
-| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, Phase 1, endpoint met | ΔG **−8.606** kcal/mol, Kd 862.6 nM, occupancy 97.6% ‡, tox flagged ‡, **covalent** (acrylamide warhead). Experimental structure **7VVB** (confidence 0.9). PoS **+0.475** → AMGN up / REGN, NVS down. |
-| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, Phase 3, endpoint met | ΔG −8.702 kcal/mol †, Kd 738.2 nM, occupancy 94.5% ‡, clean, not covalent. **AlphaFold** model AF-P13569-F1 (confidence 0.7 — see below). PoS **+0.552** → VRTX up / CRSP, BLUE down. |
-| `dashboard_kras_7VVB.html` | ″ | Rendered `/status` with the 3D viewer. |
-| `dashboard_cftr_AF-P13569-F1.html` | ″ | Rendered `/status`; AlphaFold model rendered from AFDB. |
-| `analysis_dashboard.html` | both | Rendered `/analysis`: physics→price scatter, an estimator head-to-head (empty here — single-estimator corpus), sortable table, and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). Open it and click a row. |
+| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, Phase 1, endpoint met | ΔG **−8.336 ± 0.010** kcal/mol (n=3), Kd 1336.9 nM, **free-drug** occupancy 73.9% (fu 0.11), tox flagged ‡, **covalent** (acrylamide warhead). Experimental structure **7VVB** (confidence 0.895). PoS **+0.47** → AMGN up / REGN, NVS down. |
+| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, Phase 3, endpoint met | ΔG −8.161 ± 0.052 kcal/mol † (n=3), Kd 1776.8 nM, **free-drug** occupancy **6.7%** (fu 0.01), clean, not covalent. Experimental cryo-EM structure **9MXL** via native mmCIF (confidence 0.874). PoS **+0.37** → VRTX up / CRSP, BLUE down. |
+| `dashboard_kras_7VVB.html` | ″ | Rendered `/status` with the 3D viewer; docking ΔG shown as mean ± sd. |
+| `dashboard_cftr_9MXL.html` | ″ | Rendered `/status`; the 9MXL cryo-EM structure rendered from RCSB. |
+| `analysis_dashboard.html` | both | Rendered `/analysis`: physics→price scatter, an estimator head-to-head (empty here — single-estimator corpus), sortable table (ΔG columns carry ± sd), and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). Open it and click a row. |
 
 Each JSON holds the trial event, the resolved sponsor/competitor tickers, the full
-`sim_result` (binding, exposure, occupancy, tox/covalent flags, docking box,
-provenance: UniProt / PDB id / SMILES / descriptors), and the market model's
+`sim_result` (binding with per-seed replicates and sd, exposure, free-drug occupancy,
+tox/covalent flags, docking box, provenance: UniProt / PDB id / **structure format** /
+SMILES / descriptors / **fu + source** / **vina seeds**), and the market model's
 `price_calls` + `commentary`.
+
+## Docking is now three seeds, reported as mean ± sd
+
+`run_vina` docks across a **deterministic seed set** (42, 43, 44) and the result carries
+`binding_affinity_kcal_mol` (mean ΔG), `binding_affinity_sd_kcal_mol` (sample sd), and
+`replicates` (n). Kd is derived from the **mean** ΔG (`Kd = exp(mean(ΔG)/RT)`), and the
+sd feeds a small confidence penalty. This retires the core of the old "reported precision
+exceeds real precision" gap: a single draw hid the seed-to-seed spread. The spread here is
+small (0.010 / 0.052 kcal/mol) — but that measures **sampling noise only**, not model
+bias, box placement, or scoring-function error, which dominate and are not captured by
+re-seeding. Cost scales linearly with seed count (3× the docking time).
 
 ## ‡ How to read the occupancy and tox columns
 
-**Occupancy is a total-drug upper bound, not target engagement.** `occ = C/(C + Kd)` is
-evaluated on the *total* tissue concentration; only **unbound** drug engages a target, and
-the pipeline has no fraction-unbound (`fu`) term. Ivacaftor is **>99% plasma-protein-bound**,
-so its recorded **94.5% is really ~15%** once corrected — and that reclassifies it under the
-market model's `occ < 30` branch, turning a **+0.15 bonus into a −0.10 penalty**, dropping
-the PoS delta 0.552 → 0.340 and downgrading the VRTX call from `strong` to `moderate`.
-Sotorasib (~89% bound) corrects from 97.6% to ~81%. This is
-[issue #1](../README.md#known-issues).
+**Occupancy is now a free-drug engagement estimate, not a total-drug upper bound.** Only
+**unbound** drug engages a target, so occupancy is evaluated on the free concentration,
+`occ = C_free/(C_free + Kd)` with `C_free = fu · C_total`. The fraction-unbound `fu` comes
+from a small curated plasma-protein-binding table (source recorded in
+`provenance.fu_source`); an unknown drug falls back to `fu = 1.0` **with a warning**, which
+reproduces the old total-drug upper bound rather than silently pretending 1.0 is measured.
+Exposure metrics (Cmax, AUC) still use total concentration — they are total-drug quantities.
+
+- **Ivacaftor is >99% plasma-protein-bound** (fu 0.01): its occupancy is **6.7%**, not a
+  headline number. This flips the market model's occupancy modifier from **+0.15 to −0.10**
+  (the `occ < 30` branch), dropping the PoS delta. The VRTX call nonetheless stays
+  `strong` (+0.37) — because the mmCIF fix (below) raised confidence from 0.7 to 0.874 and
+  0.37 still clears the 0.35 `strong` threshold. So the free-drug correction changed the
+  *occupancy contribution's sign*, not the headline magnitude this time.
+- **Sotorasib is ~89% bound** (fu 0.11): occupancy **73.9%**, still above the +0.15 band.
 
 **The "tox" flag is a Lipinski drug-likeness heuristic, not a toxicity model** — ≥2 Ro5
 violations, which predicts oral absorption, not safety. It fires on sotorasib because
 sotorasib is a big lipophilic oncology molecule; sotorasib is also an approved drug. It is
 still priced as a −0.15 safety penalty. This is [issue #3](../README.md#known-issues).
 
-Both are documented rather than patched, because fixing either changes the numbers in these
-artifacts, and they would then no longer reproduce from the committed source — which is the
-one property this directory exists to demonstrate.
+Both the tox heuristic and the crude PK are documented rather than patched; the free-drug
+correction fixes occupancy specifically, not the generic PK model (single-dose,
+one-compartment, F≈1, generic ADME constants), which remains a placeholder.
 
 ## † How to read the CFTR ΔG (and why it is not the headline)
 
-**The CFTR binding number is not a pocket-resolved affinity.** The docking box is
-centroid-centered and capped at 40 Å — both artifacts record `size: [40, 40, 40]`,
-i.e. the cap is binding in both runs. CFTR is a 1480-residue membrane protein measuring
-139 × 117 × 147 Å, so that box contains only **19% of the receptor's atoms**, and
-ivacaftor binds at the TM1/TM6 interface rather than the centroid. The run is a real,
-reproducible execution of the pipeline; the ΔG is a dock into an arbitrary central slab.
+**The CFTR binding number is still not a pocket-resolved affinity — even though 9MXL is now
+a real experimental structure.** The docking box is centroid-centered and capped at 40 Å
+(both artifacts record `size: [40, 40, 40]`, i.e. the cap binds in both runs). CFTR is a
+1480-residue membrane protein; the 40 Å box contains only **~26% of 9MXL's atoms**, and
+ivacaftor binds at the TM1/TM6 interface rather than the centroid. Native mmCIF support
+(below) fixed *which structure* is docked; it did **not** fix *where* the box sits.
 
-KRAS is the better-founded number — at 56 × 55 × 44 Å the same box covers **80%** of the
+KRAS is the better-founded number — at 56 × 55 × 44 Å the same box covers **~80%** of the
 receptor — which is why it carries the headline. Reproduce both figures against the
 committed code:
 
@@ -68,8 +101,8 @@ cd ../trial-impact-service && python verify_docking_box.py
 ```
 
 This is [open issue #2](../README.md#known-issues). It is documented rather than fixed
-because "make the box cover the receptor" is not actually the fix — an uncapped CFTR box
-is ~2.4 M Å³, far past the volume where Vina's sampling means anything. The fix is pocket
+because "make the box cover the receptor" is not the fix — an uncapped CFTR box is
+~2.4 M Å³, far past the volume where Vina's sampling means anything. The fix is pocket
 detection (fpocket / P2Rank) or a drug-bound structure pinned per trial, which is a real
 piece of work and would change every number on this page.
 
@@ -77,29 +110,32 @@ piece of work and would change every number on this page.
 
 ```bash
 cd ../trial-impact-service
-python run_real.py --watch                                   # KRAS × sotorasib
+python regen_artifacts.py                                   # both, committed stack, offline transport
+# — or a live Devin session per trial —
+python run_real.py --watch                                  # KRAS × sotorasib
 python run_real.py --watch --target CFTR --drug ivacaftor \
-    --tissue lung --dose 150 --phase PHASE3                  # CFTR × ivacaftor
+    --tissue lung --dose 150 --phase PHASE3                 # CFTR × ivacaftor
 ```
 
-Docking is now **seed-pinned**, so a re-run reproduces the same ΔG rather than drifting.
-Two independent CFTR sessions returned ΔG −8.702 / Kd 738.217 / occupancy 94.54 —
-identical. (Before the seed was pinned, the same input wandered: −8.42 / −8.59 / −8.61.)
+Docking is **seed-pinned across a fixed set (42, 43, 44)**, so a re-run reproduces the same
+mean ΔG and sd rather than drifting. Install the simulation stack from
+`requirements-sim.txt` first.
 
-## Why CFTR uses an AlphaFold model, not the 9MXL cryo-EM structure
+## CFTR now uses the 9MXL cryo-EM structure (native mmCIF via gemmi)
 
-An earlier CFTR run on record used the experimental cryo-EM structure **9MXL** at
-confidence 0.9. That result is **not reproducible from this source tree**, so it has
-been retired rather than kept for looks:
+Earlier, CFTR degraded to the AlphaFold model AF-P13569-F1 at confidence 0.7 because
+`9MXL` is **mmCIF-only** — `files.rcsb.org/download/9MXL.pdb` returns **404** (very large
+modern structures often have no legacy PDB file) and `fetch_structure` read `.pdb` only.
 
-- `9MXL` is **mmCIF-only** — `files.rcsb.org/download/9MXL.pdb` returns **404** (very
-  large modern structures often have no legacy PDB file), and `fetch_structure` reads
-  `.pdb` only.
-- So the committed pipeline *cannot* obtain 9MXL. The original number came from a Devin
-  session working around the gap inside its sandbox — the exact silent divergence the
-  `code_patched` field now exists to make visible.
+`fetch_structure` now **falls back to the mmCIF file and converts it with `gemmi`** before
+ever reaching AlphaFold, so it obtains the real experimental structure:
 
-The pipeline therefore falls back to the AlphaFold prediction and reports
-**confidence 0.7** instead of 0.9, which is the honest signal: this is a predicted
-structure, not an experimental one. Native mmCIF support
-is tracked under Limitations in the service README.
+- `9MXL.pdb` → 404 → `9MXL.cif` downloaded → converted to PDB via `gemmi.read_structure`
+  → docked. `provenance.structure_format` records `"mmCIF"`; confidence is 0.874
+  (experimental base 0.9, less a small docking-noise penalty), not 0.7.
+- Experimental structures are still preferred over AlphaFold when available; AlphaFold
+  remains the fallback only when RCSB has neither a PDB nor an mmCIF file.
+
+This retires the mmCIF limitation. It does **not** retire the docking-box gap above (the
+box still covers only ~26% of 9MXL), and native mmCIF support does not by itself establish
+scientific validity — see Limitations in the service README.

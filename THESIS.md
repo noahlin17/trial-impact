@@ -162,17 +162,20 @@ already in this repository, both of which are approved:
 
 | Drug | Docked Kd | Free Cmax | Free Cmax / Kd | Model implies | Actual |
 |---|---|---|---|---|---|
-| sotorasib | 863 nM | 3,779 nM | 4.4× | engages target | approved |
-| ivacaftor | 738 nM | 128 nM | 0.17× | does not engage | approved |
+| sotorasib | 1,337 nM | 3,779 nM | 2.8× | engages target | approved |
+| ivacaftor | 1,777 nM | 128 nM | 0.07× | does not engage | approved |
 
-The pipeline as built implies that ivacaftor does not engage CFTR. Ivacaftor is an effective,
-approved CF therapy. The docked Kd is far weaker than the drug's reported potency, which
-traces back to the docking box covering about 19% of CFTR and not containing the binding
-site, and to occupancy being computed from total rather than free drug.
+The pipeline as built still implies that ivacaftor barely engages CFTR (free-drug occupancy
+6.7%). Ivacaftor is an effective, approved CF therapy. The docked Kd is far weaker than the
+drug's reported potency, which now traces back almost entirely to the docking box covering only
+~26% of CFTR and not containing the binding site — the free-drug (`fu`) correction, which used to
+be the other half of this gap, is now applied inside the pipeline (occupancy uses `C_free = fu·C`),
+so the remaining error is the blind box, not a missing `fu` term.
 
-(The free-fraction values used above are literature figures for plasma protein binding that I
-applied by hand; I have not pulled them from a source in the pipeline. The direction of the
-effect is not in doubt, but the exact ratios should be treated as approximate.)
+(The free-fraction values are now resolved inside the pipeline via a small curated
+plasma-protein-binding table — sotorasib fu 0.11, ivacaftor fu 0.01 — rather than applied by hand;
+an unknown drug falls back to `fu = 1` with a warning. The direction of the effect is not in
+doubt, but the table is small and the exact ratios should still be treated as approximate.)
 
 This is the clearest reason to treat the chemistry and the market model here as placeholders.
 It also reorders the issue list: in the reactive system, those two defects are documented
