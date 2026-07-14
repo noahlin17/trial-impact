@@ -50,6 +50,17 @@ largely resolved by then); later-phase events are educational illustrations (see
 
 ---
 
+## How it works
+
+![Pipeline architecture](docs/architecture.png)
+
+A trial event is routed to the right structure and pocket, docked, and classified as *geometric
+engagement*; a PK/PD solve adds exposure. Each estimator runs head-to-head against a size-only
+baseline it must beat — and the validation experiment (bottom-left) is what tests, and falsifies,
+the affinity premise. The market layer is an illustrative downstream demo.
+
+---
+
 ## Demo — the dashboards
 
 Served locally from the two committed result artifacts (`results/sim_*.json`) into the real Flask

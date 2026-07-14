@@ -22,5 +22,13 @@ venv/
 # self-contained results/ (scores.json + figure) are committed instead.
 trial-impact-service/validation/work/
 
+# Session-local scratch — experiment probes, seed/serve harnesses, one-off design
+# notes and test plans/reports that are not part of the published project.
+_*.py
+trial-impact-service/_*.json
+DESIGN_NOTE_*.md
+TEST_PLAN_*.md
+test-report.md
+
 # OS / editor
 .DS_Store
