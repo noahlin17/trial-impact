@@ -33,6 +33,7 @@ installed by Devin, not by the Flask service.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -149,6 +150,7 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
             _log(f"using experimental structure {pdb_id} (source format: {fmt})")
             return pdb_path, {
                 "structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt,
+                "structure_sha256": structure_checksum(pdb_path),
             }
     except (requests.RequestException, KeyError, IndexError, ValueError) as exc:
         _log(f"experimental structure lookup failed ({exc}); trying AlphaFold")
@@ -160,6 +162,7 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
     return af_path, {
         "structure_source": "AlphaFold", "pdb_id": f"AF-{uniprot}-F1",
         "structure_format": "pdb",
+        "structure_sha256": structure_checksum(af_path),
     }
 
 
@@ -230,6 +233,22 @@ def _download(url: str, dest: str) -> None:
     resp.raise_for_status()
     with open(dest, "wb") as fh:
         fh.write(resp.content)
+
+
+def structure_checksum(path: str) -> str:
+    """SHA-256 of a fetched structure file, recorded in provenance.
+
+    We resolve structures from live RCSB/AlphaFold rather than pinning them (see issue
+    #10), so this makes structure *drift* **observable without enforcing anything**: two
+    runs of the same ``pdb_id`` that produce different hashes reveal that the upstream
+    file changed (a re-release/remediation) — the run is not blocked, the fact is just
+    auditable in ``provenance.structure_sha256``.
+    """
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 # --------------------------------------------------------------------------- #

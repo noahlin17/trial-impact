@@ -60,6 +60,7 @@ from .simulation import (
     _log,
     compute_docking_box,
     fetch_structure,
+    structure_checksum,
 )
 
 # Covalent-bond distance: a Cys Sγ within this of a bound hetero atom *is* the covalent
@@ -477,7 +478,8 @@ def select_binding_site(
             )
         else:
             prov = {"structure_source": "RCSB", "pdb_id": entry.holo_pdb,
-                    "structure_format": fmt}
+                    "structure_format": fmt,
+                    "structure_sha256": structure_checksum(pdb_path)}
             box_prov: dict[str, Any] = {"target_class": entry.label,
                                         "reactive_residue": f"{chain}:CYS:{resnum}"}
             ligand_pdbqt = None
@@ -513,7 +515,8 @@ def select_binding_site(
             center, size, code = ligand_box(pdb_path, entry.holo_ligand)
             return DockingSite(
                 pdb_path,
-                {"structure_source": "RCSB", "pdb_id": entry.holo_pdb, "structure_format": fmt},
+                {"structure_source": "RCSB", "pdb_id": entry.holo_pdb, "structure_format": fmt,
+                 "structure_sha256": structure_checksum(pdb_path)},
                 center, size, "holo-ligand (curated)",
                 box_provenance={"target_class": entry.label, "co_crystal_ligand": code},
                 warnings=warnings,
@@ -535,7 +538,8 @@ def select_binding_site(
                 center, size, code = ligand_box(pdb_path, comps)
                 return DockingSite(
                     pdb_path,
-                    {"structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt},
+                    {"structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt,
+                     "structure_sha256": structure_checksum(pdb_path)},
                     center, size, "holo-ligand (discovered)",
                     box_provenance={"co_crystal_ligand": code, "discovered": True},
                     warnings=warnings,

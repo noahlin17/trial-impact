@@ -1118,6 +1118,8 @@ def test_covalent_tether_prep_failure_stays_on_curated_structure(tmp_path, monke
     assert site.ligand_pdbqt is None                      # reversible, not tethered
     assert site.box_provenance["tether_failed"]
     assert any("structure unchanged" in w for w in site.warnings)
+    # Structure checksum is recorded (not enforced) so drift is observable across runs.
+    assert len(site.structure_prov["structure_sha256"]) == 64
 
 
 def test_discover_holo_ranks_by_pocket_quality_not_id_order(monkeypatch):
