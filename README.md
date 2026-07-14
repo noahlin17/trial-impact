@@ -73,8 +73,7 @@ That field exists because it caught exactly that (see below).
 > 9MXL at confidence 0.9 — but 9MXL is **mmCIF-only** and `fetch_structure` reads
 > `.pdb`, so the committed code *cannot* fetch it; that number only existed because a
 > Devin session worked around the gap in its sandbox. It has been retired in favour of
-> the AlphaFold model at **confidence 0.7**, which is lower but honest and
-> reproducible. Reproducible beats impressive.
+> the AlphaFold model at **confidence 0.7**, which is lower but reproducible.
 
 A **results-analysis view** (`GET /analysis`, exported to
 [`results/analysis_dashboard.html`](results/analysis_dashboard.html)) lets you
@@ -88,7 +87,7 @@ docked structure, the reconstructed PK/PD exposure curve, and a step-by-step
 ## Catching a bug: when the result was too clean
 
 On the first real run, the stored result matched the example values embedded in my
-own prompt — suspiciously exact. I didn't trust it. I pulled the raw Devin session
+own prompt. I pulled the raw Devin session
 transcript and found the cause: the transcript includes the full prompt text (which
 itself contains an example `SIM_RESULT_JSON` for formatting), and my extractor was
 matching that example *before* it ever reached Devin's actual output further down
