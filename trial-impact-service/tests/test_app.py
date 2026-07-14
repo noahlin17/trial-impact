@@ -1077,6 +1077,49 @@ def test_select_binding_site_unsupported_warhead_warns_and_falls_back(tmp_path, 
     assert any("not a tetherable" in w for w in site.warnings)
 
 
+def test_covalent_tether_prep_failure_stays_on_curated_structure(tmp_path, monkeypatch):
+    """A tether-prep failure must NOT re-resolve a different structure (issue #10).
+
+    The non-determinism we hit was: a curated covalent target (KRAS→6OIM) found its
+    reactive Cys, then Meeko tether prep failed in that environment, and the router
+    *silently degraded through discovery+fpocket to a different PDB* (7VVB) with a
+    materially different ΔG. Once the curated holo + reactive residue resolve we commit
+    to that structure: a tether-prep failure degrades to reversible scoring in the SAME
+    6OIM reactive-residue box, and never calls discovery/fpocket/fetch_structure.
+    """
+    pytest.importorskip("rdkit")
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+    from app.simulation import embed_ligand
+
+    holo = tmp_path / "6OIM.pdb"
+    holo.write_text(_covalent_holo_pdb())
+    monkeypatch.setattr(bs, "_fetch_experimental_pdb", lambda pdb_id, wd: (str(holo), "pdb"))
+
+    def _tether_boom(*a, **k):
+        raise RuntimeError("mk_prepare_ligand.py not on PATH (meeko not installed)")
+
+    monkeypatch.setattr(bs, "prepare_covalent_ligand", _tether_boom)
+    # If the router degrades correctly it must never reach these lower tiers.
+    def _reresolved(*a, **k):
+        pytest.fail("re-resolved a different structure instead of staying on the curated holo")
+
+    monkeypatch.setattr(bs, "discover_holo", _reresolved)
+    monkeypatch.setattr(bs, "fetch_structure", _reresolved)
+    monkeypatch.setattr(bs, "fpocket_box", _reresolved)
+
+    site = bs.select_binding_site(
+        target="KRAS", uniprot="P01116", smiles="C=CC(=O)Nc1ccccc1",
+        mol=embed_ligand("C=CC(=O)Nc1ccccc1"), covalent=True, workdir=str(tmp_path),
+    )
+    assert site.mode == "covalent-residue (curated holo, reversible fallback)"
+    assert site.structure_prov["pdb_id"] == "6OIM"        # same curated structure
+    assert site.center == [9.0, 10.0, 10.0]               # same reactive-residue box
+    assert site.ligand_pdbqt is None                      # reversible, not tethered
+    assert site.box_provenance["tether_failed"]
+    assert any("structure unchanged" in w for w in site.warnings)
+
+
 def test_fpocket_box_parses_top_pocket(tmp_path, monkeypatch):
     """When fpocket is on PATH, ``fpocket_box`` parses pocket1_vert.pqr into a capped box;
     when it is absent it returns None (→ blind fallback)."""
