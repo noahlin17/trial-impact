@@ -1120,6 +1120,35 @@ def test_covalent_tether_prep_failure_stays_on_curated_structure(tmp_path, monke
     assert any("structure unchanged" in w for w in site.warnings)
 
 
+def test_discover_holo_ranks_by_pocket_quality_not_id_order(monkeypatch):
+    """Discovery picks the best-resolved drug-bound structure, deterministically.
+
+    Every hit already co-crystallises the drug, so among them the router must prefer the
+    structure that most faithfully resolves the pocket — sharpest method, then best
+    resolution — not RCSB's (drifting) relevance order or an arbitrary id. Here a 1.4 Å
+    X-ray beats a 3.5 Å cryo-EM and a lexicographically-smaller 2.9 Å X-ray.
+    """
+    pytest.importorskip("rdkit")
+    import app.binding_site as bs
+
+    def _ids(query):
+        return ["9ZZZ", "1AAA", "5MID"] if query["return_type"] == "entry" else ["LIG"]
+
+    quality = {
+        "9ZZZ": (0, 1.4),   # X-ray, high res  → best
+        "1AAA": (0, 2.9),   # X-ray, lower res (but smallest id)
+        "5MID": (1, 3.5),   # cryo-EM, low res
+    }
+    monkeypatch.setattr(bs, "_rcsb_ids", _ids)
+    monkeypatch.setattr(bs, "_entry_quality", lambda pid: quality[pid])
+
+    found = bs.discover_holo("P00000", "CC(=O)Oc1ccccc1C(=O)O")
+    assert found is not None
+    pdb_id, comps = found
+    assert pdb_id == "9ZZZ"        # best pocket, not min-id "1AAA" nor relevance-first
+    assert comps == ["LIG"]
+
+
 def test_fpocket_box_parses_top_pocket(tmp_path, monkeypatch):
     """When fpocket is on PATH, ``fpocket_box`` parses pocket1_vert.pqr into a capped box;
     when it is absent it returns None (→ blind fallback)."""

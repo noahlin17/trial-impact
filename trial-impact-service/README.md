@@ -258,7 +258,9 @@ addressed; ○ = documented, future work.)
   per-drug branching, so **net-new drugs route themselves**. The universe we now dock *more
   accurately than the old blind box* is: (a) **reversible** drugs with any experimental
   co-crystal — curated per target class or auto-discovered by RCSB graph-relaxed chemical search
-  — boxed on the real bound ligand; and (b) **covalent** drugs whose warhead is a tetherable
+  (ranked by which structure best resolves the pocket: sharpest method, then best resolution,
+  then a deterministic id tiebreak) — boxed on the real bound ligand; and (b) **covalent** drugs
+  whose warhead is a tetherable
   Michael acceptor **and** whose target is a curated covalent class (KRAS G12C, EGFR, BTK),
   tethered to the geometrically-detected reactive cysteine. Everything else degrades to fpocket
   then the blind centroid box and **says which tier it took** in `docking_box.mode`. The routing
