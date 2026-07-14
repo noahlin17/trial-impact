@@ -9,3 +9,7 @@ vina==1.2.5
 openbabel-wheel==3.1.1.20
 numpy==1.26.4
 requests==2.32.3
+# mmCIF parsing/conversion for structures that have no legacy .pdb file (large
+# cryo-EM complexes). Lets fetch_structure use a real experimental structure instead
+# of degrading to a predicted model. See _cif_to_pdb in app/simulation.py.
+gemmi==0.6.6

@@ -145,10 +145,11 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
         resp = requests.get(url, timeout=_HTTP_TIMEOUT)
         if resp.ok and resp.json().get(uniprot):
             pdb_id = resp.json()[uniprot][0]["pdb_id"].upper()
-            pdb_path = os.path.join(workdir, f"{pdb_id}.pdb")
-            _download(f"https://files.rcsb.org/download/{pdb_id}.pdb", pdb_path)
-            _log(f"using experimental structure {pdb_id}")
-            return pdb_path, {"structure_source": "RCSB", "pdb_id": pdb_id}
+            pdb_path, fmt = _fetch_experimental_pdb(pdb_id, workdir)
+            _log(f"using experimental structure {pdb_id} (source format: {fmt})")
+            return pdb_path, {
+                "structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt,
+            }
     except (requests.RequestException, KeyError, IndexError, ValueError) as exc:
         _log(f"experimental structure lookup failed ({exc}); trying AlphaFold")
 
@@ -156,7 +157,42 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
     af_path = os.path.join(workdir, f"AF-{uniprot}.pdb")
     _download(_alphafold_pdb_url(uniprot), af_path)
     _log(f"using AlphaFold model AF-{uniprot}-F1")
-    return af_path, {"structure_source": "AlphaFold", "pdb_id": f"AF-{uniprot}-F1"}
+    return af_path, {
+        "structure_source": "AlphaFold", "pdb_id": f"AF-{uniprot}-F1",
+        "structure_format": "pdb",
+    }
+
+
+def _fetch_experimental_pdb(pdb_id: str, workdir: str) -> tuple[str, str]:
+    """Fetch an experimental structure as a ``.pdb`` file; return (path, source_format).
+
+    Prefers the legacy PDB file, but large modern structures (big cryo-EM complexes)
+    are **mmCIF-only** — ``files.rcsb.org/download/<id>.pdb`` 404s for them — which used
+    to force a degrade to the AlphaFold model. When the legacy file is missing, download
+    the mmCIF and convert it to PDB with gemmi, so a real experimental structure is used
+    instead of a predicted one. The receptor prep and box only read ATOM/HETATM records,
+    which survive the conversion.
+    """
+    pdb_path = os.path.join(workdir, f"{pdb_id}.pdb")
+    try:
+        _download(f"https://files.rcsb.org/download/{pdb_id}.pdb", pdb_path)
+        return pdb_path, "pdb"
+    except requests.RequestException as exc:
+        _log(f"{pdb_id}.pdb unavailable ({exc}); fetching mmCIF and converting via gemmi")
+
+    cif_path = os.path.join(workdir, f"{pdb_id}.cif")
+    _download(f"https://files.rcsb.org/download/{pdb_id}.cif", cif_path)
+    _cif_to_pdb(cif_path, pdb_path)
+    return pdb_path, "mmCIF"
+
+
+def _cif_to_pdb(cif_path: str, pdb_path: str) -> None:
+    """Convert an mmCIF structure to PDB using gemmi (first model, standard records)."""
+    import gemmi  # lazy — ships in requirements-sim.txt, like the rest of the stack
+
+    structure = gemmi.read_structure(cif_path)
+    structure.setup_entities()
+    structure.write_pdb(pdb_path)
 
 
 # AlphaFold DB stamps a model version into the filename (…-F1-model_v6.pdb) and bumps

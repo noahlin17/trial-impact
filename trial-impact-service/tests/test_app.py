@@ -486,6 +486,61 @@ def test_rationale_reports_dg_uncertainty():
     assert "±" not in market_model._sponsor_rationale(ev, without, 0.475)
 
 
+# --- mmCIF structures (gemmi) ------------------------------------------------- #
+def test_fetch_experimental_prefers_pdb_then_falls_back_to_mmcif(tmp_path, monkeypatch):
+    """Legacy .pdb wins; when it 404s the mmCIF is fetched and converted via gemmi."""
+    import requests
+
+    from app import simulation
+
+    # Happy path: the legacy .pdb exists -> used directly, no conversion.
+    monkeypatch.setattr(simulation, "_download", lambda url, dest: open(dest, "w").write("X"))
+    path, fmt = simulation._fetch_experimental_pdb("7VVB", str(tmp_path))
+    assert fmt == "pdb" and path.endswith("7VVB.pdb")
+
+    # mmCIF-only: .pdb 404s, so the .cif is fetched and converted.
+    fetched = []
+
+    def only_cif(url, dest):
+        fetched.append(url)
+        if url.endswith(".pdb"):
+            raise requests.HTTPError("404 Not Found")
+        open(dest, "w").write("cif")
+
+    monkeypatch.setattr(simulation, "_download", only_cif)
+    monkeypatch.setattr(simulation, "_cif_to_pdb", lambda c, p: open(p, "w").write("PDB"))
+    path, fmt = simulation._fetch_experimental_pdb("9MXL", str(tmp_path))
+    assert fmt == "mmCIF"
+    assert any(u.endswith("9MXL.pdb") for u in fetched)  # tried legacy first
+    assert any(u.endswith("9MXL.cif") for u in fetched)  # then mmCIF
+
+
+def test_cif_to_pdb_conversion(tmp_path):
+    """gemmi reads an mmCIF and writes ATOM records the receptor prep can parse."""
+    gemmi = pytest.importorskip("gemmi")
+    from app.simulation import _cif_to_pdb
+
+    st = gemmi.Structure()
+    st.name = "TEST"
+    model = gemmi.Model("1")
+    chain = gemmi.Chain("A")
+    res = gemmi.Residue()
+    res.name, res.seqid = "ALA", gemmi.SeqId("1")
+    atom = gemmi.Atom()
+    atom.name, atom.element, atom.pos = "CA", gemmi.Element("C"), gemmi.Position(1, 2, 3)
+    res.add_atom(atom)
+    chain.add_residue(res)
+    model.add_chain(chain)
+    st.add_model(model)
+
+    cif = tmp_path / "x.cif"
+    st.make_mmcif_document().write_file(str(cif))
+    pdb = tmp_path / "x.pdb"
+    _cif_to_pdb(str(cif), str(pdb))
+    text = pdb.read_text()
+    assert "ATOM" in text and " CA " in text and "ALA" in text
+
+
 # --- covalent-warhead detection ---------------------------------------------- #
 # SMILES inlined (no network). Skipped unless RDKit is present — it ships in
 # requirements-sim.txt and normally runs inside the Devin sandbox, not the web tier.
