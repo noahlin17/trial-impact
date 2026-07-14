@@ -629,12 +629,19 @@ limitation is fundamental to all fast docking scoring functions (Glide/GOLD/Auto
 swapping the docking *engine* would not fix it — the fix is a different *class* of scorer layered on
 the reusable Vina pose/routing/pocket/covalent/provenance infra:
 - **gnina CNN rescoring** (open source, ~drop-in on Vina/smina poses) — best accuracy-per-effort;
-  the natural first `gnina-rescore@1` estimator to run head-to-head against `vina-docking-pkpd`;
-- **MM-GBSA** (AmberTools/OpenMM implicit-solvent single-point) — more physics, heavier, slower;
+  the natural first `gnina-rescore@1` estimator to run head-to-head against `vina-docking-pkpd`.
+  Needs a GPU (the only released binary is CUDA-only), so it is not runnable in this CPU sandbox;
+- **MM-GBSA** (OpenMM implicit-solvent single-point) — **built and tested here, and it did not help.**
+  A CPU-only single-snapshot MM-GBSA (ff14SB / GAFF-2.11 / OBC2, ligand minimized in a rigid
+  receptor) was run on the same 8 anchors ([`trial-impact-service/validation/`](trial-impact-service/validation/README.md)):
+  Spearman ρ(MM-GBSA, pKd) = **−0.24** (95% CI [−0.93, +0.62]), **no better than Vina** (−0.24) and
+  still size-tracking (ρ ≈ +0.4). So the cheap MM-GBSA is **not shipped as a strength estimator** —
+  same discipline as #4. This is a clean, reproducible negative result, not a shipped feature;
 - **FEP/TI** — gold standard for *relative* affinity but only within a congeneric series on one
   target, and too expensive per pair for a broad event-driven pipeline.
 No fake/unimplemented estimator is added now; the `Estimator` interface exists so a real one slots
-in when built.
+in when built. The MM-GBSA head-to-head is committed as a reproducible experiment (`make validate`),
+not as a production scorer.
 
 #3 (drug-likeness read as toxicity) was the same species of defect and is now fixed: the flag is
 renamed `druglikeness_flag` and priced at zero.
@@ -645,7 +652,7 @@ renamed `druglikeness_flag` and priced at zero.
 |---|---|---|---|
 | 2 | **Docking box is now pocket-routed, with residual caveats** — `select_binding_site` boxes the covalent reactive Cys / curated or discovered co-crystal ligand / fpocket / blind, in that order (`docking_box.mode`). Both published runs now box the real pocket (KRAS 6OIM switch-II, CFTR 6O2P/VX7) | The blind-slab problem is fixed for routed targets. **Remaining:** cognate/holo redocking is partly circular; fpocket is geometric (its top 6O2P pocket was ~79 Å off the real site); and the **Tier-D blind box still fires** for any target with no co-crystal and no fpocket | ◑ |
 | 3 | **Drug-likeness flag no longer priced as safety** — the ≥2-Lipinski-violation flag (predicts *oral absorption*, not toxicity) is renamed `druglikeness_flag` and surfaced as informational provenance only | **Fixed:** the −0.15 "safety" penalty is removed from `pos_breakdown`; the flag still fires on sotorasib but no longer moves the PoS delta or the call (KRAS is `strong`, +0.50 — of which +0.05 is the geometric-engagement corroborator, not the flag) | ✅ |
-| 4 | **ΔG was consumed as an absolute Kd — resolved by re-scoping docking to geometric engagement** | **Fixed (this PR).** An 8-anchor calibration proved the raw Vina score does not rank measured affinity (it tracks ligand size, not Kd — detail above), so no absolute Kd, no Kd-derived occupancy, and no relative binding-strength band are shipped. Docking now reports only a geometric `binding_engagement` classification; the market model drops the affinity/occupancy pricing terms and keeps only a capped +0.05 geometric corroboration of a positive readout. Estimators bump to `vina-docking-pkpd@3` / `ligand-efficiency-baseline@2`. **Residual (scope, not defect):** Vina cannot supply an affinity/strength signal at all — recovering one needs a different *class* of scorer (gnina CNN / MM-GBSA / FEP), documented as future work above | ✅ |
+| 4 | **ΔG was consumed as an absolute Kd — resolved by re-scoping docking to geometric engagement** | **Fixed (this PR).** An 8-anchor calibration proved the raw Vina score does not rank measured affinity (it tracks ligand size, not Kd — detail above), so no absolute Kd, no Kd-derived occupancy, and no relative binding-strength band are shipped. Docking now reports only a geometric `binding_engagement` classification; the market model drops the affinity/occupancy pricing terms and keeps only a capped +0.05 geometric corroboration of a positive readout. Estimators bump to `vina-docking-pkpd@3` / `ligand-efficiency-baseline@2`. **Residual (scope, not defect):** Vina cannot supply an affinity/strength signal at all — recovering one needs a different *class* of scorer. A CPU single-snapshot **MM-GBSA was subsequently built and tested on the same 8 anchors and also failed** (ρ = −0.24, no better than Vina, still size-tracking — see `validation/`), so it is not shipped either; gnina CNN / explicit-solvent MM-GBSA / FEP remain documented future work | ✅ |
 | 7 | **Sponsor→ticker resolution is a hand-maintained 6-entry file** with hardcoded competitors | Real resolution is **entity resolution** (messy sponsor strings, listed parents, private/pre-IPO sponsors with no ticker and therefore no trade). **The system runs on a watchlist, not a universe** — the scaling claim is not yet earned | ○ |
 | 8 | **Webhook signature verification now fails closed** — an unset `WATCHER_SHARED_SECRET` makes `/webhook/trial-update` reject *every* request (`503`) | **Fixed:** the endpoint requires the secret, so an unset secret can no longer accept unsigned callers or spend a Devin session; startup still warns loudly that the endpoint is dark | ✅ |
 | 9 | **The blind fallback box now spans only docked atoms** — `compute_docking_box` (Tier-D only) computes the centroid box over `ATOM` records, matching the `ATOM`-only receptor prep (was `ATOM`+`HETATM`, so it stretched onto waters/ions/co-crystal ligands that are stripped before docking) | **Fixed:** the last-resort blind box no longer parks on undocked hetero atoms. The pocket-aware tiers box the ligand/residue directly and are unaffected; no published artifact uses the blind tier, so no numbers changed | ✅ |

@@ -1,0 +1,93 @@
+{
+  "n": 8,
+  "rows": [
+    {
+      "target": "ABL1",
+      "drug": "dasatinib",
+      "pdb_id": "7N9G",
+      "mode": "holo-ligand (discovered)",
+      "heavy_atoms": 33,
+      "vina_dg": -9.137,
+      "mmgbsa_dg": -24.088,
+      "measured_kd_nM": 0.08,
+      "measured_pkd": 10.09
+    },
+    {
+      "target": "F10",
+      "drug": "rivaroxaban",
+      "pdb_id": "2W26",
+      "mode": "holo-ligand (discovered)",
+      "heavy_atoms": 29,
+      "vina_dg": -9.426,
+      "mmgbsa_dg": -38.861,
+      "measured_kd_nM": 0.4,
+      "measured_pkd": 9.4
+    },
+    {
+      "target": "EGFR",
+      "drug": "erlotinib",
+      "pdb_id": "1M17",
+      "mode": "holo-ligand (discovered)",
+      "heavy_atoms": 29,
+      "vina_dg": -7.801,
+      "mmgbsa_dg": -21.745,
+      "measured_kd_nM": 0.77,
+      "measured_pkd": 9.11
+    },
+    {
+      "target": "EGFR",
+      "drug": "gefitinib",
+      "pdb_id": "4I22",
+      "mode": "holo-ligand (discovered)",
+      "heavy_atoms": 31,
+      "vina_dg": -9.044,
+      "mmgbsa_dg": -44.366,
+      "measured_kd_nM": 1.4,
+      "measured_pkd": 8.85
+    },
+    {
+      "target": "EGFR",
+      "drug": "lapatinib",
+      "pdb_id": "1XKK",
+      "mode": "holo-ligand (discovered)",
+      "heavy_atoms": 40,
+      "vina_dg": -10.938,
+      "mmgbsa_dg": -54.272,
+      "measured_kd_nM": 2.8,
+      "measured_pkd": 8.55
+    },
+    {
+      "target": "KDR",
+      "drug": "sunitinib",
+      "pdb_id": "4AGD",
+      "mode": "holo-ligand (discovered)",
+      "heavy_atoms": 29,
+      "vina_dg": -10.058,
+      "mmgbsa_dg": -49.367,
+      "measured_kd_nM": 2.9,
+      "measured_pkd": 8.54
+    },
+    {
+      "target": "ABL1",
+      "drug": "nilotinib",
+      "pdb_id": "5MO4",
+      "mode": "holo-ligand (discovered)",
+      "heavy_atoms": 39,
+      "vina_dg": -13.605,
+      "mmgbsa_dg": -54.722,
+      "measured_kd_nM": 14.5,
+      "measured_pkd": 7.84
+    },
+    {
+      "target": "ABL1",
+      "drug": "imatinib",
+      "pdb_id": "3PYY",
+      "mode": "holo-ligand (discovered)",
+      "heavy_atoms": 37,
+      "vina_dg": -8.795,
+      "mmgbsa_dg": -3.681,
+      "measured_kd_nM": 44.0,
+      "measured_pkd": 7.36
+    }
+  ]
+}

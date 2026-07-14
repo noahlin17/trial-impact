@@ -218,6 +218,15 @@ a known clinical readout carries the call and docking is only a geometric corrob
 predictive system there is no readout to fall back on, so recovering a real *strength* signal
 (gnina CNN rescoring / MM-GBSA / FEP — §future work) becomes blocking.
 
+The obvious next candidate, a single-snapshot **MM-GBSA rescore** of the docked poses (which adds
+the electrostatics and desolvation terms Vina omits), was subsequently built CPU-only and validated
+on the same eight anchors (`trial-impact-service/validation/`). It **also failed**: Spearman
+ρ(MM-GBSA, pKd) = −0.24 (95% CI [−0.93, +0.62]), no better than Vina's −0.24, and it still tracks
+ligand size (ρ ≈ +0.4). Applying the same discipline used on Vina, the cheap MM-GBSA is *not*
+shipped as a strength estimator — the negative result is itself the finding, and it sharpens the
+scope: recovering cross-target affinity needs a congeneric same-target series or far more expensive
+sampling (explicit-solvent MM-GBSA ensembles / FEP), not a cheaper single-point.
+
 ### 3.5 What a credible backtest would require
 
 The forecast is worth what the validation is worth, and I think a naive backtest here would
