@@ -58,13 +58,15 @@ binding free energy ΔG reported as mean ± sd (the scalar only — the pose is 
 Limitations), then solve the PK/PD model in **closed form**
 (Bateman) for tissue exposure (Cmax/AUC). The ΔG is reported as a geometric target-engagement
 classification, **not** a calibrated affinity — no absolute Kd or occupancy (issue #4). That needs a full sandbox that
-can `pip install` a heavy scientific
-stack, pull structures, and iterate on failures — exactly what a Devin session is.
+can build a heavy native scientific
+stack (the canonical conda-lock `trialsim` env — see Simulation environment), pull structures, and iterate on failures — exactly what a Devin session is.
 One session per event keeps runs isolated, independently retryable, and observable
 (the same design the pipeline uses throughout).
 
 `app/simulation.py` is the canonical, CLI-runnable pipeline. Devin **clones a pinned
-commit** (`SIM_REPO_URL` @ `SIM_REPO_COMMIT`), installs `requirements-sim.txt`, runs
+commit** (`SIM_REPO_URL` @ `SIM_REPO_COMMIT`), builds the canonical conda-lock `trialsim`
+env (`conda-sim.lock.yml` + `scripts/install_fpocket.sh`; `requirements-sim.txt` is only a
+pip fallback that lacks ProDy/fpocket, so it cannot run the covalent/pocket routes), runs
 the selected estimator (`python -m app.simulation --estimator <id>`), and reports back
 a single `SIM_RESULT_JSON:` line the service parses. The source is **cloned, not
 embedded** in the prompt — so the prompt no longer grows with the pipeline (the old
@@ -134,7 +136,7 @@ app/
   templates/_viewer3d.html  # shared 3Dmol viewer partial, reused by both dashboards
 tickers.json        # sponsor → ticker + competitor map
 requirements.txt    # web-service deps (Flask, requests, gunicorn)
-requirements-sim.txt# heavy sim deps (rdkit, meeko, vina, openbabel, numpy) — installed by Devin
+requirements-sim.txt# pip fallback for sim deps (no ProDy/fpocket); canonical is conda-sim.lock.yml
 simulate_trial.py   # fires signed trial-event payloads (stand-in for the watcher)
 run_real.py         # fire ONE real trial event end to end (creates a real Devin session)
 compare_estimators.py  # race one trial through 2+ estimators head-to-head (real sessions)
@@ -189,7 +191,9 @@ for any market-moving readout.
 
 ### Run the real physics locally (optional)
 ```bash
-pip install -r requirements-sim.txt
+# canonical env (needed for the covalent/pocket routes below — see Simulation environment):
+conda-lock install --conda "$(command -v micromamba)" --name trialsim conda-sim.lock.yml
+bash scripts/install_fpocket.sh
 # default docking estimator:
 python -m app.simulation --target KRAS --drug sotorasib --tissue tumor --dose 960 --json-only
 # pick an estimator explicitly (see `app/estimators.py` for ids):
