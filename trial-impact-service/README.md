@@ -219,7 +219,9 @@ python -m app.simulation --target KRAS --drug sotorasib --estimator ligand-effic
   "endpoint_outcome": "met", "dose_mg": 960
 }
 ```
-Signed with `X-CTGov-Signature: sha256=<hmac>` when `WATCHER_SHARED_SECRET` is set.
+Signed with `X-CTGov-Signature: sha256=<hmac>`. **The endpoint fails closed:** with no
+`WATCHER_SHARED_SECRET` configured it rejects *every* request (`503`); with the secret set, a
+missing or bad signature is a `401`.
 An optional `"estimator": "<id>"` selects which estimator runs (default: the docking
 pipeline); an explicit id also lets the same trial be stored under two estimators for
 a head-to-head. An unknown id is a `400`.
@@ -231,7 +233,7 @@ a head-to-head. An unknown id is a `400`.
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `DEVIN_API_KEY` | yes | — | Authenticates Devin API calls. |
-| `WATCHER_SHARED_SECRET` | recommended | — | HMAC secret; when set, webhook signatures are enforced. |
+| `WATCHER_SHARED_SECRET` | **yes (webhook)** | — | HMAC secret. The webhook **fails closed**: unset ⇒ every request is rejected (`503`); set ⇒ signatures are enforced (bad/missing ⇒ `401`). |
 | `SIM_REPO_URL` | no | `…/trial-impact` | Repo Devin clones to run the simulation. |
 | `SIM_REPO_COMMIT` | **yes (real runs)** | — | Exact commit Devin checks out. Empty = *not configured*: the webhook refuses to launch an unpinned (unverifiable) session. `run_real.py`/`compare_estimators.py` fall back to local `git HEAD`. |
 | `SLACK_WEBHOOK_URL` | no | — | Slack alerts on market-movers. |
@@ -297,16 +299,16 @@ addressed; ○ = documented, future work.)
   **Caveat:** the curated `fu` table is small (a per-drug enrichment path, same mechanism as
   `endpoint_outcome`, is the general fix), and the free-drug correction does **not** repair the
   generic PK model (single-dose, one-compartment, F ≈ 1) it sits on top of.
-- **`tox_flag` is a drug-likeness heuristic, not a toxicity model** ○ —
-  [issue #3](../README.md#known-issues). It is `≥2 Lipinski Rule-of-5 violations`
+- **`druglikeness_flag` is a drug-likeness heuristic, and is no longer priced** ✅ —
+  [issue #3](../README.md#known-issues), fixed. It is `≥2 Lipinski Rule-of-5 violations`
   (`mw>500, logp>5, hbd>5, hba>10`). Ro5 predicts **oral absorption and permeability**; it
   says nothing about safety. Sotorasib trips it on MW 560.6 + logP 5.30 — and sotorasib is
-  an **approved, orally dosed drug**. The flag fires on it *because* it is a large
-  lipophilic oncology molecule, which is typical for the class. The market model then
-  charges **−0.15 PoS as if it were a safety finding**. The descriptor arithmetic is
-  correct; the interpretation is a category error. **Fix:** rename to `drug_likeness_flag`
-  and either drop the penalty or replace it with a real structural-alert model (PAINS /
-  Brenk) or a tox QSAR.
+  an **approved, orally dosed drug** — so pricing it as a safety event was a category error.
+  The market model previously charged **−0.15 PoS as if it were a safety finding**; that
+  penalty is **removed**. The flag is renamed `tox_flag → druglikeness_flag` and surfaced as
+  informational provenance only (it appears in the reasoning trace labelled *informational,
+  not priced* and contributes `0.0` to the delta). A real safety signal would need a
+  structural-alert model (PAINS / Brenk) or a tox QSAR — deliberately **not** faked here.
 - **ΔG is documented as relative but consumed as absolute** ○ —
   [issue #4](../README.md#known-issues). This file says (correctly, below) that Vina's ΔG
   is "a *relative* signal, not a measured affinity". The code then converts it to an
@@ -458,22 +460,26 @@ addressed; ○ = documented, future work.)
   and thresholds are magic numbers. The real fix is **backtesting** against
   historical biotech readouts and actual next-day price moves to fit them.
 - **Missed-trial asymmetry** ✅ — fixed. Modifiers are now applied by meaning
-  (efficacy corroboration only strengthens a win; tox is always a downside risk)
-  rather than mirrored by the readout sign, which previously let a tox flag reduce
-  the downside of a *failed* trial. The met-trial path is unchanged.
+  (efficacy corroboration only strengthens a win) rather than mirrored by the readout
+  sign, which previously let the drug-likeness flag reduce the downside of a *failed*
+  trial. The met-trial path is unchanged. (The flag itself is now unpriced — issue #3 —
+  so it can no longer move any call regardless of sign.)
 - **Spurious alerts on `unknown` outcomes** ✅ — fixed, and this one was live on the
   *common* path. Every term in `pos_breakdown` is a modifier on a clinical readout, but
   they were applied even when there was no readout: an `unknown` outcome (base `0.0`)
-  plus a tox flag scored `-0.15 × 0.95 = -0.1425`, which clears the `0.10`
-  market-moving threshold and emits a **"down" call on a trial that has reported
+  plus a (then-priced) drug-likeness flag scored `-0.15 × 0.95 = -0.1425`, which clears
+  the `0.10` market-moving threshold and emits a **"down" call on a trial that has reported
   nothing** — a directional signal derived purely from the drug's Lipinski violations.
+  (That flag is now unpriced entirely — issue #3 — so this path is doubly closed.)
   And `unknown` is the *default* for every trial the watchlist has not enriched, so this
   was the majority path in production, not an edge case. The modifiers are now gated on
   `has_readout`, so no readout means no call. Both published runs are `met`, so their
   numbers are byte-identical — a regression test asserts exactly that.
-- **No phase weighting** ○ — a Phase 1 pass shouldn't move a stock like a Phase 3;
-  the base should scale by phase (`{P1:0.4, P2:0.7, P3:1.0}` ≈ 1 line). Deliberately
-  left out this round to avoid changing the demo's numbers.
+- **No phase weighting — by design** — the actionable scope is **preclinical / Phase 1
+  only** (binding is a molecular property established by end of Phase 1; Phase 2/3 test
+  efficacy and trial statistics the physics does not model), so there is a *single*
+  actionable tier and nothing to weight. Phase 2/3 runs are educational only. See
+  [the preclinical / Phase 1 scope](../README.md#trial-phase--the-preclinical--phase-1-scope).
 - **Naive competitor read-through** ○ — competitors are assumed to move opposite the
   sponsor, one magnitude bucket softer. Real read-through depends on mechanism /
   target overlap and modality, not just "is a competitor."
@@ -515,14 +521,13 @@ addressed; ○ = documented, future work.)
   `/analysis` shows a comparison only once **more than one** estimator has completed for a trial.
 
 ### Security & operations
-- **Webhook signature verification fails open** ◑ — `signature_required` is
-  `bool(WATCHER_SHARED_SECRET)`, so if the secret is unset the service accepts **any**
-  caller's trial event, and each accepted event spends a real Devin session. The
-  fail-open default is deliberate (the demos and local runs post unsigned), but it used
-  to be *silent*, which is the actual problem: an operator who forgot the secret in
-  production would get an open, billable endpoint with no indication of it. `create_app`
-  now logs a loud warning at startup when verification is disabled. It still fails open —
-  a production deployment should make the secret mandatory and refuse to boot without it.
+- **Webhook signature verification fails closed** ✅ — [issue #8](../README.md#known-issues),
+  fixed. `/webhook/trial-update` now rejects *every* request with `503` when
+  `WATCHER_SHARED_SECRET` is unset, so a forgotten secret yields a **dark** endpoint, never
+  an open, billable one — an unauthenticated caller can no longer spend a real Devin session.
+  With the secret set, a missing or bad signature is `401`. `create_app` still logs a loud
+  startup warning when the secret is absent so the disabled state is obvious. (Local/demo
+  runs sign with the same secret via `WATCHER_SHARED_SECRET`, as the quick-start shows.)
 - **No retries or timeouts on hung sessions** ○ — a Devin session that goes `blocked` or
   hangs is left for a human; `blocked` is deliberately non-terminal so `/poll` can pick it
   up again, but nothing escalates it.

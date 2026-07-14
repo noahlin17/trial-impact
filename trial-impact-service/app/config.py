@@ -34,8 +34,10 @@ class Config:
     sim_repo_commit: str
 
     # --- Trigger authentication ----------------------------------------------
-    # Shared secret the ctgov-watcher signs webhooks with (HMAC-SHA256). When
-    # empty, signature verification is skipped (dev mode only).
+    # Shared secret the ctgov-watcher signs webhooks with (HMAC-SHA256). REQUIRED:
+    # the /webhook endpoint fails *closed* — when this is empty it rejects every
+    # request (503), so an unauthenticated caller can never spend a Devin session.
+    # Must be set for the endpoint to accept any event (see .env.example).
     watcher_shared_secret: str
 
     # --- Output surfaces ------------------------------------------------------

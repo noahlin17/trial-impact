@@ -42,7 +42,7 @@ STRONG_WIN = {
     "binding_affinity_kcal_mol": -9.5,
     "kd_nM": 90.0,
     "target_occupancy_pct": 80.0,
-    "tox_flag": False,
+    "druglikeness_flag": False,
     "confidence": 0.9,
 }
 
@@ -51,7 +51,7 @@ RICH_SIM = {
     "target": "KRAS", "drug": "sotorasib", "tissue": "tumor", "dose_mg": 960.0,
     "binding_affinity_kcal_mol": -8.585, "kd_nM": 892.54,
     "cmax_ng_ml": 19259.45, "auc_ng_h_ml": 143963.8,
-    "target_occupancy_pct": 97.47, "tox_flag": True, "confidence": 0.9,
+    "target_occupancy_pct": 97.47, "druglikeness_flag": True, "confidence": 0.9,
     "provenance": {
         "uniprot": "P01116", "structure_source": "RCSB", "pdb_id": "7VVB",
         "smiles": "C[C@H]1CN(...)C(=O)C=C",
@@ -171,6 +171,39 @@ def test_webhook_rejects_bad_signature(ctx):
         headers={"Content-Type": "application/json", SIGNATURE_HEADER: "sha256=bad"},
     )
     assert resp.status_code == 401
+
+
+def test_webhook_fails_closed_without_secret(tmp_path):
+    """With no shared secret the endpoint fails *closed* (issue #8).
+
+    A signed request that would be accepted under a configured secret must be rejected
+    (503) when WATCHER_SHARED_SECRET is unset, rather than silently accepting unsigned
+    callers who each spend a Devin session."""
+    cfg = Config(
+        devin_api_key="test-devin", devin_api_base="http://devin.test",
+        sim_repo_url="https://example.test/repo", sim_repo_commit="a" * 40,
+        watcher_shared_secret="",  # unset
+        slack_webhook_url="", smtp_host="", smtp_port=587, smtp_user="",
+        smtp_password="", email_from="", email_to="",
+        tickers_path="tickers.json", market_moving_threshold=0.10,
+        database_path=str(tmp_path / "noauth.db"),
+    )
+    app = create_app(cfg, db=Database(cfg.database_path), devin=FakeDevin(),
+                     alerter=FakeAlerter(), tickers=TICKERS)
+    app.testing = True
+    client = app.test_client()
+    body = json.dumps(_payload()).encode()
+    # Even a body signed under some secret is refused — the server has no secret to check.
+    resp = client.post(
+        "/webhook/trial-update", data=body,
+        headers={"Content-Type": "application/json", SIGNATURE_HEADER: sign(SECRET, body)},
+    )
+    assert resp.status_code == 503
+    # And an unsigned request is refused too (never falls through to processing).
+    resp2 = client.post(
+        "/webhook/trial-update", data=body, headers={"Content-Type": "application/json"}
+    )
+    assert resp2.status_code == 503
 
 
 def test_webhook_rejects_missing_nct(ctx):
@@ -299,7 +332,7 @@ def test_extract_ignores_prompt_echo_and_takes_last_result():
     SIM_RESULT_JSON). The extractor must skip that echo and return Devin's real,
     final result — the exact bug seen in the first live Devin run."""
     example = '{"binding_affinity_kcal_mol": -9.2, "kd_nM": 180.4}'  # from the prompt
-    real = '{"binding_affinity_kcal_mol": -8.585, "kd_nM": 892.54, "tox_flag": true}'
+    real = '{"binding_affinity_kcal_mol": -8.585, "kd_nM": 892.54, "druglikeness_flag": true}'
     data = {
         "status_enum": "blocked",
         "structured_output": None,
@@ -311,46 +344,52 @@ def test_extract_ignores_prompt_echo_and_takes_last_result():
     }
     out = extract_sim_result(data)
     assert out["kd_nM"] == 892.54  # Devin's real value, NOT the prompt example 180.4
-    assert out["tox_flag"] is True
+    assert out["druglikeness_flag"] is True
 
 
-def test_missed_trial_tox_increases_downside():
-    """A tox flag must make a *failed* trial worse, never better — and molecular
-    potency must not rescue a miss (efficacy modifiers drop out for a miss)."""
+def test_druglikeness_flag_does_not_change_the_delta():
+    """The drug-likeness flag is informational, not a priced safety term (issue #3).
+
+    A ≥2-Lipinski-violation flag predicts oral absorption, not toxicity, and fires on
+    approved drugs (sotorasib), so it must move the PoS delta by exactly nothing — for
+    a win *and* for a miss. Efficacy modifiers still drop out for a miss."""
+    for outcome in ("met", "missed"):
+        ev = {"nct_id": "N", "endpoint_outcome": outcome, "target": "KRAS", "sponsor": "Amgen"}
+        flagged = dict(RICH_SIM)                       # druglikeness_flag True
+        clean = {**RICH_SIM, "druglikeness_flag": False}
+        assert market_model.pos_delta(ev, flagged) == market_model.pos_delta(ev, clean)
+        b = market_model.pos_breakdown(ev, flagged)
+        assert b["druglikeness_flag"] is True
+        assert "druglikeness_penalty" not in b and "tox_penalty" not in b
+    # potency does not rescue a miss: efficacy modifiers drop out.
     ev_miss = {"nct_id": "N", "endpoint_outcome": "missed", "target": "KRAS", "sponsor": "Amgen"}
-    tox_sim = dict(RICH_SIM)                      # tox_flag True, potent binder
-    clean_sim = {**RICH_SIM, "tox_flag": False}
-    d_tox = market_model.pos_delta(ev_miss, tox_sim)
-    d_clean = market_model.pos_delta(ev_miss, clean_sim)
-    assert d_tox < d_clean < 0                    # tox deepens the downside
-    b = market_model.pos_breakdown(ev_miss, clean_sim)
-    assert b["binding_modifier"] == 0.0 and b["occupancy_modifier"] == 0.0
+    b_miss = market_model.pos_breakdown(ev_miss, RICH_SIM)
+    assert b_miss["binding_modifier"] == 0.0 and b_miss["occupancy_modifier"] == 0.0
+    assert b_miss["final"] < 0
 
 
-def test_met_trial_unchanged_by_fix():
-    """Regression guard: the fix must not move the met-trial numbers (the demo runs
-    are both 'met')."""
+def test_met_trial_breakdown_numbers():
+    """Pin the met-trial arithmetic with drug-likeness no longer priced (issue #3)."""
     ev_met = {"nct_id": "N", "endpoint_outcome": "met", "target": "KRAS", "sponsor": "Amgen"}
     b = market_model.pos_breakdown(ev_met, RICH_SIM)
     # met: base .5, binding 0 (dg -8.585, kd 892 -> neither potent nor weak),
-    # occ +.15 (97%), tox -.15 (flag) -> subtotal .5 ; scale .95 -> .475
-    assert round(b["subtotal"], 3) == 0.5
-    assert abs(b["final"] - 0.475) < 1e-9
+    # occ +.15 (97%), drug-likeness flag not priced -> subtotal .65 ; scale .95 -> .6175
+    assert round(b["subtotal"], 3) == 0.65
+    assert abs(b["final"] - 0.6175) < 1e-9
 
 
 def test_unknown_outcome_does_not_emit_a_call_on_chemistry_alone():
     """No readout means no call.
 
     `unknown` is the default for every trial the watchlist has not enriched, so this
-    is the *common* path in production. A tox flag alone used to score
-    -0.15 × 0.95 = -0.1425, clear the 0.10 market-moving threshold, and emit a "down"
+    is the *common* path in production. A (then-priced) drug-likeness flag alone used to
+    score -0.15 × 0.95 = -0.1425, clear the 0.10 market-moving threshold, and emit a "down"
     call on a trial that had reported nothing — a spurious alert on the majority path.
     """
     ev = {"nct_id": "N", "endpoint_outcome": "unknown", "target": "KRAS", "sponsor": "Amgen"}
-    b = market_model.pos_breakdown(ev, RICH_SIM)   # RICH_SIM carries tox_flag=True
+    b = market_model.pos_breakdown(ev, RICH_SIM)   # RICH_SIM carries druglikeness_flag=True
 
     assert b["outcome_base"] == 0.0
-    assert b["tox_penalty"] == 0.0                 # was -0.15
     assert b["final"] == 0.0                       # was -0.1425
     assert abs(market_model.pos_delta(ev, RICH_SIM)) < 0.10   # below the threshold
 
@@ -376,7 +415,7 @@ def test_pos_breakdown_reduces_to_delta():
             # exact invariants on the raw components
             assert abs(
                 b["outcome_base"] + b["binding_modifier"]
-                + b["occupancy_modifier"] + b["tox_penalty"] - b["subtotal"]
+                + b["occupancy_modifier"] - b["subtotal"]
             ) < 1e-12
             assert abs(b["final"] - market_model.pos_delta(ev, sim)) < 1e-12
             # display components sum to the final (within rounding)
@@ -438,7 +477,7 @@ def test_fu_correction_flips_the_market_call():
     ev = {"nct_id": "NCT-VERIFY-002", "endpoint_outcome": "met",
           "target": "CFTR", "drug": "ivacaftor"}
     base_sim = {"binding_affinity_kcal_mol": -8.702, "kd_nM": 738.217,
-                "tox_flag": False, "confidence": 0.7}
+                "druglikeness_flag": False, "confidence": 0.7}
     total = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 94.54})
     free = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 14.76})
     assert total["occupancy_modifier"] == 0.15 and free["occupancy_modifier"] == -0.10
@@ -823,7 +862,7 @@ def test_analysis_payload_and_route(ctx):
 
     payload = client.get("/analysis.json").get_json()
     assert payload["summary"]["analyzed"] == 2
-    assert payload["summary"]["tox_rate"] == 1.0
+    assert payload["summary"]["druglikeness_rate"] == 1.0
     assert len(payload["relationships"]["points"]) == 2
     run = payload["runs"][0]
     assert run["detail"]["pkpd_curve"] is not None

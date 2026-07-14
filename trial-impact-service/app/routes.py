@@ -56,7 +56,15 @@ def webhook_trial_update() -> Any:
     db: db_module.Database = ctx["db"]
 
     raw = request.get_data()
-    if cfg.signature_required and not verify(
+    # Fail closed: with no shared secret there is no way to authenticate the caller,
+    # and every accepted event spends a Devin session, so an unset secret must refuse
+    # traffic rather than accept it. (The old behaviour skipped verification when the
+    # secret was empty, which left the endpoint open to anyone — see issue #8.)
+    if not cfg.watcher_shared_secret:
+        return jsonify(
+            {"error": "webhook disabled: WATCHER_SHARED_SECRET is not configured"}
+        ), 503
+    if not verify(
         cfg.watcher_shared_secret, raw, request.headers.get(SIGNATURE_HEADER)
     ):
         return jsonify({"error": "invalid or missing signature"}), 401

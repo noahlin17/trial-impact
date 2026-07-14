@@ -37,7 +37,7 @@ and what it caught.)
 
 | File | Trial | Result |
 |------|-------|--------|
-| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, **Phase 1 (in scope)**, endpoint met | ΔG **−7.202 ± 0.187** kcal/mol (n=3), Kd 8412.3 nM, **free-drug** occupancy 31.0% (fu 0.11), tox flagged ‡, **covalent** (acrylamide warhead). Route **covalent-tethered** to Cys A:12 of curated holo **6OIM** (confidence 0.806). PoS **+0.32** → AMGN up/moderate · REGN, NVS down. |
+| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, **Phase 1 (in scope)**, endpoint met | ΔG **−7.202 ± 0.187** kcal/mol (n=3), Kd 8412.3 nM, **free-drug** occupancy 31.0% (fu 0.11), drug-likeness flagged ‡ (informational, not priced), **covalent** (acrylamide warhead). Route **covalent-tethered** to Cys A:12 of curated holo **6OIM** (confidence 0.806). PoS **+0.45** → AMGN up/strong · REGN, NVS down/moderate. |
 | `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, **Phase 3 (educational only)**, endpoint met | ΔG −7.404 ± 0.007 kcal/mol † (n=3), Kd 6061.5 nM, **free-drug** occupancy **2.06%** (fu 0.01), clean, not covalent. Route **holo-ligand** boxed on co-crystal **VX7** in curated **6O2P** (confidence 0.897). PoS **+0.38** → VRTX up/strong · CRSP, BLUE down. Included to illustrate the pipeline on a well-characterized drug — a Phase 3 event is **outside the actionable preclinical / Phase 1 scope** (see root README). |
 | `dashboard_kras_6OIM.html` | ″ | Rendered `/status` with the 3D viewer; docking ΔG shown as mean ± sd. |
 | `dashboard_cftr_6O2P.html` | ″ | Rendered `/status`; the 6O2P cryo-EM structure rendered from RCSB. |
@@ -45,7 +45,7 @@ and what it caught.)
 
 Each JSON holds the trial event, the resolved sponsor/competitor tickers, the full
 `sim_result` (binding with per-seed replicates and sd, exposure, free-drug occupancy,
-tox/covalent flags, **docking box with routing `mode` + provenance**, provenance: UniProt /
+druglikeness/covalent flags, **docking box with routing `mode` + provenance**, provenance: UniProt /
 PDB id / **structure format** / SMILES / descriptors / **fu + source** / **vina seeds**),
 and the market model's `price_calls` + `commentary`.
 
@@ -81,7 +81,7 @@ precision" gap: a single draw hid the seed-to-seed spread. The spread here is sm
 placement, or scoring-function error, which dominate and are not captured by re-seeding.
 Cost scales linearly with seed count (3× the docking time).
 
-## ‡ How to read the occupancy and tox columns
+## ‡ How to read the occupancy and drug-likeness columns
 
 **Occupancy is a free-drug engagement estimate, not a total-drug upper bound.** Only
 **unbound** drug engages a target, so occupancy is evaluated on the free concentration,
@@ -96,16 +96,19 @@ Exposure metrics (Cmax, AUC) still use total concentration — they are total-dr
   (occupancy modifier −0.10). The VRTX call still comes back `strong` (+0.38) on the
   endpoint-met and confidence (0.897) terms.
 - **Sotorasib is ~89% bound** (fu 0.11): occupancy **31.0%** (Kd 8412 nM). The AMGN call is
-  `up / moderate` (+0.32).
+  `up / strong` (+0.45) — it rose from `moderate`/+0.32 once the drug-likeness flag stopped
+  being charged as a −0.15 safety penalty (issue #3).
 
-**The "tox" flag is a Lipinski drug-likeness heuristic, not a toxicity model** — ≥2 Ro5
-violations, which predicts oral absorption, not safety. It fires on sotorasib because
-sotorasib is a big lipophilic oncology molecule; sotorasib is also an approved drug. It is
-still priced as a −0.15 safety penalty. This is [issue #3](../README.md#known-issues).
+**The `druglikeness_flag` is a Lipinski drug-likeness heuristic, not a toxicity model, and is
+no longer priced** — ≥2 Ro5 violations, which predicts oral absorption, not safety. It fires on
+sotorasib because sotorasib is a big lipophilic oncology molecule; sotorasib is also an approved
+drug — so charging it as a safety event was a category error. The −0.15 penalty is **removed**;
+the flag (renamed from `tox_flag`) is surfaced as informational provenance only and contributes
+`0.0` to the PoS delta. This is [issue #3](../README.md#known-issues), **fixed**.
 
-Both the tox heuristic and the crude PK are documented rather than patched; the free-drug
-correction fixes occupancy specifically, not the generic PK model (single-dose,
-one-compartment, F≈1, generic ADME constants), which remains a placeholder.
+The drug-likeness heuristic is now informational, and the crude PK is documented rather than
+patched; the free-drug correction fixes occupancy specifically, not the generic PK model
+(single-dose, one-compartment, F≈1, generic ADME constants), which remains a placeholder.
 
 ## † How to read the two ΔGs (pocket-resolved, but cognate and reversible-scored)
 

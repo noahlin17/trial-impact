@@ -81,7 +81,7 @@ class SimResult:
     cmax_ng_ml: float | None = None
     auc_ng_h_ml: float | None = None
     target_occupancy_pct: float | None = None
-    tox_flag: bool | None = None
+    druglikeness_flag: bool | None = None
     covalent_flag: bool | None = None
     confidence: float | None = None
     provenance: dict[str, Any] = field(default_factory=dict)
@@ -276,7 +276,7 @@ def embed_ligand(smiles: str):
 
 
 def ligand_descriptors(mol) -> dict[str, float]:
-    """Physicochemical descriptors used for the crude tox / drug-likeness signal."""
+    """Physicochemical descriptors used for the drug-likeness (Lipinski) signal."""
     from rdkit.Chem import Crippen, Descriptors, Lipinski
 
     return {
@@ -745,11 +745,14 @@ def run_simulation(
             result.auc_ng_h_ml = round(pkpd["auc_ng_h_ml"], 3)
             result.target_occupancy_pct = round(pkpd["target_occupancy_pct"], 2)
 
-            # Crude drug-likeness/tox signal: ≥2 Lipinski violations flags risk.
+            # Drug-likeness (oral-absorption) signal: ≥2 Lipinski Rule-of-5 violations.
+            # This is NOT a toxicity/safety signal — it predicts passive oral absorption,
+            # not harm — so it is surfaced as information only and is not priced by the
+            # market model. (It fires on approved oncology drugs like sotorasib.)
             violations = sum(
                 [desc["mw"] > 500, desc["logp"] > 5, desc["hbd"] > 5, desc["hba"] > 10]
             )
-            result.tox_flag = violations >= 2
+            result.druglikeness_flag = violations >= 2
 
             # Confidence: experimental structure > predicted; full run > fallbacks;
             # and noisier docking (larger ΔG spread across seeds) is less trustworthy.

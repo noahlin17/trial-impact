@@ -187,7 +187,7 @@ class LigandEfficiencyBaseline:
             violations = sum(
                 [desc["mw"] > 500, desc["logp"] > 5, desc["hbd"] > 5, desc["hba"] > 10]
             )
-            result.tox_flag = violations >= 2
+            result.druglikeness_flag = violations >= 2
             # Low by construction: this is a size proxy with no structure and no pocket.
             result.confidence = 0.2
         except Exception as exc:  # noqa: BLE001 — surface failures as data, like run_simulation

@@ -29,7 +29,7 @@ def corpus_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
     base = stats.compute_stats(events)
 
     dgs, occs, deltas = [], [], []
-    tox = 0
+    druglike = 0
     by_sponsor: dict[str, list[float]] = {}
     by_target: dict[str, list[float]] = {}
     for e in completed:
@@ -40,15 +40,15 @@ def corpus_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
             dgs.append(s["binding_affinity_kcal_mol"])
         if s.get("target_occupancy_pct") is not None:
             occs.append(s["target_occupancy_pct"])
-        if s.get("tox_flag"):
-            tox += 1
+        if s.get("druglikeness_flag"):
+            druglike += 1
         by_sponsor.setdefault(e.get("sponsor") or "?", []).append(d)
         by_target.setdefault(e.get("target") or "?", []).append(d)
 
     n = len(completed)
     base.update({
         "analyzed": n,
-        "tox_rate": round(tox / n, 3) if n else None,
+        "druglikeness_rate": round(druglike / n, 3) if n else None,
         "mean_dg": round(statistics.mean(dgs), 3) if dgs else None,
         "median_dg": round(statistics.median(dgs), 3) if dgs else None,
         "mean_occupancy": round(statistics.mean(occs), 1) if occs else None,
@@ -76,7 +76,7 @@ def relationships(events: list[dict[str, Any]]) -> dict[str, Any]:
             "kd": s.get("kd_nM"),
             "occ": s.get("target_occupancy_pct"),
             "pos": round(market_model.pos_delta(e, s), 3),
-            "tox": bool(s.get("tox_flag")),
+            "druglikeness": bool(s.get("druglikeness_flag")),
             "estimator": s.get("estimator"),
         })
     return {"points": points}
@@ -174,7 +174,8 @@ def build_payload(events: list[dict[str, Any]]) -> dict[str, Any]:
             "tissue": e.get("tissue"), "phase": e.get("phase"),
             "dg": s.get("binding_affinity_kcal_mol"),
             "dg_sd": s.get("binding_affinity_sd_kcal_mol"), "kd": s.get("kd_nM"),
-            "occupancy": s.get("target_occupancy_pct"), "tox": bool(s.get("tox_flag")),
+            "occupancy": s.get("target_occupancy_pct"),
+            "druglikeness": bool(s.get("druglikeness_flag")),
             "pos_delta": round(market_model.pos_delta(e, s), 3),
             "direction": call["direction"] if call else "flat",
             "magnitude": call["magnitude"] if call else "flat",

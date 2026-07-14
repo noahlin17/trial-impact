@@ -34,7 +34,6 @@
     "cmax_ng_ml": 19259.451,
     "auc_ng_h_ml": 143390.88,
     "target_occupancy_pct": 31.0,
-    "tox_flag": true,
     "covalent_flag": true,
     "confidence": 0.806,
     "provenance": {
@@ -86,24 +85,25 @@
     "error": null,
     "estimator": "vina-docking-pkpd@2",
     "code_patched": false,
-    "patch_summary": null
+    "patch_summary": null,
+    "druglikeness_flag": true
   },
-  "commentary": "Trial NCT-REAL-0001 \u2014 Amgen (sotorasib / KRAS): endpoint met.\nModelled probability-of-success delta: +0.32.\n  \u25b2 AMGN (Amgen, sponsor): up / moderate\n  \u25bc REGN (Regeneron, competitor): down / slight\n  \u25bc NVS (Novartis, competitor): down / slight\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
+  "commentary": "Trial NCT-REAL-0001 \u2014 Amgen (sotorasib / KRAS): endpoint met.\nModelled probability-of-success delta: +0.45.\n  \u25b2 AMGN (Amgen, sponsor): up / strong\n  \u25bc REGN (Regeneron, competitor): down / moderate\n  \u25bc NVS (Novartis, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
   "price_calls": [
     {
       "ticker": "AMGN",
       "name": "Amgen",
       "role": "sponsor",
       "direction": "up",
-      "magnitude": "moderate",
-      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking \u0394G -7.202\u00b10.187 (n=3) kcal/mol (Kd 8412.324 nM). Peak target occupancy 31.0%. Structural tox flag raised. PoS delta +0.32."
+      "magnitude": "strong",
+      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking \u0394G -7.202\u00b10.187 (n=3) kcal/mol (Kd 8412.324 nM). Peak target occupancy 31.0%. Drug-likeness flag (\u22652 Lipinski violations) \u2014 informational, predicts oral absorption, not toxicity; not priced into the call. PoS delta +0.45."
     },
     {
       "ticker": "REGN",
       "name": "Regeneron",
       "role": "competitor",
       "direction": "down",
-      "magnitude": "slight",
+      "magnitude": "moderate",
       "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals."
     },
     {
@@ -111,12 +111,12 @@
       "name": "Novartis",
       "role": "competitor",
       "direction": "down",
-      "magnitude": "slight",
+      "magnitude": "moderate",
       "rationale": "Second-order read-through: a up move for Amgen on KRAS typically implies a down move for rivals."
     }
   ],
-  "created_at": "2026-07-14T05:49:41+00:00",
-  "updated_at": "2026-07-14T07:41:51+00:00",
+  "created_at": "2026-07-14T14:38:12+00:00",
+  "updated_at": "2026-07-14T14:38:12+00:00",
   "error_message": null,
   "alert_sent": 1
 }
