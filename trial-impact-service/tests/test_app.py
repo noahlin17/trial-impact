@@ -98,6 +98,7 @@ def ctx(tmp_path):
         devin_api_key="test-devin",
         devin_api_base="http://devin.test",
         sim_repo_url="https://example.test/repo",
+        sim_repo_commit="a" * 40,
         watcher_shared_secret=SECRET,
         slack_webhook_url="",
         smtp_host="", smtp_port=587, smtp_user="", smtp_password="",
@@ -426,24 +427,167 @@ def test_detect_covalent(name, smiles, expected):
     assert detect_covalent(embed_ligand(smiles)) is expected, name
 
 
-# --- prompt budget ----------------------------------------------------------- #
-def test_simulation_prompt_fits_devin_limit():
-    """The prompt embeds all of simulation.py, so it grows with the pipeline. Devin
-    rejects >30k with an opaque 400 that never mentions size — catch it here instead."""
-    from app.prompts import MAX_PROMPT_CHARS, build_simulation_prompt
+# --- prompt: pinned commit, no embedded source ------------------------------- #
+def _build_prompt(**over):
+    from app.prompts import build_simulation_prompt
 
-    prompt = build_simulation_prompt(
-        event={"nct_id": "NCT1", "target": "KRAS", "drug": "sotorasib",
-               "tissue": "tumor", "dose_mg": 960, "sponsor": "Amgen"},
-        sim_repo_url="https://github.com/noahlin17/trial-impact",
-    )
-    assert len(prompt) <= MAX_PROMPT_CHARS, (
-        f"prompt is {len(prompt)} chars — over Devin's {MAX_PROMPT_CHARS} limit"
-    )
-    # The embedded source must be the real thing, not a stale/partial copy.
-    assert "def run_simulation(" in prompt and "SIM_RESULT_JSON" in prompt
-    # ...and the session must be told to disclose any in-sandbox patch.
+    kwargs = {
+        "event": {"nct_id": "NCT1", "target": "KRAS", "drug": "sotorasib",
+                  "tissue": "tumor", "dose_mg": 960, "sponsor": "Amgen"},
+        "sim_repo_url": "https://github.com/noahlin17/trial-impact",
+        "sim_repo_commit": "c0ffee1234567890c0ffee1234567890c0ffee12",
+        "estimator": "vina-docking-pkpd@1",
+    }
+    kwargs.update(over)
+    return build_simulation_prompt(**kwargs)
+
+
+def test_prompt_clones_pinned_commit_not_embedded_source():
+    """The pipeline is now *cloned at a pinned commit*, not embedded, so the prompt
+    stays small and reproducibility is verifiable against the commit."""
+    from app.prompts import MAX_PROMPT_CHARS
+
+    commit = "c0ffee1234567890c0ffee1234567890c0ffee12"
+    prompt = _build_prompt(sim_repo_commit=commit)
+
+    assert len(prompt) <= MAX_PROMPT_CHARS
+    # Clones + checks out the pinned commit...
+    assert "git clone" in prompt and f"git checkout {commit}" in prompt
+    # ...runs the selected estimator...
+    assert '--estimator "vina-docking-pkpd@1"' in prompt
+    # ...must disclose any in-sandbox patch...
     assert "code_patched" in prompt
+    # ...and does NOT embed the pipeline source any more (that was the 30k ceiling).
+    assert "def run_simulation(" not in prompt
+
+
+def test_prompt_requires_a_pinned_commit():
+    """A blank commit is an unreproducible run — building the prompt must refuse."""
+    with pytest.raises(ValueError, match="sim_repo_commit is required"):
+        _build_prompt(sim_repo_commit="")
+
+
+# --- estimators: the harness/estimator boundary ------------------------------ #
+def test_estimator_registry_and_default():
+    from app.estimators import (
+        DEFAULT_ESTIMATOR_ID,
+        get_estimator,
+        list_estimators,
+    )
+    from app.simulation import VINA_ESTIMATOR_ID
+
+    ids = list_estimators()
+    # Two implementations ship: the real docking pipeline + a labelled control.
+    assert VINA_ESTIMATOR_ID in ids
+    assert "ligand-efficiency-baseline@1" in ids
+    # The default is the real pipeline (so existing behaviour is unchanged).
+    assert DEFAULT_ESTIMATOR_ID == VINA_ESTIMATOR_ID
+    # Every registered estimator stamps its own id onto results it makes, and
+    # the lookup round-trips.
+    for est_id in ids:
+        assert get_estimator(est_id).id == est_id
+    with pytest.raises(KeyError, match="unknown estimator"):
+        get_estimator("does-not-exist@9")
+
+
+def test_webhook_rejects_unknown_estimator(ctx):
+    client, _devin, _alerter, _db = ctx
+    resp = _post(client, _payload("NCT-EST", estimator="nope@1"))
+    assert resp.status_code == 400
+    assert "unknown estimator" in resp.get_json()["error"]
+
+
+def test_webhook_estimator_selects_and_keys_the_event(ctx):
+    client, devin, _alerter, db = ctx
+    est = "ligand-efficiency-baseline@1"
+    resp = _post(client, _payload("NCT-EST2", estimator=est))
+    assert resp.status_code == 201
+    event = resp.get_json()["event"]
+    # An explicit estimator suffixes the key so it can coexist with the default run.
+    assert event["event_id"] == make_event_id("NCT-EST2", "results_posted", est)
+    assert db.get_event(event["event_id"]) is not None
+    # The prompt tells the session to run that estimator, and to clone the pinned commit.
+    prompt = devin.created[0]["prompt"]
+    assert f'--estimator "{est}"' in prompt
+    assert "git checkout" in prompt
+
+
+def test_webhook_refuses_unpinned_run(tmp_path):
+    """No SIM_REPO_COMMIT -> the run is not reproducible; refuse it, visibly."""
+    cfg = Config(
+        devin_api_key="test-devin", devin_api_base="http://devin.test",
+        sim_repo_url="https://example.test/repo", sim_repo_commit="",
+        watcher_shared_secret=SECRET,
+        slack_webhook_url="", smtp_host="", smtp_port=587, smtp_user="",
+        smtp_password="", email_from="", email_to="",
+        tickers_path="tickers.json", market_moving_threshold=0.10,
+        database_path=str(tmp_path / "unpinned.db"),
+    )
+    devin, alerter = FakeDevin(), FakeAlerter()
+    app = create_app(cfg, db=Database(cfg.database_path), devin=devin,
+                     alerter=alerter, tickers=TICKERS)
+    app.testing = True
+    resp = _post(app.test_client(), _payload("NCT-UNPINNED"))
+    assert resp.status_code == 503
+    assert "SIM_REPO_COMMIT" in resp.get_json()["error"]
+    # Nothing was launched, and the failure is recorded (not silently dropped).
+    assert devin.created == []
+    assert resp.get_json()["event"]["status"] == STATUS_FAILED
+
+
+def test_cli_dispatches_through_the_estimator_registry(monkeypatch):
+    """`python -m app.simulation --estimator X` must route to estimator X."""
+    import app.estimators as estimators
+    from app.simulation import SimResult, main
+
+    seen = {}
+
+    class _Spy:
+        id = "spy@1"
+
+        def run(self, *, target, drug, tissue, dose_mg, uniprot=None):
+            seen.update(target=target, drug=drug, estimator=self.id)
+            return SimResult(target=target, drug=drug, tissue=tissue,
+                             dose_mg=dose_mg, estimator=self.id)
+
+    monkeypatch.setitem(estimators.REGISTRY, "spy@1", _Spy())
+    rc = main(["--target", "KRAS", "--drug", "sotorasib", "--estimator", "spy@1"])
+    assert rc == 0
+    assert seen == {"target": "KRAS", "drug": "sotorasib", "estimator": "spy@1"}
+
+
+def test_analysis_estimator_head_to_head(ctx):
+    """Two estimators on one trial produce a side-by-side comparison entry."""
+    from app import analysis
+
+    _client, _devin, _alerter, db = ctx
+
+    def _row(nct, est, dg, occ):
+        sim = {**RICH_SIM, "binding_affinity_kcal_mol": dg,
+               "target_occupancy_pct": occ, "estimator": est}
+        eid = make_event_id(nct, "results_posted", est)
+        db.upsert_new_event(
+            event_id=eid, nct_id=nct, sponsor="Amgen", drug="sotorasib",
+            target="KRAS", tissue="tumor", phase="PHASE3", event_type="results_posted",
+            endpoint_outcome="met", sponsor_ticker="AMGN", competitor_tickers=[],
+            devin_session_id=None, session_url=None, status=STATUS_QUEUED,
+        )
+        db.update_event_status(event_id=eid, status=STATUS_COMPLETED, sim_result=sim)
+
+    _row("NCT-H2H", "vina-docking-pkpd@1", -8.6, 97.5)
+    _row("NCT-H2H", "ligand-efficiency-baseline@1", -7.5, 88.0)
+    _row("NCT-SOLO", "vina-docking-pkpd@1", -9.1, 80.0)
+
+    payload = analysis.build_payload(db.list_events())
+    trials = payload["comparison"]["trials"]
+    # Only the trial with two estimators is a head-to-head; the solo one is omitted.
+    assert len(trials) == 1
+    t = trials[0]
+    assert t["nct_id"] == "NCT-H2H"
+    assert [a["estimator"] for a in t["arms"]] == [
+        "ligand-efficiency-baseline@1", "vina-docking-pkpd@1"
+    ]
+    assert t["dg_spread"] == pytest.approx(1.1, abs=1e-6)
 
 
 # --- docking box + pose capture (pure parsing; no RDKit/Vina needed) --------- #

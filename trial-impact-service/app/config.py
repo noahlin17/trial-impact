@@ -26,6 +26,12 @@ class Config:
     devin_api_base: str
     # Repo Devin clones to run the real-physics pipeline (app/simulation.py).
     sim_repo_url: str
+    # The exact commit Devin checks out before running. Pinning it is what makes a
+    # run reproducible-from-source and lets `code_patched` be *verified* against the
+    # commit rather than trusted. Empty is treated as "not configured": the webhook
+    # refuses to launch an unpinned (unverifiable) session, the same way it refuses
+    # without an API key. See prompts.py and "The result contract" in the README.
+    sim_repo_commit: str
 
     # --- Trigger authentication ----------------------------------------------
     # Shared secret the ctgov-watcher signs webhooks with (HMAC-SHA256). When
@@ -58,6 +64,7 @@ class Config:
             sim_repo_url=os.environ.get(
                 "SIM_REPO_URL", "https://github.com/noahlin17/trial-impact"
             ),
+            sim_repo_commit=os.environ.get("SIM_REPO_COMMIT", ""),
             watcher_shared_secret=os.environ.get("WATCHER_SHARED_SECRET", ""),
             slack_webhook_url=os.environ.get("SLACK_WEBHOOK_URL", ""),
             smtp_host=os.environ.get("SMTP_HOST", ""),
@@ -78,6 +85,11 @@ class Config:
     @property
     def devin_configured(self) -> bool:
         return bool(self.devin_api_key)
+
+    @property
+    def sim_pinned(self) -> bool:
+        """True once a commit is pinned — required to launch a verifiable session."""
+        return bool(self.sim_repo_commit)
 
     @property
     def slack_configured(self) -> bool:

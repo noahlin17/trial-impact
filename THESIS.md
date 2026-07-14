@@ -68,10 +68,14 @@ than as the product. The event trigger, the sandbox, the result contract, the
 reproducible-from-source guarantee and the (not yet built) backtest are meant to be
 independent of which model produces the numbers.
 
-That separation is currently aspirational rather than real. `docking_box` is specific to
-Vina, there is no `estimator` field recording which model produced a number, and
-`simulation.py` is a Vina-shaped module embedded in the prompt. Closing that gap is the
-first item in [Next steps](README.md#next-steps).
+That separation is now largely real. There is an explicit `Estimator` interface + registry
+(`app/estimators.py`), every result records the `estimator` that produced it, and the session
+**clones a pinned commit** rather than running a Vina-shaped module embedded in the prompt — so
+the harness no longer bakes in the model. What remains: `docking_box` is still a Vina-specific
+field on the shared contract, and the only estimators shipped are the docking pipeline and a
+deliberately naive **control** (a heavy-atom size proxy) — the point of assumptions 5–6 below.
+A real head-to-head against a *second physical* model, and the backtest that would make the
+comparison meaningful, are still ahead. The pinned commit buys reproducibility, not validity.
 
 The claim, then, is not that docking generates alpha. It is that this is a plausible
 substrate for finding out what might. That framing is also why the reproducibility work in
