@@ -16,6 +16,14 @@ validation, market microstructure and portfolio construction are drawn from publ
 literature and standard results, not from direct experience. Where I am reasoning from
 evidence, from first principles, or simply guessing, I have tried to say so.
 
+**Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
+The one falsifiable scientific claim this project actually tests — *does the docking score rank
+binding strength?* — was tested on 8 approved drugs with measured ChEMBL affinities and **rejected**:
+Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size, ρ ≈ +0.45), and a CPU MM-GBSA rescore did
+not improve on it (ρ = −0.24, still size-tracking). So the pipeline ships only a *geometric
+engagement* claim, and the negative result — reproducible via `make validate` — is the substantive
+finding.
+
 ---
 
 ## 1. The signal

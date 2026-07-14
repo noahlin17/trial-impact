@@ -1,29 +1,81 @@
 # Trial Impact
 
-An event-driven system that runs structure-based chemistry on **preclinical / Phase 1**
-clinical-trial events and produces a quantitative estimate of target engagement, rather than a
-categorical read on the result.
+**A structure-based drug–target *engagement* pipeline that stress-tested its own central premise —
+and re-scoped the claim when the premise failed.**
 
-The system is built around a single question — *does the molecule engage its target at a tolerated
-exposure?* — which is a preclinical / Phase 1 question by construction. When a trial event arrives,
-the service opens an isolated [Devin](https://devin.ai) session that performs protein–ligand docking
-(AutoDock Vina) and a PK/PD solve against the drug and its target. Docking is reported as
-**geometric target engagement** — did the molecule dock into the experimentally-resolved binding
-site with a reproducible multi-seed pose — **not** as a calibrated affinity: a Vina score is a
-relative, size-confounded ranking, not a Kd (see [issue #4](#known-issues)). Exposure (Cmax/AUC)
-comes from the PK solve. All of it is computed from the structure and the chemistry rather than
-from the sponsor's description of the result.
+Given a clinical-trial event, the service routes the drug and its target to the right experimental
+structure and binding pocket, docks the ligand (AutoDock Vina) into that pocket, and reports whether
+the molecule makes a **reproducible, geometrically sound engagement** — computed from the structure
+and the chemistry, not from the sponsor's description of the result. A closed-form PK/PD solve adds
+tissue exposure (Cmax/AUC).
 
-Because binding is a fixed molecular property that is largely resolved by the end of Phase 1, the
-actionable scope is **preclinical / Phase 1**; later-phase events are treated as educational
-illustrations (see [Trial phase](#trial-phase--the-preclinical--phase-1-scope)).
+What makes this more than "a pipeline that runs" is the validation below: the tempting claim — that a
+docking score measures *how strongly* a drug binds — was tested against measured affinities and
+**falsified**, twice, so the shipped claim is the narrower one the method can actually support.
+
+## Headline result — a docking score is not binding strength (and a physics rescore doesn't fix it)
+
+I tested the affinity premise on **8 approved drugs with real, measured affinities** (ChEMBL Ki/Kd,
+pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a CPU MM-GBSA:
+
+![Head-to-head: neither Vina nor single-snapshot MM-GBSA recovers measured affinity; both track ligand size](trial-impact-service/validation/results/headtohead.png)
+
+| predictor | Spearman ρ vs measured pKd | ρ vs ligand size |
+|---|---|---|
+| heavy atoms (size baseline) | −0.52 | — |
+| Vina −ΔG | **−0.24** | +0.45 |
+| MM-GBSA −ΔG | **−0.24** | +0.40 |
+
+- **The raw Vina score does not rank cross-target affinity** — it tracks ligand **size** (the biggest
+  molecules score "best" while being weaker binders).
+- **A physics-based MM-GBSA rescore does not rescue it** — same ρ, still size-confounded ([`validation/`](trial-impact-service/validation/README.md), reproduce with `make validate`).
+
+So the pipeline makes only the claim the method can back — **geometric target engagement** (did the
+molecule dock into the experimentally-resolved site with a reproducible multi-seed pose) — and
+deliberately **not** an absolute Kd, occupancy, or binding-strength number.
+
+**What it *can* claim** ✅ reproducible pocket routing (covalent-tether → co-crystal → fpocket → blind
+tiers, recorded in `docking_box.mode`); a reproducible docked pose; directional PK/PD exposure; and an
+auditable, self-falsifying validation of its own scoring.
+**What it *cannot* claim** ❌ absolute affinity / Kd; target occupancy; that docking ranks cross-target
+potency; or a validated market prediction — the market/stock layer further down is an **illustrative,
+un-backtested downstream demo**, not a result.
+
+The actionable scientific scope is **preclinical / Phase 1** (binding is a fixed molecular property
+largely resolved by then); later-phase events are educational illustrations (see
+[Trial phase](#trial-phase--the-preclinical--phase-1-scope)).
 
 > **Not investment advice.** Output is an automated research signal for informational
 > purposes only; a disclaimer is attached to each assessment.
 
 ---
 
-## Thesis
+## Demo — the dashboards
+
+Served locally from the two committed result artifacts (`results/sim_*.json`) into the real Flask
+app — no re-dock. Both surfaces report the honest claim only: a **relative ΔG score labelled "not a
+Kd"** and a **geometric engagement** classification — never an absolute affinity or occupancy.
+
+**`/status`** — one row per trial: docking ΔG (score), geometric engagement, and the (illustrative)
+price calls.
+
+![Status dashboard](docs/dashboard-status.png)
+
+**`/analysis`** — the corpus view: ΔG is labelled *relative, size-confounded, not an affinity*; the
+charts are engagement-count and PoS, not Kd/occupancy; occupancy is shown only when a calibrated Kd
+exists (the docking estimator reports none).
+
+![Analysis dashboard](docs/dashboard-analysis.png)
+
+---
+
+## Motivation & (unvalidated) market thesis
+
+> **Read this section as motivation, not as a result.** The market/stock layer is an
+> illustrative downstream demo: a rules-based engine on a small hand-curated watchlist, **not
+> backtested against realized price moves**. It exists to show what a validated engagement signal
+> *could* eventually feed; nothing here is a tradeable claim. The defensible, tested core of the
+> project is the biophysics validation above.
 
 A desk watching a readout receives a label: the endpoint was met, or it was not. That label is
 public within minutes and priced quickly, and it says little about whether the molecule should
