@@ -7,8 +7,11 @@ categorical read on the result.
 The system is built around a single question — *does the molecule engage its target at a tolerated
 exposure?* — which is a preclinical / Phase 1 question by construction. When a trial event arrives,
 the service opens an isolated [Devin](https://devin.ai) session that performs protein–ligand docking
-(AutoDock Vina) and a PK/PD solve against the drug and its target, and returns a binding affinity, an
-implied Kd and a derived target occupancy — computed from the structure and the chemistry rather than
+(AutoDock Vina) and a PK/PD solve against the drug and its target. Docking is reported as
+**geometric target engagement** — did the molecule dock into the experimentally-resolved binding
+site with a reproducible multi-seed pose — **not** as a calibrated affinity: a Vina score is a
+relative, size-confounded ranking, not a Kd (see [issue #4](#known-issues)). Exposure (Cmax/AUC)
+comes from the PK solve. All of it is computed from the structure and the chemistry rather than
 from the sponsor's description of the result.
 
 Because binding is a fixed molecular property that is largely resolved by the end of Phase 1, the
@@ -85,9 +88,11 @@ is tethered to its reactive cysteine, a reversible drug is boxed on a curated or
 co-crystal ligand, and only an un-routable target falls back to fpocket then a blind centroid box
 (the tier is recorded in `docking_box.mode`). The PK model is still generic (single-dose,
 one-compartment, no bioavailability term) and the market model is uncalibrated and rules-based.
-Occupancy applies a free-drug (`fu`) correction; combined with the new pocket ΔGs it implies
-ivacaftor barely engages its target (2.06%) — the docking scores an empirical, cognate,
-reversible-only ΔG, not a validated affinity. These caveats are set out in
+The docking ΔG is **not** turned into an absolute Kd or a Kd-derived occupancy any more: an
+8-anchor calibration through this exact pipeline found the raw Vina score does not rank measured
+affinity (r(−ΔG, affinity) ≈ −0.4) and instead tracks ligand size/contact area (r(−ΔG,
+heavy-atoms) ≈ +0.6), and ligand-efficiency normalization did not rescue it — so docking is
+reported only as *geometric engagement* (issue #4). These caveats are set out in
 [Known issues](#known-issues). The current numbers are not tradeable.
 
 The assumption most likely to be fatal is not "can we compute the chemistry," which works, but
@@ -130,8 +135,8 @@ ClinicalTrials.gov API v2 ──poll──▶  ctgov-watcher/            (gives 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                     trial-impact-service/  (Flask)                       │
 │  TRIGGER   verify signature → resolve tickers → create Devin session ────┼─▶ Devin session
-│  ORCHESTRATE  Devin runs docking + PK/PD in its sandbox ◀────────────────┼── real ΔG, Kd,
-│  RECONCILE /poll → parse SIM_RESULT_JSON → market model → alert          │   occupancy
+│  ORCHESTRATE  Devin runs docking + PK/PD in its sandbox ◀────────────────┼── ΔG (score),
+│  RECONCILE /poll → parse SIM_RESULT_JSON → market model → alert          │   engagement
 │  OBSERVE   /status → dashboard (stats, price calls, 3D structure viewer) │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -150,7 +155,8 @@ Each has its own README with full detail.
 The simulation is a real pipeline rather than a stub: fetch the target structure
 (UniProt → experimental PDB or mmCIF, else AlphaFold), fetch the ligand (PubChem → SMILES →
 RDKit 3D), dock with AutoDock Vina across a fixed seed set for a mean ΔG ± sd, then solve a
-PK/PD model in closed form (Bateman) for tissue exposure and free-drug target occupancy.
+PK/PD model in closed form (Bateman) for tissue exposure (Cmax/AUC). The docking ΔG is reported
+as a geometric engagement classification, not a calibrated affinity (issue #4).
 
 The workload is the reason a sandbox is used rather than a fixed container. It has to
 `pip install` a heavy and fragile scientific stack (RDKit, Meeko, OpenBabel, Vina), pull
@@ -185,15 +191,16 @@ and the rendered dashboards — open the `.html` files in a browser). Docking ru
 trial returns the same mean ΔG and sd. (Regenerated with `regen_artifacts.py` against the
 pinned stack; `run_real.py` runs the same pipeline in a live Devin session.)
 
-**Read the physics columns as the product and the model call as scaffolding.** ΔG / Kd /
-occupancy are the net-new data modality — the quantity a pricing model would eventually
-consume as a feature. The `Model call` column is the transparent rules-based placeholder
-described above; it shows that the pipeline runs end to end, and it is not a trade.
+**Read the physics columns as the product and the model call as scaffolding.** The docking ΔG
+(a *relative, size-confounded score*, not an affinity — issue #4), the resulting **geometric
+engagement** classification, and exposure (Cmax/AUC) are the net-new data modality a pricing model
+would eventually consume as features. The `Model call` column is the transparent rules-based
+placeholder described above; it shows that the pipeline runs end to end, and it is not a trade.
 
-| Trial | Target × Drug | Structure (route) | ΔG (kcal/mol) | Kd | Target occ. ‡ | Flags | Model call |
-|-------|---------------|-----------|---------------|----|-----------|-----|-----------|
-| Phase 1 — **in scope** | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | **−7.202 ± 0.187** | 8412 nM | 31.0% ‡ | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
-| Phase 3 — *educational only* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | −7.404 ± 0.007 † | 6061 nM | 2.06% ‡ | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
+| Trial | Target × Drug | Structure (route) | ΔG (score, kcal/mol) | Engagement ‡ | Flags | Model call |
+|-------|---------------|-----------|---------------|-----------|-----|-----------|
+| Phase 1 — **in scope** | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | **−7.202 ± 0.187** | experimental-site (reproducible pose) ‡ | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
+| Phase 3 — *educational only* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | −7.404 ± 0.007 † | experimental-site (reproducible pose) ‡ | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
 
 **Only the Phase 1 row is in the actionable scope** — this is the tier the system is built for. The
 Phase 3 CFTR × ivacaftor run is included purely as an *educational* illustration of the pipeline on a
@@ -202,8 +209,9 @@ well-characterized drug; it is not a tradeable signal. As set out in
 binding is a molecular property fixed from the start and largely established by end of Phase 1, so a
 Phase 2/3 event adds efficacy / statistical evidence the physics does not model.
 
-The *scoring* layer reproduces deterministically from the committed source: Kd, Cmax, free-drug
-occupancy and both PoS deltas fall out of the mean ΔG by fixed arithmetic. The mean ΔG itself,
+The *scoring* layer reproduces deterministically from the committed source: the engagement
+classification, Cmax, and both PoS deltas fall out of the mean ΔG and the resolved route by fixed
+arithmetic. The mean ΔG itself,
 however, depends on which structure the router resolves from **live** PDBe/RCSB at run time, which
 is not pinned point-in-time (issue #10) — so byte-identical reproduction holds only when the same
 structures resolve; an environment where the curated holo does not resolve routes differently and
@@ -217,18 +225,20 @@ rather than a blind central slab: KRAS is tethered to the switch-II Cys of **6OI
 boxed on the co-crystal ivacaftor (VX7) in **6O2P**, so these are pocket-correct scores, not the
 old slab artefacts.
 
-**‡ Two of these columns should be read with caution**; [Known issues](#known-issues) has the
-detail. Occupancy applies a free-drug correction — `occ` uses `C_free = fu·C` — so it is a
-target-engagement estimate rather than a total-drug upper bound; `fu` comes from a small curated
-plasma-protein-binding table (unknown drugs fall back to `fu = 1` with a warning). Combined with
-the new pocket ΔGs, ivacaftor (fu 0.01) comes back at **2.06%** and sotorasib (fu 0.11) at
-**31.0%**. Ivacaftor still sits in the market model's `occ < 30` band (occupancy modifier
-+0.15 → −0.10), yet the VRTX call stays `strong` (PoS delta +0.38) on the endpoint-met and
-confidence terms (issue #1 retired). The `druglikeness_flag` is ≥2 Lipinski violations — a
-drug-likeness / oral-absorption heuristic, **not** a toxicity model — so it is surfaced as
-information only and is **not priced** into the call (issue #3, fixed). It fires on sotorasib,
-an approved drug; with the former −0.15 "safety" penalty removed, the KRAS call rises to `strong`
-(PoS delta +0.45), while ivacaftor (one violation, unflagged) is unchanged.
+**‡ The ΔG and engagement columns should be read as *geometry, not strength*** — [Known
+issues](#known-issues) #4 has the detail. The **engagement** column is a geometric claim: the
+ligand docked into the *experimentally-resolved* binding site (a curated holo / covalent-tethered
+residue) with a reproducible multi-seed pose (ΔG sd ≤ 0.75). It is deliberately **not** a
+binding-strength or affinity claim, because the Vina score ranks by size/contact, not affinity
+(the 8-anchor calibration in [issue #4](#known-issues)). The ΔG is retained as a docking score;
+an absolute Kd and a Kd-derived occupancy are **no longer surfaced** (the uncalibrated exp(ΔG/RT)
+value is kept, clearly labelled, in `provenance.vina_pseudo_kd_nM` only). The market model prices
+only a small, capped geometric corroboration of a positive readout — no ΔG/Kd magnitude, no
+occupancy. The `druglikeness_flag` is ≥2 Lipinski violations — a drug-likeness / oral-absorption
+heuristic, **not** a toxicity model — so it is surfaced as information only and is **not priced**
+into the call (issue #3, fixed). It fires on sotorasib, an approved drug; with the former −0.15
+"safety" penalty removed, the KRAS call is `strong` (PoS delta +0.50), while ivacaftor (one
+violation, unflagged) is unchanged.
 
 The inputs are drug-specific rather than hardcoded: sotorasib's flags derive from its computed
 descriptors (MW 560.6, logP 5.30) and an RDKit substructure match on its acrylamide warhead,
@@ -252,9 +262,10 @@ documented as such.
 
 A **results-analysis view** (`GET /analysis`, exported to
 [`results/analysis_dashboard.html`](results/analysis_dashboard.html)) lets you
-inspect the whole corpus and learn from it: cross-run charts (ΔG/Kd/occupancy vs the
-market call), a sortable comparison table, and a per-run drill-down with the 3D
-docked structure, the reconstructed PK/PD exposure curve, and a step-by-step
+inspect the whole corpus and learn from it: cross-run charts (docking ΔG *score* vs the
+market call, and geometric-engagement counts), a sortable comparison table, and a per-run
+drill-down with the 3D docked structure, the reconstructed PK/PD exposure curve (occupancy is
+shown only when a calibrated Kd exists — the docking estimator reports none), and a step-by-step
 **reasoning trace** of how each probability-of-success delta was built.
 
 ---
@@ -300,9 +311,9 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 | Assumption | | Where it stands |
 |---|---|---|
 | **One-compartment Bateman model, closed form** | ◑ | `ka`/`Vd`/`CL` are fixed physiological placeholders and `Kp` is order-of-magnitude, so exposure is **directional, not drug-specific** — it will tell you a 960 mg dose achieves high exposure, not what sotorasib's real Cmax is. No bioavailability term either (`F` = 1), which flatters oral exposure. |
-| **Free-drug occupancy** | ✅ | `occ = C_free/(C_free + Kd)` with `C_free = fu·C` — only *unbound* drug engages a target. `fu` comes from a small curated plasma-protein-binding table (`provenance.fu_source`); an unknown drug falls back to `fu = 1` **with a warning**, reproducing the old total-drug upper bound rather than pretending 1.0 is measured. With the new pocket ΔGs, ivacaftor (fu 0.01) is **2.06%**, sotorasib (fu 0.11) **31.0%**. Exposure (Cmax, AUC) still uses total concentration. Retires [issue #1](#known-issues). Caveat: the `fu` table is small and does not fix the generic PK model. |
-| **Single dose, peak occupancy** | ○ | No steady-state accumulation; occupancy is the peak of a single-dose curve, and AUC is AUC(0–48h), not AUC(0–∞). Most of these drugs are dosed chronically. |
-| **Kd from an empirical docking score** | ○ | `Kd = exp(ΔG/RT)` treats Vina's empirical score as a rigorous free energy, at body temperature (310.15 K) rather than the 298.15 K its calibration assumes. The Kd inherits every approximation in the ΔG and then gets compared against absolute thresholds — see [issue #4](#known-issues). |
+| **Target occupancy** | ○ | **No longer reported by the docking estimator.** Occupancy is `C_free/(C_free + Kd)`, which depends entirely on a Kd the Vina score cannot support (issue #4). The free-drug (`fu`) machinery and its curated table remain in `run_pkpd` for any estimator that *does* supply a real Kd, but the docking path leaves occupancy `None`. Exposure (Cmax, AUC) is Kd-independent and is retained. |
+| **Single dose, exposure only** | ○ | No steady-state accumulation; Cmax is the peak of a single-dose curve and AUC is AUC(0–48h), not AUC(0–∞). Most of these drugs are dosed chronically. |
+| **Kd from an empirical docking score** | ○ | **Removed as a headline.** `Kd = exp(ΔG/RT)` treated Vina's empirical score as a rigorous free energy (and at 310.15 K where its calibration assumes 298.15 K). An 8-anchor calibration showed the raw score does not rank affinity at all (issue #4), so the docking estimator no longer surfaces a Kd; the uncalibrated value survives only as a clearly-labelled `provenance.vina_pseudo_kd_nM`, never priced. |
 
 Genuine per-drug pharmacology needs enrichment overrides (`fu`, `Vd`, `CL` per drug — the
 same mechanism as `endpoint_outcome`) or a structure→PK model.
@@ -340,10 +351,11 @@ Both published runs now sit inside the routed universe — sotorasib via the cov
 tier, CFTR via a curated holo — rather than partly outside it as before.
 
 The *pharmacology* half is weaker still, and I would not defend it as more than
-directional: occupancy now carries a free-drug (`fu`) correction, but with generic PK constants
-and no bioavailability term the exposure numbers remain order-of-magnitude scene-setting, not
-predictions — and the `fu` table covers only a handful of drugs. The ΔG is the number worth
-arguing about; the occupancy is better-founded than before but still rests on the crude Kd.
+directional: with generic PK constants and no bioavailability term the exposure numbers remain
+order-of-magnitude scene-setting, not predictions. Target occupancy is no longer reported at all
+from docking, because it rested on a Kd the Vina score cannot support (issue #4); what the docking
+half now claims is only *geometric engagement* — the molecule docked into the resolved site with a
+reproducible pose — which is a claim the method can actually back.
 
 ---
 
@@ -453,7 +465,7 @@ runs are head-to-head-able (`compare_estimators.py`, `/analysis`). The shipped s
 is a deliberately naive *control*, not a rival model, and pinning buys reproducibility, not
 validity — so the science in step 2 still stands, and a real second estimator (co-folding / FEP /
 QSAR) remains future work. Selection is caller-driven: a request either names an estimator or
-takes the fixed default (`vina-docking-pkpd@2`), and a head-to-head is opt-in — nothing fans out
+takes the fixed default (`vina-docking-pkpd@3`), and a head-to-head is opt-in — nothing fans out
 across estimators by default. **Automatic best-fit routing** (pick per trial — e.g. structure-based
 docking when a target structure resolves, fall back to the structure-free baseline otherwise) is
 deferred; until it lands the default is Vina.
@@ -466,8 +478,10 @@ mean ± sd, native mmCIF, pocket-aware routing, covalent tethering, and conda-lo
   switch-II Cys; CFTR boxes 6O2P's ivacaftor site — no more blind central slab. *Remaining:* cognate
   circularity, fpocket being geometric-not-biological, and the surviving blind Tier-D fallback (see
   [issue #2](#known-issues)).
-- **A free-drug (`fu`) term** ✅ occupancy now uses `occ = C_free/(C_free + Kd)` with `C_free = fu·C`
-  from a curated table (unknown → `fu = 1` with a warning). Retires issue #1.
+- **A free-drug (`fu`) term** ✅ the free-drug occupancy machinery (`occ = C_free/(C_free + Kd)`,
+  `C_free = fu·C`, curated `fu` table) landed in #3 and retired issue #1. It is now dormant for the
+  docking estimator, because #4's calibration showed the Vina-derived Kd it consumed is not a real
+  affinity; it remains available for any future estimator that produces a calibrated Kd.
 - **Covalent scoring** ◑ flagged Michael-acceptor warheads against a curated covalent class
   (KRAS G12C, EGFR, BTK) are Meeko-tethered to the geometrically-detected reactive cysteine and
   docked in a residue box. Vina still scores reversibly (no bond enthalpy), so it is a pocket-correct
@@ -486,8 +500,10 @@ genetic-association score for the target–indication pair — genetically-suppo
 at roughly twice the rate, making it the strongest known public predictor of clinical success,
 and a stronger one than anything docking produces. Add clinical precedent and trial-design
 quality (endpoint, powering, biomarker enrichment). Then build the **retrospective panel of
-known winners and losers** and make the chemistry clear it — *the current build fails that panel,
-predicting that ivacaftor does not engage its target.*
+known winners and losers** and make the chemistry clear it — but note the anchor experiment
+(issue #4) shows the current docking layer contributes only *geometric engagement*, not an
+affinity/strength signal, so the panel is where a rescoring estimator (gnina/MM-GBSA) would have
+to prove it adds incremental IC over the genetics-plus-base-rate baseline.
 
 **4 · Build the corpus — point-in-time, with honest labels**
 Accumulate `(trial design, physics, genetics, outcome, realized move)` per trial, backfilled over
@@ -563,21 +579,73 @@ are one invariant applied, and belong in the design from the outset rather than 
 the **preclinical / Phase 1 scope** (the physics answers a Phase 1 question, so it is not consumed
 as a Phase 2/3 efficacy claim — see [Trial phase](#trial-phase--the-preclinical--phase-1-scope));
 the **no-call gate** (a ΔG is an *input* to a probability, so a trial with no clinical readout
-yields no directional call — [THESIS §3.1](THESIS.md)); the **free-drug occupancy** correction
-(total drug is not engaged drug, #1); the **estimator/harness split** (Vina is one
-implementation, not "the model"); and the **drug-likeness flag** (a Ro5 oral-absorption heuristic,
-so it is information, never a priced safety event — #3). The open row below — #4 (relative score
-read as absolute Kd) — is where the invariant is *still* violated; that is what makes it a defect
-to fix rather than an acceptable simplification. #3 (drug-likeness read as toxicity) was the same
-defect and is now fixed: the flag is renamed `druglikeness_flag` and priced at zero.
+yields no directional call — [THESIS §3.1](THESIS.md)); the **estimator/harness split** (Vina is
+one implementation, not "the model"); and the **drug-likeness flag** (a Ro5 oral-absorption
+heuristic, so it is information, never a priced safety event — #3). #4 (relative score read as
+absolute Kd) was the last open violation of this invariant; it is now **resolved by re-scoping the
+docking claim** rather than by calibrating the number — see the anchor experiment below.
+
+**Issue #4, and why docking is now only a geometric claim.** #4 began as "ΔG is documented as
+*relative* but consumed as *absolute* Kd." The plan was to keep Vina's *ranking* and demote only
+its *magnitude* to a calibrated relative band. To validate that, 8 potent approved reversible
+binders with clean ChEMBL Ki/Kd (kinase hinge binders across ABL1/EGFR/VEGFR2 + FXa/rivaroxaban,
+pKd 7.4–10.1) were docked **through this exact pipeline**. The result **falsified the ranking
+premise across diverse ligands**:
+
+- `r(−ΔG, measured affinity) ≈ −0.39` — no usable affinity signal (if anything, the wrong sign);
+- `r(−ΔG, heavy-atom count) ≈ +0.64` — the score tracks **ligand size / contact area**, not affinity;
+- `r(ligand-efficiency, affinity) ≈ +0.05` — size-normalizing the score does **not** rescue it.
+  (nilotinib docks *strongest* at −13.6 yet is one of the *weakest* anchors at 14.5 nM — because it
+  is large, not because it binds tightly.)
+
+Two independent faults were separated in the process: (a) the post-SIM transform `Kd = exp(ΔG/RT)`
+is invalid for a relative score, but `exp()` is *monotonic* and so preserves whatever ranking ΔG
+carries — fixing it cannot inject affinity information; (b) the **docking/scoring layer itself**
+is the primary cause — Vina's score is dominated by vdW contact, is not calibrated across
+different pockets, and its resolution is coarser than our anchor set's ~2.7-log affinity spread.
+No downstream transform can recover affinity information that is absent from the score. A
+cross-target "relative binding-strength band" built on this score would therefore be
+**size-in-disguise**, not affinity — the same overclaim in new clothes — so **it is not shipped.**
+
+The resolution (this PR) demotes the docking claim to what the method can defend:
+- the raw ΔG is retained as a clearly-labelled **relative docking score** (not an affinity);
+- **no absolute Kd** and **no Kd-derived occupancy** are surfaced by the docking estimator (both are
+  `None`); the uncalibrated `exp(ΔG/RT)` value is kept only in `provenance.vina_pseudo_kd_nM` with
+  an explicit "NOT an affinity (issue #4)" note;
+- docking is reported as a **geometric `binding_engagement` classification** — `experimental-site`
+  (docked into an experimentally-resolved site with a reproducible multi-seed pose, sd ≤ 0.75) /
+  `experimental-site-noisy` / `predicted-pocket` (fpocket) / `no-site` (blind) / `no-structure`
+  (structure-free baseline) / `failed`;
+- multi-seed sd is used as **reproducibility/quality** evidence, not affinity uncertainty;
+- the **market model** removes the docking-derived affinity and occupancy pricing terms entirely.
+  It now applies only a small, capped (**+0.05**) geometric corroboration for an `experimental-site`
+  engagement, and only to a *positive* clinical readout — docking can never rescue a missed
+  endpoint, and the no-call gate still holds when there is no readout;
+- the estimator IDs bump so old and new results stay comparable in the corpus:
+  `vina-docking-pkpd@2 → @3`, `ligand-efficiency-baseline@1 → @2`.
+
+**Future scoring — how the *strength* signal could come back (documented, not built).** The
+limitation is fundamental to all fast docking scoring functions (Glide/GOLD/AutoDock4 share it), so
+swapping the docking *engine* would not fix it — the fix is a different *class* of scorer layered on
+the reusable Vina pose/routing/pocket/covalent/provenance infra:
+- **gnina CNN rescoring** (open source, ~drop-in on Vina/smina poses) — best accuracy-per-effort;
+  the natural first `gnina-rescore@1` estimator to run head-to-head against `vina-docking-pkpd`;
+- **MM-GBSA** (AmberTools/OpenMM implicit-solvent single-point) — more physics, heavier, slower;
+- **FEP/TI** — gold standard for *relative* affinity but only within a congeneric series on one
+  target, and too expensive per pair for a broad event-driven pipeline.
+No fake/unimplemented estimator is added now; the `Estimator` interface exists so a real one slots
+in when built.
+
+#3 (drug-likeness read as toxicity) was the same species of defect and is now fixed: the flag is
+renamed `druglikeness_flag` and priced at zero.
 
 **Status:** ○ open · ◑ mitigated, not fixed · ✅ fixed
 
 | # | Issue | Impact | |
 |---|---|---|---|
 | 2 | **Docking box is now pocket-routed, with residual caveats** — `select_binding_site` boxes the covalent reactive Cys / curated or discovered co-crystal ligand / fpocket / blind, in that order (`docking_box.mode`). Both published runs now box the real pocket (KRAS 6OIM switch-II, CFTR 6O2P/VX7) | The blind-slab problem is fixed for routed targets. **Remaining:** cognate/holo redocking is partly circular; fpocket is geometric (its top 6O2P pocket was ~79 Å off the real site); and the **Tier-D blind box still fires** for any target with no co-crystal and no fpocket | ◑ |
-| 3 | **Drug-likeness flag no longer priced as safety** — the ≥2-Lipinski-violation flag (predicts *oral absorption*, not toxicity) is renamed `druglikeness_flag` and surfaced as informational provenance only | **Fixed:** the −0.15 "safety" penalty is removed from `pos_breakdown`; the flag still fires on sotorasib but no longer moves the PoS delta or the call (KRAS rises to `strong`, +0.45) | ✅ |
-| 4 | **ΔG is documented as *relative* but consumed as *absolute*** — converted to `Kd = exp(ΔG/RT)` and branched on hard cutoffs (`Kd ≤ 100 nM`, `ΔG ≤ −9.0`) | The code and the docs disagree about what the number *is*. The conversion also uses 310.15 K where Vina's calibration assumes 298.15 K, making every Kd **~1.75× looser** | ○ |
+| 3 | **Drug-likeness flag no longer priced as safety** — the ≥2-Lipinski-violation flag (predicts *oral absorption*, not toxicity) is renamed `druglikeness_flag` and surfaced as informational provenance only | **Fixed:** the −0.15 "safety" penalty is removed from `pos_breakdown`; the flag still fires on sotorasib but no longer moves the PoS delta or the call (KRAS is `strong`, +0.50 — of which +0.05 is the geometric-engagement corroborator, not the flag) | ✅ |
+| 4 | **ΔG was consumed as an absolute Kd — resolved by re-scoping docking to geometric engagement** | **Fixed (this PR).** An 8-anchor calibration proved the raw Vina score does not rank measured affinity (it tracks ligand size, not Kd — detail above), so no absolute Kd, no Kd-derived occupancy, and no relative binding-strength band are shipped. Docking now reports only a geometric `binding_engagement` classification; the market model drops the affinity/occupancy pricing terms and keeps only a capped +0.05 geometric corroboration of a positive readout. Estimators bump to `vina-docking-pkpd@3` / `ligand-efficiency-baseline@2`. **Residual (scope, not defect):** Vina cannot supply an affinity/strength signal at all — recovering one needs a different *class* of scorer (gnina CNN / MM-GBSA / FEP), documented as future work above | ✅ |
 | 7 | **Sponsor→ticker resolution is a hand-maintained 6-entry file** with hardcoded competitors | Real resolution is **entity resolution** (messy sponsor strings, listed parents, private/pre-IPO sponsors with no ticker and therefore no trade). **The system runs on a watchlist, not a universe** — the scaling claim is not yet earned | ○ |
 | 8 | **Webhook signature verification now fails closed** — an unset `WATCHER_SHARED_SECRET` makes `/webhook/trial-update` reject *every* request (`503`) | **Fixed:** the endpoint requires the secret, so an unset secret can no longer accept unsigned callers or spend a Devin session; startup still warns loudly that the endpoint is dark | ✅ |
 | 9 | **The blind fallback box now spans only docked atoms** — `compute_docking_box` (Tier-D only) computes the centroid box over `ATOM` records, matching the `ATOM`-only receptor prep (was `ATOM`+`HETATM`, so it stretched onto waters/ions/co-crystal ligands that are stripped before docking) | **Fixed:** the last-resort blind box no longer parks on undocked hetero atoms. The pocket-aware tiers box the ligand/residue directly and are unaffected; no published artifact uses the blind tier, so no numbers changed | ✅ |
@@ -592,18 +660,23 @@ and estimator entangled) are resolved in [#2](https://github.com/noahlin17/trial
 the session now clones a pinned commit and Vina is one estimator behind an interface. **#1**
 (total-drug occupancy) and **#11** (single-seed over-precision) are resolved in
 [#3](https://github.com/noahlin17/trial-impact/pull/3), with native **mmCIF** support (gemmi).
-This PR then adds **pocket-aware routing** (`app/binding_site.py`: covalent-tethered → curated /
-discovered co-crystal → fpocket → blind), **covalent tethering** for curated covalent classes
-(reversible-scored lower bound), and **conda-lock** as the canonical sim environment — so #2 drops
-from a blind-slab defect to the routed-with-caveats state above, and the corrected CFTR pin (6O2P,
-not the mis-labelled 9MXL) fixes the structure too. A later iteration additionally fixes **#3**
-(the drug-likeness heuristic priced as toxicity — now the informational `druglikeness_flag`, never
-a PoS penalty) and **#8** (webhook fail-open → fail-closed on an unset secret). The design lives under
+[#4](https://github.com/noahlin17/trial-impact/pull/4) added **pocket-aware routing**
+(`app/binding_site.py`: covalent-tethered → curated / discovered co-crystal → fpocket → blind),
+**covalent tethering** for curated covalent classes (reversible-scored lower bound), and
+**conda-lock** as the canonical sim environment — so #2 dropped from a blind-slab defect to the
+routed-with-caveats state above, and the corrected CFTR pin (6O2P, not the mis-labelled 9MXL)
+fixed the structure too. [#6](https://github.com/noahlin17/trial-impact/pull/6) framed the
+preclinical / Phase 1 founding scope and fixed **#3** (the drug-likeness heuristic priced as
+toxicity — now the informational `druglikeness_flag`, never a PoS penalty) and **#8** (webhook
+fail-open → fail-closed on an unset secret). **This PR** then resolves **#4** by re-scoping docking
+to geometric engagement (the anchor experiment above): no absolute Kd, no Kd-derived occupancy, no
+strength band; estimators at `@3` / `@2`. The design lives under
 [Estimators](trial-impact-service/README.md#estimators-one-interface-many-models-vina-is-not-the-architecture)
 and [Limitations](trial-impact-service/README.md#limitations--modeling-caveats); the residual
-caveats (control ≠ validated model, reproducibility ≠ validity, seed sd measures sampling noise
-only, the `fu` table is small, cognate docking is circular, covalent ΔG is a reversible lower
-bound, fpocket is geometric, the blind Tier-D box survives) are in Limitations.
+caveats (control ≠ validated model, reproducibility ≠ validity, seed sd measures sampling/quality
+noise only, cognate docking is circular, covalent ΔG is a reversible lower bound, fpocket is
+geometric, the blind Tier-D box survives, and docking is now a geometric-engagement claim with no
+affinity/occupancy signal until a rescoring estimator lands) are in Limitations.
 
 **Fixed earlier, kept on the record:** the AlphaFold fallback URL was stale and *every*
 fallback 404'd; Vina ran with `seed=0`, which it reads as *random*, so repeat runs drifted; a

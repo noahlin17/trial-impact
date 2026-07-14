@@ -2,7 +2,9 @@
 
 Artifacts from two **real** runs of the committed pipeline — a real structure fetch, a
 real AutoDock Vina docking run (**three seeds**, reported as mean ± sd) into a
-**pocket-routed** box, a real PK/PD solve with a **free-drug** occupancy correction. The
+**pocket-routed** box, a real PK/PD solve for exposure (Cmax/AUC). Docking is reported as a
+**geometric engagement** classification, not a calibrated affinity — the raw Vina score is a
+relative, size-confounded ranking, not a Kd ([issue #4](../README.md#known-issues)). The
 `.json` files are the exact records the service stored; open the `.html` files in a
 browser for the interactive 3D structure, the PK/PD curve, and the price calls.
 
@@ -29,25 +31,27 @@ and what it caught.)
 > (0.6.0 was withdrawn from PyPI). This is expected toolchain + methodology drift, not a
 > code patch — `code_patched` is `false`.
 
-> **Estimator attribution.** These are the default docking pipeline, `vina-docking-pkpd@2`
-> (bumped from `@1` because the routed box changes the ΔG numbers; stamped onto every
-> result). The head-to-head against the `ligand-efficiency-baseline@1` **control** is not
-> shown here — the baseline is a naive floor to beat, not a second opinion, and running it
-> does not re-validate these numbers. See "Estimators" in the service README.
+> **Estimator attribution.** These are the default docking pipeline, `vina-docking-pkpd@3`
+> (bumped from `@2` because #4 changed the result semantics — no Kd, no Kd-derived occupancy,
+> a new `binding_engagement` classification; stamped onto every result). The head-to-head
+> against the `ligand-efficiency-baseline@2` **control** is not shown here — the baseline is a
+> naive floor to beat, not a second opinion, and running it does not re-validate these numbers.
+> See "Estimators" in the service README.
 
 | File | Trial | Result |
 |------|-------|--------|
-| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, **Phase 1 (in scope)**, endpoint met | ΔG **−7.202 ± 0.187** kcal/mol (n=3), Kd 8412.3 nM, **free-drug** occupancy 31.0% (fu 0.11), drug-likeness flagged ‡ (informational, not priced), **covalent** (acrylamide warhead). Route **covalent-tethered** to Cys A:12 of curated holo **6OIM** (confidence 0.806). PoS **+0.45** → AMGN up/strong · REGN, NVS down/moderate. |
-| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, **Phase 3 (educational only)**, endpoint met | ΔG −7.404 ± 0.007 kcal/mol † (n=3), Kd 6061.5 nM, **free-drug** occupancy **2.06%** (fu 0.01), clean, not covalent. Route **holo-ligand** boxed on co-crystal **VX7** in curated **6O2P** (confidence 0.897). PoS **+0.38** → VRTX up/strong · CRSP, BLUE down. Included to illustrate the pipeline on a well-characterized drug — a Phase 3 event is **outside the actionable preclinical / Phase 1 scope** (see root README). |
+| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, **Phase 1 (in scope)**, endpoint met | ΔG **−7.202 ± 0.187** kcal/mol (n=3) — a *relative docking score, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), drug-likeness flagged (informational, not priced), **covalent** (acrylamide warhead). Route **covalent-tethered** to Cys A:12 of curated holo **6OIM** (confidence 0.806). PoS **+0.50** → AMGN up/strong · REGN, NVS down/moderate. |
+| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, **Phase 3 (educational only)**, endpoint met | ΔG −7.404 ± 0.007 kcal/mol † (n=3) — a *relative docking score, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), clean, not covalent. Route **holo-ligand** boxed on co-crystal **VX7** in curated **6O2P** (confidence 0.897). PoS **+0.52** → VRTX up/strong · CRSP, BLUE down. Included to illustrate the pipeline on a well-characterized drug — a Phase 3 event is **outside the actionable preclinical / Phase 1 scope** (see root README). |
 | `dashboard_kras_6OIM.html` | ″ | Rendered `/status` with the 3D viewer; docking ΔG shown as mean ± sd. |
 | `dashboard_cftr_6O2P.html` | ″ | Rendered `/status`; the 6O2P cryo-EM structure rendered from RCSB. |
 | `analysis_dashboard.html` | both | Rendered `/analysis`: physics→price scatter, an estimator head-to-head (empty here — single-estimator corpus), sortable table (ΔG columns carry ± sd), and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). Open it and click a row. |
 
 Each JSON holds the trial event, the resolved sponsor/competitor tickers, the full
-`sim_result` (binding with per-seed replicates and sd, exposure, free-drug occupancy,
-druglikeness/covalent flags, **docking box with routing `mode` + provenance**, provenance: UniProt /
-PDB id / **structure format** / SMILES / descriptors / **fu + source** / **vina seeds**),
-and the market model's `price_calls` + `commentary`.
+`sim_result` (docking ΔG with per-seed replicates and sd, the geometric `binding_engagement`
+classification, exposure, druglikeness/covalent flags, **docking box with routing `mode` +
+provenance**, provenance: UniProt / PDB id / **structure format** / SMILES / descriptors /
+**vina seeds** / a clearly-labelled uncalibrated `vina_pseudo_kd_nM`), and the market model's
+`price_calls` + `commentary`. `kd_nM` and `target_occupancy_pct` are `null` (issue #4).
 
 ## The docking box is now routed to the pocket
 
@@ -74,30 +78,33 @@ still fires for any target with no co-crystal and no fpocket. This is
 
 `run_vina` docks across a **deterministic seed set** (42, 43, 44) and the result carries
 `binding_affinity_kcal_mol` (mean ΔG), `binding_affinity_sd_kcal_mol` (sample sd), and
-`replicates` (n). Kd is derived from the **mean** ΔG (`Kd = exp(mean(ΔG)/RT)`), and the
-sd feeds a small confidence penalty. This retires the old "reported precision exceeds real
-precision" gap: a single draw hid the seed-to-seed spread. The spread here is small
-(0.187 / 0.007 kcal/mol) — but that measures **sampling noise only**, not model bias, box
-placement, or scoring-function error, which dominate and are not captured by re-seeding.
-Cost scales linearly with seed count (3× the docking time).
+`replicates` (n). No absolute Kd is derived from the ΔG any more (issue #4); the sd feeds a
+small confidence penalty **and** gates the engagement classification — an experimentally-resolved
+site with sd ≤ 0.75 kcal/mol is `experimental-site` (a *reproducible* pose), a larger spread is
+`experimental-site-noisy`. This retires the old "reported precision exceeds real precision" gap:
+a single draw hid the seed-to-seed spread. The spread here is small (0.187 / 0.007 kcal/mol) — but
+that measures **sampling/reproducibility noise only**, not model bias, box placement, or
+scoring-function error, which dominate and are not captured by re-seeding. Cost scales linearly
+with seed count (3× the docking time).
 
-## ‡ How to read the occupancy and drug-likeness columns
+## ‡ How to read the ΔG / engagement and drug-likeness columns
 
-**Occupancy is a free-drug engagement estimate, not a total-drug upper bound.** Only
-**unbound** drug engages a target, so occupancy is evaluated on the free concentration,
-`occ = C_free/(C_free + Kd)` with `C_free = fu · C_total`. The fraction-unbound `fu` comes
-from a small curated plasma-protein-binding table (source recorded in
-`provenance.fu_source`); an unknown drug falls back to `fu = 1.0` **with a warning**, which
-reproduces the old total-drug upper bound rather than silently pretending 1.0 is measured.
-Exposure metrics (Cmax, AUC) still use total concentration — they are total-drug quantities.
+**The ΔG is a relative docking *score*, not an affinity, and no Kd or occupancy is derived from
+it.** An 8-anchor calibration through this exact pipeline ([issue #4](../README.md#known-issues))
+showed the raw Vina score does not rank measured affinity (r(−ΔG, affinity) ≈ −0.4) and instead
+tracks ligand size/contact area (r(−ΔG, heavy-atoms) ≈ +0.6). So the docking result is demoted to
+a **geometric `binding_engagement`** claim: `experimental-site` means the ligand docked into an
+*experimentally-resolved* site (a curated holo / covalent-tethered residue) with a *reproducible*
+multi-seed pose (sd ≤ 0.75). Both runs above are `experimental-site`. `kd_nM` and
+`target_occupancy_pct` are `null`; the uncalibrated `exp(ΔG/RT)` value survives only as a
+clearly-labelled `provenance.vina_pseudo_kd_nM` (never priced). Exposure (Cmax, AUC) is
+Kd-independent and is retained.
 
-- **Ivacaftor is >99% plasma-protein-bound** (fu 0.01): combined with the pocket-resolved
-  Kd (6061 nM) its occupancy is **2.06%**, in the market model's `occ < 30` band
-  (occupancy modifier −0.10). The VRTX call still comes back `strong` (+0.38) on the
-  endpoint-met and confidence (0.897) terms.
-- **Sotorasib is ~89% bound** (fu 0.11): occupancy **31.0%** (Kd 8412 nM). The AMGN call is
-  `up / strong` (+0.45) — it rose from `moderate`/+0.32 once the drug-likeness flag stopped
-  being charged as a −0.15 safety penalty (issue #3).
+The **market model** prices only a small, capped (+0.05) geometric corroboration for an
+`experimental-site` engagement, and only on a *positive* clinical readout — it never prices ΔG/Kd
+magnitude or occupancy, and engagement can never rescue a missed endpoint or manufacture a call
+when there is no readout. The free-drug (`fu`) occupancy machinery remains in `run_pkpd` for any
+future estimator that supplies a real Kd, but the docking path leaves occupancy `None`.
 
 **The `druglikeness_flag` is a Lipinski drug-likeness heuristic, not a toxicity model, and is
 no longer priced** — ≥2 Ro5 violations, which predicts oral absorption, not safety. It fires on
@@ -105,10 +112,6 @@ sotorasib because sotorasib is a big lipophilic oncology molecule; sotorasib is 
 drug — so charging it as a safety event was a category error. The −0.15 penalty is **removed**;
 the flag (renamed from `tox_flag`) is surfaced as informational provenance only and contributes
 `0.0` to the PoS delta. This is [issue #3](../README.md#known-issues), **fixed**.
-
-The drug-likeness heuristic is now informational, and the crude PK is documented rather than
-patched; the free-drug correction fixes occupancy specifically, not the generic PK model
-(single-dose, one-compartment, F≈1, generic ADME constants), which remains a placeholder.
 
 ## † How to read the two ΔGs (pocket-resolved, but cognate and reversible-scored)
 

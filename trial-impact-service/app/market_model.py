@@ -59,11 +59,14 @@ def resolve_tickers(sponsor: str, tickers_map: dict[str, dict[str, Any]]) -> dic
 def pos_delta(event: dict[str, Any], sim: dict[str, Any] | None) -> float:
     """Probability-of-success delta in [-1, 1] from the readout + physics.
 
-    The clinical readout dominates; the simulation corroborates or tempers it
-    (strong target engagement + high occupancy strengthen a win; weak binding
-    discounts it). The whole signal is scaled by the simulation's confidence when
-    physics is available. The drug-likeness flag is informational and is *not* priced
-    (it predicts oral absorption, not safety — see ``run_simulation``).
+    The clinical readout dominates; the simulation only *corroborates* it. Docking is a
+    **geometric engagement** check, not a binding-strength signal — the Vina score
+    ranks by size/contact, not affinity (issue #4) — so no ΔG/Kd magnitude or occupancy
+    is priced. A run that docks the molecule into the experimentally-resolved target
+    site with a reproducible pose adds a small, capped corroboration to a positive
+    readout; nothing else moves the call. The signal is scaled by the simulation's
+    confidence. The drug-likeness flag is informational and is *not* priced (it predicts
+    oral absorption, not safety — see ``run_simulation``).
     """
     return pos_breakdown(event, sim)["final"]
 
@@ -71,11 +74,13 @@ def pos_delta(event: dict[str, Any], sim: dict[str, Any] | None) -> float:
 def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str, Any]:
     """Decompose the PoS delta into its contributions (the reasoning trace).
 
-    Returns the ordered pieces that make up ``pos_delta`` — clinical base, binding,
-    occupancy, and the confidence scaling — plus a ``components`` list for display.
+    Returns the ordered pieces that make up ``pos_delta`` — clinical base, geometric
+    engagement, and the confidence scaling — plus a ``components`` list for display.
     ``pos_delta`` is exactly ``breakdown["final"]``, so the headline number and the
     trace shown on the analysis dashboard can never disagree. The drug-likeness flag
-    is carried for display but contributes 0.0 — it is not a priced term.
+    is carried for display but contributes 0.0 — it is not a priced term. Binding is
+    represented by a single geometric ``engagement_modifier`` (issue #4): there is no
+    separate binding-strength or occupancy term any more.
     """
     outcome = (event.get("endpoint_outcome") or "unknown").lower()
     base = {"met": 0.5, "missed": -0.5}.get(outcome, 0.0)
@@ -87,8 +92,7 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
             "outcome": outcome,
             "sim_available": False,
             "outcome_base": base,
-            "binding_modifier": 0.0,
-            "occupancy_modifier": 0.0,
+            "engagement_modifier": 0.0,
             "druglikeness_flag": False,
             "subtotal": base,
             "confidence_scale": 0.6,
@@ -99,30 +103,22 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
             ],
         }
 
-    kd = sim.get("kd_nM")
-    dg = sim.get("binding_affinity_kcal_mol")
+    engagement = sim.get("binding_engagement")
 
-    binding_raw = 0.0
-    if dg is not None:
-        if dg <= -9.0 or (kd is not None and kd <= 100):
-            binding_raw = 0.20  # potent binder corroborates efficacy
-        elif dg > -6.0:
-            binding_raw = -0.10  # weak binding undercuts the story
-
-    occ = sim.get("target_occupancy_pct")
-    occ_raw = 0.0
-    if occ is not None:
-        if occ >= 70:
-            occ_raw = 0.15
-        elif occ < 30:
-            occ_raw = -0.10
+    # Docking is a GEOMETRIC engagement corroborator, not a binding-strength signal.
+    # The Vina score ranks by ligand size/contact area, not affinity (issue #4: an
+    # 8-anchor calibration found r(−ΔG, affinity)≈−0.4 vs r(−ΔG, size)≈+0.6), so a
+    # ΔG/Kd magnitude and a Kd-derived occupancy are NOT priced. The only thing docking
+    # can honestly add is confirming the molecule docks into the experimentally-resolved
+    # target site with a reproducible pose — a small, capped corroboration of a win.
+    engagement_raw = 0.05 if engagement == "experimental-site" else 0.0
 
     druglike = bool(sim.get("druglikeness_flag"))
 
     # Apply modifiers by *meaning*, not by mirroring the readout sign.
-    #   - Efficacy corroboration (binding, occupancy) only strengthens a WIN;
-    #     molecular potency doesn't rescue a missed clinical endpoint, so it is
-    #     dropped for a miss. The met path is therefore byte-identical to before.
+    #   - Geometric engagement corroboration only strengthens a WIN; docking into the
+    #     right pocket doesn't rescue a missed clinical endpoint, so it is dropped for a
+    #     miss. It is also small and capped (issue #4): docking cannot claim strength.
     #   - The drug-likeness flag (≥2 Lipinski violations) is *not priced*: it predicts
     #     oral absorption, not toxicity, and fires on approved drugs (sotorasib). It was
     #     previously charged -0.15 as if a safety finding had occurred; that conflated a
@@ -134,9 +130,8 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
     # declines to call — the no-call gate falls out of the design, it is not a patch.
     is_win = base > 0
     has_readout = outcome in ("met", "missed")
-    binding = binding_raw if is_win else 0.0
-    occupancy = occ_raw if is_win else 0.0
-    subtotal = base + binding + occupancy
+    engagement_mod = engagement_raw if is_win else 0.0
+    subtotal = base + engagement_mod
 
     confidence = sim.get("confidence") or 0.7
     scale = 0.5 + 0.5 * confidence
@@ -145,8 +140,8 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
     if has_readout:
         components = [
             {"label": f"Endpoint {outcome}", "value": round(base, 3)},
-            {"label": "Binding (ΔG / Kd)", "value": round(binding, 3)},
-            {"label": "Target occupancy", "value": round(occupancy, 3)},
+            {"label": "Target engagement (geometric; docks in resolved site)",
+             "value": round(engagement_mod, 3)},
             {"label": f"× confidence {round(scale, 2)}", "value": round(final - subtotal, 3)},
         ]
         if druglike:
@@ -166,8 +161,8 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
         "outcome": outcome,
         "sim_available": True,
         "outcome_base": base,
-        "binding_modifier": binding,
-        "occupancy_modifier": occupancy,
+        "engagement_modifier": engagement_mod,
+        "binding_engagement": engagement,
         "druglikeness_flag": druglike,
         "subtotal": subtotal,
         "confidence_scale": scale,
@@ -271,14 +266,17 @@ def _sponsor_rationale(event: dict[str, Any], sim: dict[str, Any] | None, delta:
     parts = [f"Trial {event.get('nct_id', '')} endpoint {outcome}."]
     if sim and not sim.get("error"):
         dg = sim.get("binding_affinity_kcal_mol")
-        occ = sim.get("target_occupancy_pct")
+        engagement = sim.get("binding_engagement")
         if dg is not None:
             sd = sim.get("binding_affinity_sd_kcal_mol")
             n = sim.get("replicates")
             dg_txt = f"{dg}" if sd is None else f"{dg}±{sd} (n={n})"
-            parts.append(f"Docking ΔG {dg_txt} kcal/mol (Kd {sim.get('kd_nM')} nM).")
-        if occ is not None:
-            parts.append(f"Peak target occupancy {occ}%.")
+            parts.append(
+                f"Docking score ΔG {dg_txt} kcal/mol (relative, size-confounded — "
+                f"not an affinity; issue #4)."
+            )
+        if engagement is not None:
+            parts.append(f"Target engagement: {engagement} (geometry, not strength).")
         if sim.get("druglikeness_flag"):
             parts.append(
                 "Drug-likeness flag (≥2 Lipinski violations) — informational, "

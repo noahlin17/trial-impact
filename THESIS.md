@@ -27,8 +27,10 @@ say much about whether the molecule should have been expected to work.
 The idea here is to produce a second input for the same event: an estimate of whether the
 drug engages its target, computed from the protein structure and the ligand chemistry
 rather than from the sponsor's description of the result. The output is a continuous
-quantity (ΔG, an implied Kd, a PK/PD-derived occupancy) rather than a categorical one,
-which has three consequences:
+quantity (a docking ΔG *score* plus a geometric target-engagement classification, and
+PK/PD-derived exposure) rather than a categorical one — note that the ΔG is *not* turned into
+an absolute Kd or occupancy, because it cannot support that claim (§3.4, issue #4). This has
+three consequences:
 
 - it can be scored against realized outcomes, so its value can be measured rather than
   argued;
@@ -193,28 +195,28 @@ already in this repository, both of which are approved:
 | sotorasib | 8,412 nM | 3,779 nM | 0.45× | does not engage | approved |
 | ivacaftor | 6,061 nM | 128 nM | 0.02× | does not engage | approved |
 
-The pipeline as built now implies that *neither* drug engages its target (free-drug occupancy
-31.0% for sotorasib, 2.06% for ivacaftor). Both are approved, effective therapies, so the
-retrospective check still fails — and it now fails on *both* rows rather than one. Note the
-direction of the change: pocket-aware routing did **not** make the numbers "look right." It made
-the docked Kd *weaker* (8,412 / 6,061 nM vs the old 1,337 / 1,777 nM), because the previous KRAS
-score came from a blind box that happened to sit in a favorable slab and the previous CFTR score
-was docked against a mis-labelled structure (9MXL contains (R)-BPO-27, not ivacaftor). The honest
-reading is that an empirical, cognate, reversible-only docking ΔG — even one boxed on the correct
-pocket — is not calibrated to reproduce a drug's clinical potency, and the covalent KRAS score is
-additionally a reversible lower bound (no bond enthalpy). The free-drug (`fu`) correction is
-applied inside the pipeline (occupancy uses `C_free = fu·C`); it is real but it is not what closes
-this gap.
+The table above is **the earlier, now-withdrawn form of the pipeline**, which turned the docking
+ΔG into an absolute Kd (`Kd = exp(ΔG/RT)`) and implied that *neither* approved drug engages its
+target — a clear failure. That check motivated a proper calibration: 8 potent approved reversible
+binders with clean ChEMBL Ki/Kd were docked through this exact pipeline. The result **falsified the
+premise that Vina ranks affinity at all** across diverse ligands — `r(−ΔG, measured affinity) ≈
+−0.39`, while `r(−ΔG, heavy-atom count) ≈ +0.64` (the score tracks ligand size, not Kd), and
+ligand-efficiency normalization did not rescue it. `exp()` is monotonic, so the invalid transform
+was not the root cause; the docking/scoring layer itself cannot supply the affinity information.
 
-(The free-fraction values are now resolved inside the pipeline via a small curated
-plasma-protein-binding table — sotorasib fu 0.11, ivacaftor fu 0.01 — rather than applied by hand;
-an unknown drug falls back to `fu = 1` with a warning. The direction of the effect is not in
-doubt, but the table is small and the exact ratios should still be treated as approximate.)
+The resolution (issue #4) is to **stop making a binding-strength claim at all**: the docking ΔG is
+kept only as a clearly-labelled relative *score*, no absolute Kd or Kd-derived occupancy is
+surfaced, and docking is reported as a geometric `binding_engagement` classification (did the
+ligand dock into an experimentally-resolved site with a reproducible pose). A cross-target
+"relative binding band" would have been size-in-disguise, so it is not shipped. The free-drug
+(`fu`) occupancy machinery remains in the pipeline for any future estimator that produces a real
+Kd, but the docking path leaves occupancy `None`.
 
 This is the clearest reason to treat the chemistry and the market model here as placeholders.
-It also reorders the issue list: in the reactive system, those two defects are documented
-caveats, because a known clinical readout carries the call. In a predictive system there is
-no readout to fall back on, so they become blocking.
+It also reorders the issue list: in the reactive system this is a documented scope limit, because
+a known clinical readout carries the call and docking is only a geometric corroborator. In a
+predictive system there is no readout to fall back on, so recovering a real *strength* signal
+(gnina CNN rescoring / MM-GBSA / FEP — §future work) becomes blocking.
 
 ### 3.5 What a credible backtest would require
 

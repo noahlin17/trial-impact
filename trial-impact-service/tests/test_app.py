@@ -49,9 +49,12 @@ STRONG_WIN = {
 # A full sim_result (with the fields pkpd_curve + the dashboard need).
 RICH_SIM = {
     "target": "KRAS", "drug": "sotorasib", "tissue": "tumor", "dose_mg": 960.0,
-    "binding_affinity_kcal_mol": -8.585, "kd_nM": 892.54,
+    # Current (@3) schema: the Vina score is not an affinity, so no headline Kd and no
+    # Kd-derived occupancy; engagement is the geometric claim (issue #4).
+    "binding_affinity_kcal_mol": -8.585, "kd_nM": None,
     "cmax_ng_ml": 19259.45, "auc_ng_h_ml": 143963.8,
-    "target_occupancy_pct": 97.47, "druglikeness_flag": True, "confidence": 0.9,
+    "target_occupancy_pct": None, "binding_engagement": "experimental-site",
+    "druglikeness_flag": True, "confidence": 0.9,
     "provenance": {
         "uniprot": "P01116", "structure_source": "RCSB", "pdb_id": "7VVB",
         "smiles": "C[C@H]1CN(...)C(=O)C=C",
@@ -364,18 +367,21 @@ def test_druglikeness_flag_does_not_change_the_delta():
     # potency does not rescue a miss: efficacy modifiers drop out.
     ev_miss = {"nct_id": "N", "endpoint_outcome": "missed", "target": "KRAS", "sponsor": "Amgen"}
     b_miss = market_model.pos_breakdown(ev_miss, RICH_SIM)
-    assert b_miss["binding_modifier"] == 0.0 and b_miss["occupancy_modifier"] == 0.0
+    assert b_miss["engagement_modifier"] == 0.0
     assert b_miss["final"] < 0
 
 
 def test_met_trial_breakdown_numbers():
-    """Pin the met-trial arithmetic with drug-likeness no longer priced (issue #3)."""
+    """Pin the met-trial arithmetic: docking is a small geometric corroborator only.
+
+    Binding *strength* and occupancy are no longer priced (issue #4). RICH_SIM docked
+    into an experimentally-resolved site, so engagement adds a small, capped +0.05 to a
+    win; drug-likeness is not priced. base .5 + engagement .05 -> subtotal .55; the
+    confidence scale 0.95 gives .5225."""
     ev_met = {"nct_id": "N", "endpoint_outcome": "met", "target": "KRAS", "sponsor": "Amgen"}
     b = market_model.pos_breakdown(ev_met, RICH_SIM)
-    # met: base .5, binding 0 (dg -8.585, kd 892 -> neither potent nor weak),
-    # occ +.15 (97%), drug-likeness flag not priced -> subtotal .65 ; scale .95 -> .6175
-    assert round(b["subtotal"], 3) == 0.65
-    assert abs(b["final"] - 0.6175) < 1e-9
+    assert round(b["subtotal"], 3) == 0.55
+    assert abs(b["final"] - 0.5225) < 1e-9
 
 
 def test_unknown_outcome_does_not_emit_a_call_on_chemistry_alone():
@@ -414,8 +420,7 @@ def test_pos_breakdown_reduces_to_delta():
             b = market_model.pos_breakdown(ev, sim)
             # exact invariants on the raw components
             assert abs(
-                b["outcome_base"] + b["binding_modifier"]
-                + b["occupancy_modifier"] - b["subtotal"]
+                b["outcome_base"] + b["engagement_modifier"] - b["subtotal"]
             ) < 1e-12
             assert abs(b["final"] - market_model.pos_delta(ev, sim)) < 1e-12
             # display components sum to the final (within rounding)
@@ -426,13 +431,18 @@ def test_pos_breakdown_reduces_to_delta():
 def test_pkpd_curve_shape():
     from app.simulation import pkpd_curve
 
+    # The @3 docking result carries no Kd, so the exposure curve is present but the
+    # occupancy trace is empty (issue #4).
     c = pkpd_curve(RICH_SIM)
     assert set(c) == {"t_h", "conc_ng_ml", "occupancy_pct"}
     assert len(c["t_h"]) == 97
     assert c["t_h"][0] == 0.0 and c["conc_ng_ml"][0] == 0.0  # nothing absorbed at t=0
-    assert all(0.0 <= o <= 100.0 for o in c["occupancy_pct"])
+    assert c["occupancy_pct"] == []  # no Kd -> no occupancy trace
     peak = c["conc_ng_ml"].index(max(c["conc_ng_ml"]))
     assert 0 < peak < 96  # rise then decay, not monotonic to an endpoint
+    # A legacy artifact that still carries a Kd keeps its occupancy trace (0..100).
+    legacy = pkpd_curve({**RICH_SIM, "kd_nM": 892.54})
+    assert legacy["occupancy_pct"] and all(0.0 <= o <= 100.0 for o in legacy["occupancy_pct"])
     assert pkpd_curve({"kd_nM": 1}) is None  # missing dose / MW -> no curve
 
 
@@ -467,23 +477,108 @@ def test_pkpd_curve_honours_stored_fu():
     """The dashboard reconstruction reads fu from provenance (legacy runs -> 1.0)."""
     from app.simulation import pkpd_curve
 
-    legacy = pkpd_curve(RICH_SIM)  # no provenance.fu -> total-drug curve
-    bound = pkpd_curve({**RICH_SIM, "provenance": {**RICH_SIM["provenance"], "fu": 0.05}})
+    # Legacy (@2) artifacts still carry a Kd; the reconstruction reads fu from provenance.
+    legacy_sim = {**RICH_SIM, "kd_nM": 892.54}
+    legacy = pkpd_curve(legacy_sim)  # no provenance.fu -> total-drug curve
+    bound = pkpd_curve({**legacy_sim, "provenance": {**RICH_SIM["provenance"], "fu": 0.05}})
     assert max(bound["occupancy_pct"]) < max(legacy["occupancy_pct"])
 
 
-def test_fu_correction_flips_the_market_call():
-    """Ivacaftor's total-drug 94.5% is a 'strong' call; free-drug ~15% is 'moderate'."""
+def test_occupancy_is_no_longer_priced():
+    """Occupancy must not move the market call any more (issue #4).
+
+    Occupancy was C_free/(C_free+Kd) driven by an uncalibrated Vina-derived Kd, so it
+    encoded a binding-strength claim the docking score cannot support. The pricing now
+    keys off geometric engagement, so two runs that differ only in a (stored, legacy)
+    occupancy value produce the identical call."""
     ev = {"nct_id": "NCT-VERIFY-002", "endpoint_outcome": "met",
           "target": "CFTR", "drug": "ivacaftor"}
-    base_sim = {"binding_affinity_kcal_mol": -8.702, "kd_nM": 738.217,
+    base_sim = {"binding_affinity_kcal_mol": -8.702, "kd_nM": None,
+                "binding_engagement": "experimental-site",
                 "druglikeness_flag": False, "confidence": 0.7}
-    total = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 94.54})
-    free = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 14.76})
-    assert total["occupancy_modifier"] == 0.15 and free["occupancy_modifier"] == -0.10
-    assert round(total["final"], 2) == 0.55 and round(free["final"], 2) == 0.34
-    assert market_model._magnitude(abs(total["final"])) == "strong"
-    assert market_model._magnitude(abs(free["final"])) == "moderate"
+    hi = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 94.54})
+    lo = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 14.76})
+    assert hi["final"] == lo["final"]  # occupancy no longer priced
+    assert "occupancy_modifier" not in hi
+    # Engagement is the only docking corroborator, and it is small and capped.
+    assert hi["engagement_modifier"] == 0.05
+    no_engage = market_model.pos_breakdown(ev, {**base_sim, "binding_engagement": "no-site"})
+    assert no_engage["engagement_modifier"] == 0.0
+
+
+# --- issue #4: docking is geometric engagement, not calibrated affinity ------ #
+def test_classify_engagement_geometry_not_strength():
+    """The docking run's honest claim is geometric (did it dock into a real, resolved
+    site with a reproducible pose) — never a binding-strength/affinity claim."""
+    from app.simulation import classify_engagement
+
+    # Experimental (holo / covalent-tethered / covalent-residue) sites with a tight,
+    # reproducible multi-seed pose -> the strongest geometric claim we make.
+    for mode in ("holo-ligand (curated)", "covalent-tethered (curated holo)",
+                 "covalent-residue (curated holo, reversible fallback)"):
+        code, note = classify_engagement(mode, -8.0, 0.1)
+        assert code == "experimental-site" and "not affinity" in note
+    # Same resolved site but a noisy pose (large ΔG spread) is demoted, not trusted.
+    code, _ = classify_engagement("holo-ligand (curated)", -8.0, 5.0)
+    assert code == "experimental-site-noisy"
+    # A single-draw run (sd None) is treated as reproducible (no measurable spread).
+    assert classify_engagement("holo-ligand (curated)", -8.0, None)[0] == "experimental-site"
+    # A geometrically-predicted pocket is not a proven site.
+    assert classify_engagement("fpocket", -8.0, 0.1)[0] == "predicted-pocket"
+    # A blind whole-receptor box is not site-specific.
+    assert classify_engagement("blind", -8.0, 0.1)[0] == "no-site"
+    # No pose at all -> failed, regardless of mode.
+    assert classify_engagement("holo-ligand (curated)", None, None)[0] == "failed"
+
+
+def test_docking_result_exposes_no_absolute_kd_or_occupancy():
+    """A Vina score is size-confounded, not an affinity (issue #4): the docking result
+    must not surface an absolute Kd or a Kd-derived occupancy, but must keep the
+    uncalibrated exp(ΔG/RT) value clearly labelled in provenance."""
+    from app.simulation import SimResult, kd_from_dg
+
+    # The dataclass defaults encode the contract (no re-dock needed to assert it).
+    r = SimResult(target="KRAS", drug="sotorasib", tissue="tumor", dose_mg=960.0)
+    assert r.kd_nM is None and r.target_occupancy_pct is None
+    # The regen replay is the canonical @3 transform; assert what it produces.
+    from regen_artifacts import replay_at_current_semantics
+
+    old = {"target": "KRAS", "drug": "sotorasib", "tissue": "tumor", "dose_mg": 960.0,
+           "binding_affinity_kcal_mol": -7.202, "binding_affinity_sd_kcal_mol": 0.187,
+           "kd_nM": 8412.0, "target_occupancy_pct": 31.0,
+           "docking_box": {"mode": "covalent-tethered (curated holo)"},
+           "provenance": {"pdb_id": "6OIM", "descriptors": {"mw": 560.6}}}
+    new = replay_at_current_semantics(old)
+    assert new["kd_nM"] is None and new["target_occupancy_pct"] is None
+    assert new["binding_engagement"] == "experimental-site"
+    assert new["estimator"] == "vina-docking-pkpd@3"
+    # exp(ΔG/RT) survives only as a clearly-labelled transparency value.
+    assert new["provenance"]["vina_pseudo_kd_nM"] == round(kd_from_dg(-7.202), 3)
+    assert "issue #4" in new["provenance"]["vina_pseudo_kd_note"]
+    # exposure (Cmax/AUC) is Kd-independent and is retained.
+    assert new["cmax_ng_ml"] > 0 and new["auc_ng_h_ml"] > 0
+
+
+def test_engagement_never_rescues_a_missed_endpoint():
+    """Docking may only *corroborate* a win; it must never turn a miss positive."""
+    ev = {"nct_id": "N", "endpoint_outcome": "missed", "target": "KRAS", "sponsor": "Amgen"}
+    strong_geometry = {"binding_affinity_kcal_mol": -12.0, "kd_nM": None,
+                       "binding_engagement": "experimental-site",
+                       "druglikeness_flag": False, "confidence": 0.9}
+    b = market_model.pos_breakdown(ev, strong_geometry)
+    assert b["engagement_modifier"] == 0.0 and b["final"] < 0
+
+
+def test_no_readout_no_call_even_with_experimental_engagement():
+    """No-call gating holds: a resolved-site, reproducible pose does not manufacture a
+    call on a trial that reported nothing."""
+    ev = {"nct_id": "N", "endpoint_outcome": "unknown", "target": "KRAS", "sponsor": "Amgen"}
+    sim = {"binding_affinity_kcal_mol": -12.0, "kd_nM": None,
+           "binding_engagement": "experimental-site", "confidence": 0.9}
+    assert market_model.pos_delta(ev, sim) == 0.0
+    out = market_model.assess(ev, sim, "AMGN", "Amgen", [], threshold=0.10)
+    assert out["price_calls"] == [] or all(
+        c["direction"] == "flat" for c in out["price_calls"])
 
 
 # --- multi-seed docking: mean +/- sd instead of one draw --------------------- #
@@ -664,7 +759,7 @@ def test_estimator_registry_and_default():
     ids = list_estimators()
     # Two implementations ship: the real docking pipeline + a labelled control.
     assert VINA_ESTIMATOR_ID in ids
-    assert "ligand-efficiency-baseline@1" in ids
+    assert "ligand-efficiency-baseline@2" in ids
     # The default is the real pipeline (so existing behaviour is unchanged).
     assert DEFAULT_ESTIMATOR_ID == VINA_ESTIMATOR_ID
     # Every registered estimator stamps its own id onto results it makes, and
@@ -684,7 +779,7 @@ def test_webhook_rejects_unknown_estimator(ctx):
 
 def test_webhook_estimator_selects_and_keys_the_event(ctx):
     client, devin, _alerter, db = ctx
-    est = "ligand-efficiency-baseline@1"
+    est = "ligand-efficiency-baseline@2"
     resp = _post(client, _payload("NCT-EST2", estimator=est))
     assert resp.status_code == 201
     event = resp.get_json()["event"]
@@ -747,9 +842,9 @@ def test_analysis_estimator_head_to_head(ctx):
 
     _client, _devin, _alerter, db = ctx
 
-    def _row(nct, est, dg, occ):
+    def _row(nct, est, dg, engagement):
         sim = {**RICH_SIM, "binding_affinity_kcal_mol": dg,
-               "target_occupancy_pct": occ, "estimator": est}
+               "binding_engagement": engagement, "estimator": est}
         eid = make_event_id(nct, "results_posted", est)
         db.upsert_new_event(
             event_id=eid, nct_id=nct, sponsor="Amgen", drug="sotorasib",
@@ -759,9 +854,9 @@ def test_analysis_estimator_head_to_head(ctx):
         )
         db.update_event_status(event_id=eid, status=STATUS_COMPLETED, sim_result=sim)
 
-    _row("NCT-H2H", "vina-docking-pkpd@1", -8.6, 97.5)
-    _row("NCT-H2H", "ligand-efficiency-baseline@1", -7.5, 88.0)
-    _row("NCT-SOLO", "vina-docking-pkpd@1", -9.1, 80.0)
+    _row("NCT-H2H", "vina-docking-pkpd@3", -8.6, "experimental-site")
+    _row("NCT-H2H", "ligand-efficiency-baseline@2", -7.5, "no-structure")
+    _row("NCT-SOLO", "vina-docking-pkpd@3", -9.1, "experimental-site")
 
     payload = analysis.build_payload(db.list_events())
     trials = payload["comparison"]["trials"]
@@ -770,8 +865,13 @@ def test_analysis_estimator_head_to_head(ctx):
     t = trials[0]
     assert t["nct_id"] == "NCT-H2H"
     assert [a["estimator"] for a in t["arms"]] == [
-        "ligand-efficiency-baseline@1", "vina-docking-pkpd@1"
+        "ligand-efficiency-baseline@2", "vina-docking-pkpd@3"
     ]
+    # The head-to-head now contrasts engagement, not affinity: the docking arm claims
+    # an experimental-site engagement the structure-free baseline cannot.
+    arms = {a["estimator"]: a for a in t["arms"]}
+    assert arms["vina-docking-pkpd@3"]["engagement"] == "experimental-site"
+    assert arms["ligand-efficiency-baseline@2"]["engagement"] == "no-structure"
     assert t["dg_spread"] == pytest.approx(1.1, abs=1e-6)
 
 

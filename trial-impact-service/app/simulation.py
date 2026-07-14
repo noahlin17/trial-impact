@@ -54,7 +54,7 @@ _HTTP_TIMEOUT = 30
 # Identifier for the docking estimator implemented in this module. Stamped onto every
 # SimResult it produces so the result is attributable. Bump the version when a change
 # would move the numbers (a new scoring function, a different box strategy, etc.).
-VINA_ESTIMATOR_ID = "vina-docking-pkpd@2"
+VINA_ESTIMATOR_ID = "vina-docking-pkpd@3"
 
 
 def _log(msg: str) -> None:
@@ -78,10 +78,21 @@ class SimResult:
     # structure-free baseline, which does not dock and has no sampling noise).
     binding_affinity_sd_kcal_mol: float | None = None
     replicates: int | None = None
+    # A Vina score is a RELATIVE, size-confounded docking score, not a calibrated
+    # affinity (see issue #4 / ``classify_engagement``). We therefore no longer surface
+    # an absolute Kd as a headline: ``kd_nM`` stays ``None`` for the docking estimator
+    # and the uncalibrated exp(ΔG/RT) value is kept, clearly labelled, in provenance.
     kd_nM: float | None = None
     cmax_ng_ml: float | None = None
     auc_ng_h_ml: float | None = None
+    # Occupancy is C_free/(C_free+Kd) — it depends entirely on a Kd the docking score
+    # cannot support, so it is not reported as an engagement-strength claim. ``None``
+    # for the docking estimator; exposure (cmax/auc) is Kd-independent and is retained.
     target_occupancy_pct: float | None = None
+    # What the docking run can HONESTLY claim about engagement (geometry, not strength):
+    # "experimental-site" | "experimental-site-noisy" | "predicted-pocket" | "no-site"
+    # | "no-structure" (baseline) | "failed". See ``classify_engagement``.
+    binding_engagement: str | None = None
     druglikeness_flag: bool | None = None
     covalent_flag: bool | None = None
     confidence: float | None = None
@@ -518,12 +529,62 @@ def _dg_noise_penalty(dg_sd: float | None) -> float:
 
 
 def kd_from_dg(dg_kcal_mol: float) -> float:
-    """Convert ΔG (kcal/mol) to a dissociation constant Kd in **nanomolar**.
+    """Uncalibrated exp(ΔG/RT) of a Vina score, in **nanomolar** — NOT an affinity.
 
     ΔG = R·T·ln(Kd)  ⇒  Kd = exp(ΔG / (R·T)).  (Molar → nM via ×1e9.)
+
+    This identity only yields a real Kd if ``dg`` is a calibrated binding free energy.
+    A Vina score is not: it ranks by size/contact area, not affinity (issue #4 — an
+    8-anchor calibration found r(−ΔG, affinity)≈−0.4 but r(−ΔG, heavy-atoms)≈+0.6). So
+    the result of this function is a *transparency* value kept in provenance and
+    labelled uncalibrated; it is never surfaced as a headline Kd or priced by the
+    market model.
     """
     kd_molar = math.exp(dg_kcal_mol / (_R_KCAL * _BODY_TEMP_K))
     return kd_molar * 1e9
+
+
+# Pose reproducibility threshold: multi-seed ΔG spread (kcal/mol) below which the
+# docked pose is treated as reproducible. A larger spread means the sampler landed in
+# different places run-to-run, so even the *geometric* engagement claim is shaky.
+_POSE_REPRODUCIBLE_SD = 0.75
+
+# Route modes (see :mod:`app.binding_site`) that place the ligand in an
+# EXPERIMENTALLY-resolved drug-binding site — a crystallographer already solved where a
+# ligand binds — as opposed to a geometric guess (fpocket) or no site at all (blind).
+_EXPERIMENTAL_SITE_MODES = ("covalent-tethered", "covalent-residue", "holo-ligand")
+
+
+def classify_engagement(
+    mode: str | None, dg: float | None, dg_sd: float | None
+) -> tuple[str, str]:
+    """Classify what a docking run can HONESTLY claim about target engagement.
+
+    This is a **geometric** statement — did the ligand dock into a real, resolved
+    binding site with a reproducible pose — and deliberately *not* a binding-strength
+    or affinity claim, because the Vina score ranks by size/contact rather than
+    affinity (issue #4). Returns ``(code, human_note)``.
+    """
+    if dg is None:
+        return "failed", "docking did not produce a pose"
+    reproducible = dg_sd is None or dg_sd <= _POSE_REPRODUCIBLE_SD
+    m = (mode or "").lower()
+    if m.startswith(_EXPERIMENTAL_SITE_MODES):
+        if reproducible:
+            return "experimental-site", (
+                "docked into an experimentally-resolved binding site with a "
+                "reproducible multi-seed pose (geometric engagement, not affinity)"
+            )
+        return "experimental-site-noisy", (
+            "docked into an experimentally-resolved site but the multi-seed pose is "
+            "not reproducible (large ΔG spread)"
+        )
+    if m == "fpocket":
+        return "predicted-pocket", (
+            "docked into a geometrically-predicted pocket (fpocket), not a proven "
+            "binding site"
+        )
+    return "no-site", "blind whole-receptor box; not a site-specific engagement"
 
 
 # --------------------------------------------------------------------------- #
@@ -538,8 +599,9 @@ _PK_CL = 10.0  # L/h  clearance
 
 
 def run_pkpd(
-    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str, fu: float = 1.0
-) -> dict[str, float]:
+    *, dose_mg: float, mol_weight: float, tissue: str,
+    kd_nM: float | None = None, fu: float = 1.0,
+) -> dict[str, float | None]:
     """Summarise exposure + occupancy for a 1-compartment first-order-absorption model.
 
     The model has a closed-form (Bateman) solution, so no ODE solver is needed:
@@ -556,15 +618,19 @@ def run_pkpd(
     s = _pkpd_series(
         dose_mg=dose_mg, mol_weight=mol_weight, kd_nM=kd_nM, tissue=tissue, fu=fu
     )
+    occ = s["occupancy_pct"]
     return {
         "cmax_ng_ml": max(s["conc_ng_ml"]),
         "auc_ng_h_ml": _trapz(s["t_h"], s["conc_ng_ml"]),
-        "target_occupancy_pct": max(s["occupancy_pct"]),
+        # Only computed when a Kd is supplied; the docking estimator passes none, so
+        # occupancy is None and exposure (cmax/auc) is reported on its own.
+        "target_occupancy_pct": (max(occ) if occ else None),
     }
 
 
 def _pkpd_series(
-    *, dose_mg: float, mol_weight: float, kd_nM: float, tissue: str, fu: float = 1.0,
+    *, dose_mg: float, mol_weight: float, tissue: str,
+    kd_nM: float | None = None, fu: float = 1.0,
     t_end: float = 48.0, n: int = 97,
 ) -> dict[str, list[float]]:
     """Evaluate the Bateman exposure curve + (free-drug) occupancy on a time grid.
@@ -585,7 +651,8 @@ def _pkpd_series(
         c_free_nM = fu * c_nM  # only unbound drug engages the target
         t_h.append(round(t, 3))
         conc_ng_ml.append(round(c_tissue * 1000.0, 4))  # µg/mL → ng/mL
-        occ_pct.append(round(100.0 * c_free_nM / (c_free_nM + kd_nM), 3))
+        if kd_nM is not None:
+            occ_pct.append(round(100.0 * c_free_nM / (c_free_nM + kd_nM), 3))
     return {"t_h": t_h, "conc_ng_ml": conc_ng_ml, "occupancy_pct": occ_pct}
 
 
@@ -603,13 +670,15 @@ def pkpd_curve(sim_result: dict[str, Any], t_end: float = 48.0, n: int = 97):
     the same Bateman model. Returns ``None`` when a required field is missing.
     """
     prov = sim_result.get("provenance") or {}
-    kd = sim_result.get("kd_nM")
+    kd = sim_result.get("kd_nM")  # None for the docking estimator (issue #4)
     dose = sim_result.get("dose_mg")
     mw = (prov.get("descriptors") or {}).get("mw")
-    if not kd or not dose or not mw:
+    if not dose or not mw:
         return None
     fu = prov.get("fu")
     fu = 1.0 if fu is None else fu  # legacy artifacts predate fu → total-drug curve
+    # kd may be None: the exposure curve is Kd-independent and still informative; the
+    # occupancy trace is simply omitted when there is no (calibrated) Kd to drive it.
     return _pkpd_series(
         dose_mg=dose, mol_weight=mw, kd_nM=kd,
         tissue=sim_result.get("tissue") or "plasma", fu=fu, t_end=t_end, n=n,
@@ -744,30 +813,40 @@ def run_simulation(
             result.replicates = dock["n"]
             result.provenance["vina_seeds"] = dock["seeds"]
             result.provenance["dg_replicates"] = dock["energies"]
-            result.kd_nM = round(kd_from_dg(dg), 3)
+            # The Vina score is a RELATIVE, size-confounded docking score, not a
+            # calibrated affinity (issue #4). Keep the uncalibrated exp(ΔG/RT) value in
+            # provenance for transparency, but never surface it as an affinity, drive
+            # occupancy with it, or price it in the market model.
+            result.kd_nM = None
+            result.provenance["vina_pseudo_kd_nM"] = round(kd_from_dg(dg), 3)
+            result.provenance["vina_pseudo_kd_note"] = (
+                "exp(ΔG/RT) of the Vina score; NOT a measured or calibrated affinity — "
+                "Vina ranks by size/contact, not Kd (issue #4). Do not read as "
+                "binding strength."
+            )
+            result.binding_engagement, engagement_note = classify_engagement(
+                site.mode, dg, result.binding_affinity_sd_kcal_mol
+            )
+            result.provenance["engagement_note"] = engagement_note
+            # NB: the "ΔG is not an affinity" caveat is a *constant* scientific
+            # limitation surfaced in the UI/rationale and provenance; it is deliberately
+            # NOT appended to ``warnings`` so it does not uniformly penalise the
+            # confidence score (which is for per-run quality issues, not fixed caveats).
             sd_txt = "" if dock["dg_sd"] is None else f" ± {dock['dg_sd']:.2f}"
             _log(
                 f"ΔG = {dg:.2f}{sd_txt} kcal/mol (n={dock['n']})  →  "
-                f"Kd = {result.kd_nM:.1f} nM"
+                f"engagement: {result.binding_engagement}"
             )
 
-            # Free-drug occupancy: only the unbound fraction (fu) engages the target.
-            fu_value, fu_source = resolve_fu(drug, fu)
-            result.provenance["fu"] = fu_value
-            result.provenance["fu_source"] = fu_source
-            if fu_source == "unknown":
-                result.warnings.append(
-                    "no plasma fraction-unbound (fu) for this drug; occupancy is a "
-                    "TOTAL-drug upper bound (fu=1), not free-drug engagement"
-                )
-
+            # PK exposure (cmax/auc) is Kd-independent and remains informative context
+            # (does a tolerated dose plausibly reach the target tissue?). Occupancy is
+            # NOT computed — it needs a Kd the docking score cannot support.
             pkpd = run_pkpd(
-                dose_mg=dose_mg, mol_weight=desc["mw"], kd_nM=result.kd_nM,
-                tissue=tissue, fu=fu_value,
+                dose_mg=dose_mg, mol_weight=desc["mw"], tissue=tissue,
             )
             result.cmax_ng_ml = round(pkpd["cmax_ng_ml"], 3)
             result.auc_ng_h_ml = round(pkpd["auc_ng_h_ml"], 3)
-            result.target_occupancy_pct = round(pkpd["target_occupancy_pct"], 2)
+            result.target_occupancy_pct = None
 
             # Drug-likeness (oral-absorption) signal: ≥2 Lipinski Rule-of-5 violations.
             # This is NOT a toxicity/safety signal — it predicts passive oral absorption,
