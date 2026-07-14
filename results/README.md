@@ -1,7 +1,7 @@
 # Results
 
 Artifacts from two **real** Devin simulation sessions — real structures, a real
-AutoDock Vina docking run, a real PK/PD solve. Nothing here is mocked. The `.json`
+AutoDock Vina docking run, a real PK/PD solve. The `.json`
 files are the exact records the service stored; open the `.html` files in a browser for
 the interactive 3D structure, the PK/PD curve, and the price calls.
 
@@ -51,5 +51,5 @@ been retired rather than kept for looks:
 
 The pipeline therefore falls back to the AlphaFold prediction and reports
 **confidence 0.7** instead of 0.9, which is the honest signal: this is a predicted
-structure, not an experimental one. Reproducible beats impressive. Native mmCIF support
+structure, not an experimental one. Native mmCIF support
 is tracked under Limitations in the service README.
