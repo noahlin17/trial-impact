@@ -396,7 +396,11 @@ Vina is now one implementation behind an `Estimator` interface, every result car
 runs are head-to-head-able (`compare_estimators.py`, `/analysis`). The shipped second estimator
 is a deliberately naive *control*, not a rival model, and pinning buys reproducibility, not
 validity — so the science in step 2 still stands, and a real second estimator (co-folding / FEP /
-QSAR) remains future work.
+QSAR) remains future work. Selection is caller-driven: a request either names an estimator or
+takes the fixed default (`vina-docking-pkpd@1`), and a head-to-head is opt-in — nothing fans out
+across estimators by default. **Automatic best-fit routing** (pick per trial — e.g. structure-based
+docking when a target structure resolves, fall back to the structure-free baseline otherwise) is
+deferred; until it lands the default is Vina.
 
 **2 · Fix the science that blocks a forecast**
 - **Pocket-aware docking** (fpocket / P2Rank, or a drug-bound structure pinned per trial) — the
