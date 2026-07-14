@@ -33,6 +33,7 @@ installed by Devin, not by the Flask service.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -81,7 +82,7 @@ class SimResult:
     cmax_ng_ml: float | None = None
     auc_ng_h_ml: float | None = None
     target_occupancy_pct: float | None = None
-    tox_flag: bool | None = None
+    druglikeness_flag: bool | None = None
     covalent_flag: bool | None = None
     confidence: float | None = None
     provenance: dict[str, Any] = field(default_factory=dict)
@@ -149,6 +150,7 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
             _log(f"using experimental structure {pdb_id} (source format: {fmt})")
             return pdb_path, {
                 "structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt,
+                "structure_sha256": structure_checksum(pdb_path),
             }
     except (requests.RequestException, KeyError, IndexError, ValueError) as exc:
         _log(f"experimental structure lookup failed ({exc}); trying AlphaFold")
@@ -160,6 +162,7 @@ def fetch_structure(uniprot: str, workdir: str) -> tuple[str, dict[str, Any]]:
     return af_path, {
         "structure_source": "AlphaFold", "pdb_id": f"AF-{uniprot}-F1",
         "structure_format": "pdb",
+        "structure_sha256": structure_checksum(af_path),
     }
 
 
@@ -232,6 +235,22 @@ def _download(url: str, dest: str) -> None:
         fh.write(resp.content)
 
 
+def structure_checksum(path: str) -> str:
+    """SHA-256 of a fetched structure file, recorded in provenance.
+
+    We resolve structures from live RCSB/AlphaFold rather than pinning them (see issue
+    #10), so this makes structure *drift* **observable without enforcing anything**: two
+    runs of the same ``pdb_id`` that produce different hashes reveal that the upstream
+    file changed (a re-release/remediation) — the run is not blocked, the fact is just
+    auditable in ``provenance.structure_sha256``.
+    """
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 # --------------------------------------------------------------------------- #
 # Step 3 — drug → SMILES → RDKit 3D molecule
 # --------------------------------------------------------------------------- #
@@ -276,7 +295,7 @@ def embed_ligand(smiles: str):
 
 
 def ligand_descriptors(mol) -> dict[str, float]:
-    """Physicochemical descriptors used for the crude tox / drug-likeness signal."""
+    """Physicochemical descriptors used for the drug-likeness (Lipinski) signal."""
     from rdkit.Chem import Crippen, Descriptors, Lipinski
 
     return {
@@ -387,13 +406,18 @@ def compute_docking_box(pdb_path: str) -> tuple[list[float], list[float]]:
     "exhaustive" — on a large target this silently docks an arbitrary sub-volume. A fix
     needs pocket detection (fpocket / P2Rank) or a drug-bound structure pinned per
     trial. See "Docking box" under Limitations in the README.
+
+    The box spans only ``ATOM`` records so it matches what is actually docked: the
+    receptor prep (:func:`prepare_receptor_pdbqt`) is ``ATOM``-only, so including
+    ``HETATM`` (waters/ions/co-crystal ligands) would center the box on atoms absent
+    from the docked receptor (#9).
     """
     import numpy as np  # lazy
 
     coords = []
     with open(pdb_path) as fh:
         for line in fh:
-            if line.startswith(("ATOM", "HETATM")):
+            if line.startswith("ATOM"):
                 coords.append(
                     (float(line[30:38]), float(line[38:46]), float(line[46:54]))
                 )
@@ -745,11 +769,14 @@ def run_simulation(
             result.auc_ng_h_ml = round(pkpd["auc_ng_h_ml"], 3)
             result.target_occupancy_pct = round(pkpd["target_occupancy_pct"], 2)
 
-            # Crude drug-likeness/tox signal: ≥2 Lipinski violations flags risk.
+            # Drug-likeness (oral-absorption) signal: ≥2 Lipinski Rule-of-5 violations.
+            # This is NOT a toxicity/safety signal — it predicts passive oral absorption,
+            # not harm — so it is surfaced as information only and is not priced by the
+            # market model. (It fires on approved oncology drugs like sotorasib.)
             violations = sum(
                 [desc["mw"] > 500, desc["logp"] > 5, desc["hbd"] > 5, desc["hba"] > 10]
             )
-            result.tox_flag = violations >= 2
+            result.druglikeness_flag = violations >= 2
 
             # Confidence: experimental structure > predicted; full run > fallbacks;
             # and noisier docking (larger ΔG spread across seeds) is less trustworthy.

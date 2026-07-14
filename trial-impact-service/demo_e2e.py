@@ -53,7 +53,7 @@ EVENT = {
     "dose_mg": 50,
 }
 
-# What the (faked) Devin simulation session "returns" — a decent binder, clean tox.
+# What the (faked) Devin simulation session "returns" — a decent binder, drug-like.
 DELTA_G = -8.8
 SIM_RESULT = {
     "target": "ZORB1",
@@ -65,7 +65,7 @@ SIM_RESULT = {
     "cmax_ng_ml": 318.5,
     "auc_ng_h_ml": 4120.0,
     "target_occupancy_pct": 71.5,
-    "tox_flag": False,
+    "druglikeness_flag": False,
     "confidence": 0.82,
     "provenance": {
         "uniprot": "Q9FAKE1",
@@ -166,7 +166,7 @@ def main() -> int:
         make_event_id(EVENT["nct_id"], EVENT["event_type"]))
     print("\nStored simulation result:")
     for k in ("binding_affinity_kcal_mol", "kd_nM", "cmax_ng_ml",
-              "target_occupancy_pct", "tox_flag", "confidence"):
+              "target_occupancy_pct", "druglikeness_flag", "confidence"):
         print(f"  {k:26s} = {stored['sim_result'][k]}")
 
     print("\nShare-price calls:")

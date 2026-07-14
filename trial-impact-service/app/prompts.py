@@ -143,7 +143,7 @@ for readability — every value below is a placeholder):
 ```
 {RESULT_MARKER} {{"target": "{target}", "drug": "{drug}", "tissue": "{tissue}",
   "binding_affinity_kcal_mol": <float>, "kd_nM": <float>, "cmax_ng_ml": <float>,
-  "auc_ng_h_ml": <float>, "target_occupancy_pct": <float>, "tox_flag": <bool>,
+  "auc_ng_h_ml": <float>, "target_occupancy_pct": <float>, "druglikeness_flag": <bool>,
   "covalent_flag": <bool>, "confidence": <float>, "estimator": "{estimator}",
   "provenance": {{"uniprot": "<accession the script resolved>",
                  "pdb_id": "<structure the script actually used>"}},

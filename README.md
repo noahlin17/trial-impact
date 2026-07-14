@@ -1,14 +1,19 @@
 # Trial Impact
 
-An event-driven system that runs structure-based chemistry on clinical-trial readouts and
-produces a quantitative estimate of target engagement, rather than a categorical read on the
-result.
+An event-driven system that runs structure-based chemistry on **preclinical / Phase 1**
+clinical-trial events and produces a quantitative estimate of target engagement, rather than a
+categorical read on the result.
 
-When a trial posts results, the service opens an isolated [Devin](https://devin.ai) session
-that performs protein–ligand docking (AutoDock Vina) and a PK/PD solve against the drug and
-its target, and returns a binding affinity, an implied Kd and a derived target occupancy —
-computed from the structure and the chemistry rather than from the sponsor's description of
-the result.
+The system is built around a single question — *does the molecule engage its target at a tolerated
+exposure?* — which is a preclinical / Phase 1 question by construction. When a trial event arrives,
+the service opens an isolated [Devin](https://devin.ai) session that performs protein–ligand docking
+(AutoDock Vina) and a PK/PD solve against the drug and its target, and returns a binding affinity, an
+implied Kd and a derived target occupancy — computed from the structure and the chemistry rather than
+from the sponsor's description of the result.
+
+Because binding is a fixed molecular property that is largely resolved by the end of Phase 1, the
+actionable scope is **preclinical / Phase 1**; later-phase events are treated as educational
+illustrations (see [Trial phase](#trial-phase--the-preclinical--phase-1-scope)).
 
 > **Not investment advice.** Output is an automated research signal for informational
 > purposes only; a disclaimer is attached to each assessment.
@@ -187,12 +192,23 @@ described above; it shows that the pipeline runs end to end, and it is not a tra
 
 | Trial | Target × Drug | Structure (route) | ΔG (kcal/mol) | Kd | Target occ. ‡ | Flags | Model call |
 |-------|---------------|-----------|---------------|----|-----------|-----|-----------|
-| Phase 1 | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | **−7.202 ± 0.187** | 8412 nM | 31.0% ‡ | ⚠︎ tox ‡ · covalent | ▲ AMGN moderate · ▼ REGN/NVS |
-| Phase 3 | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | −7.404 ± 0.007 † | 6061 nM | 2.06% ‡ | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
+| Phase 1 — **in scope** | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | **−7.202 ± 0.187** | 8412 nM | 31.0% ‡ | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
+| Phase 3 — *educational only* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | −7.404 ± 0.007 † | 6061 nM | 2.06% ‡ | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
 
-Every number in both rows reproduces from the committed source: Kd, Cmax, free-drug occupancy
-and both PoS deltas fall out of the mean ΔG deterministically (verified by two independent full
-`regen_artifacts.py` runs returning byte-identical scientific numbers). The `code_patched: false`
+**Only the Phase 1 row is in the actionable scope** — this is the tier the system is built for. The
+Phase 3 CFTR × ivacaftor run is included purely as an *educational* illustration of the pipeline on a
+well-characterized drug; it is not a tradeable signal. As set out in
+[Trial phase — the preclinical / Phase 1 scope](#trial-phase--the-preclinical--phase-1-scope),
+binding is a molecular property fixed from the start and largely established by end of Phase 1, so a
+Phase 2/3 event adds efficacy / statistical evidence the physics does not model.
+
+The *scoring* layer reproduces deterministically from the committed source: Kd, Cmax, free-drug
+occupancy and both PoS deltas fall out of the mean ΔG by fixed arithmetic. The mean ΔG itself,
+however, depends on which structure the router resolves from **live** PDBe/RCSB at run time, which
+is not pinned point-in-time (issue #10) — so byte-identical reproduction holds only when the same
+structures resolve; an environment where the curated holo does not resolve routes differently and
+returns a materially different ΔG (observed: KRAS to 7VVB/fpocket −5.91 instead of
+6OIM/covalent-tethered −7.202). The `code_patched: false`
 each run reports is therefore verified rather than self-reported — the numbers came from
 `simulation.py` as committed, not from a session that patched it to work around a broken upstream
 API. That field exists because it caught exactly that case (see below). Absolute ΔGs are **weaker
@@ -208,9 +224,11 @@ plasma-protein-binding table (unknown drugs fall back to `fu = 1` with a warning
 the new pocket ΔGs, ivacaftor (fu 0.01) comes back at **2.06%** and sotorasib (fu 0.11) at
 **31.0%**. Ivacaftor still sits in the market model's `occ < 30` band (occupancy modifier
 +0.15 → −0.10), yet the VRTX call stays `strong` (PoS delta +0.38) on the endpoint-met and
-confidence terms (issue #1 retired). The `tox_flag` is ≥2 Lipinski violations, a drug-likeness
-and oral-absorption heuristic rather than a toxicity model; it fires on sotorasib, which is an
-approved drug (issue #3).
+confidence terms (issue #1 retired). The `druglikeness_flag` is ≥2 Lipinski violations — a
+drug-likeness / oral-absorption heuristic, **not** a toxicity model — so it is surfaced as
+information only and is **not priced** into the call (issue #3, fixed). It fires on sotorasib,
+an approved drug; with the former −0.15 "safety" penalty removed, the KRAS call rises to `strong`
+(PoS delta +0.45), while ivacaftor (one violation, unflagged) is unchanged.
 
 The inputs are drug-specific rather than hardcoded: sotorasib's flags derive from its computed
 descriptors (MW 560.6, logP 5.30) and an RDKit substructure match on its acrylamide warhead,
@@ -288,6 +306,29 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 
 Genuine per-drug pharmacology needs enrichment overrides (`fu`, `Vd`, `CL` per drug — the
 same mechanism as `endpoint_outcome`) or a structure→PK model.
+
+### Trial phase — the preclinical / Phase 1 scope
+
+The pipeline is scoped to **preclinical / Phase 1** by construction, because that is the only phase
+at which its one question carries new information. The pipeline answers *does the molecule engage its
+target at a tolerated exposure?* — and that is a preclinical / Phase 1 question:
+
+- Binding affinity is a fixed property of the molecule and structure: **ΔG does not change between
+  phases.** Target engagement is largely **established by the end of Phase 1**, through human PK,
+  tolerated dose and (increasingly) direct occupancy readouts.
+- Phase 2 and Phase 3 ask questions the physics does not touch: P2 is efficacy (does engaging the
+  target help patients — a target-validation / disease-biology question); P3 is whether that effect
+  replicates at scale with adequate statistics and safety. By then engagement is settled and priced,
+  so a docking number is **redundant** rather than informative.
+
+So the physics carries the most incremental information exactly when clinical uncertainty about
+engagement is highest — preclinical / Phase 1 — which is why the system targets that tier and treats
+any Phase 2/3 event as an illustration of the pipeline rather than a tradeable signal. See
+[THESIS.md §3.3](THESIS.md).
+
+Since the scope is a single tier, **the market model is phase-agnostic by design** — there is no
+phase weighting. Phase determines only *whether* an event is actionable (Phase 1) or educational
+(Phase 2/3); it never scales the call.
 
 **The practical upshot.** The *binding* half of the pipeline is defensible today for a
 **reversible, non-covalent small molecule against a small globular protein with an
@@ -379,9 +420,9 @@ table reports the raw model output.
 ```bash
 cd trial-impact-service
 cp .env.example .env          # set DEVIN_API_KEY (Slack/SMTP optional)
-                              # .env.example ships a non-empty WATCHER_SHARED_SECRET, so
-                              # webhook signature verification is ON by default. Blank it
-                              # to disable (dev only — the service warns loudly if you do).
+                              # .env.example ships a non-empty WATCHER_SHARED_SECRET, so the
+                              # webhook is ON by default. The endpoint fails CLOSED: blanking the
+                              # secret disables it (503 to every caller) — it never fails open.
 docker compose up --build     # dashboard at http://localhost:8000/status
 
 # fire a real trial event (creates a real Devin session):
@@ -508,23 +549,39 @@ the full detail and proposed fix for every row below. The domain of validity is 
 
 Most of these were found by auditing the code after the runs had been published. Several share a
 structure worth noting: in each case a locally reasonable choice is treated as a stronger claim
-further down the pipeline. A relative score is converted into an absolute Kd (#4). A drug-likeness
-heuristic is applied as a toxicity penalty (#3). A computationally tractable search box is
-described as covering the receptor (#2). (A fourth — a total concentration reported as target
-engagement — was #1, now fixed by the free-drug correction.) None of these raise an error or fail
+further down the pipeline. A relative score is converted into an absolute Kd (#4).
+A computationally tractable search box is described as covering the receptor (#2). (Two more of
+this species have since been fixed: a total concentration reported as target engagement was #1,
+corrected by the free-drug correction; and a drug-likeness heuristic priced as a toxicity penalty
+was #3, now surfaced as information only.) None of these raise an error or fail
 a test — the estimate simply becomes less well-founded than its downstream use implies.
+
+**The design invariant.** These are all the same species of defect, and naming it makes it a
+principle rather than a checklist: *no quantity may be consumed downstream as a stronger claim than
+the step that produced it can support.* Read that way, several of this project's clearest decisions
+are one invariant applied, and belong in the design from the outset rather than found afterward:
+the **preclinical / Phase 1 scope** (the physics answers a Phase 1 question, so it is not consumed
+as a Phase 2/3 efficacy claim — see [Trial phase](#trial-phase--the-preclinical--phase-1-scope));
+the **no-call gate** (a ΔG is an *input* to a probability, so a trial with no clinical readout
+yields no directional call — [THESIS §3.1](THESIS.md)); the **free-drug occupancy** correction
+(total drug is not engaged drug, #1); the **estimator/harness split** (Vina is one
+implementation, not "the model"); and the **drug-likeness flag** (a Ro5 oral-absorption heuristic,
+so it is information, never a priced safety event — #3). The open row below — #4 (relative score
+read as absolute Kd) — is where the invariant is *still* violated; that is what makes it a defect
+to fix rather than an acceptable simplification. #3 (drug-likeness read as toxicity) was the same
+defect and is now fixed: the flag is renamed `druglikeness_flag` and priced at zero.
 
 **Status:** ○ open · ◑ mitigated, not fixed · ✅ fixed
 
 | # | Issue | Impact | |
 |---|---|---|---|
 | 2 | **Docking box is now pocket-routed, with residual caveats** — `select_binding_site` boxes the covalent reactive Cys / curated or discovered co-crystal ligand / fpocket / blind, in that order (`docking_box.mode`). Both published runs now box the real pocket (KRAS 6OIM switch-II, CFTR 6O2P/VX7) | The blind-slab problem is fixed for routed targets. **Remaining:** cognate/holo redocking is partly circular; fpocket is geometric (its top 6O2P pocket was ~79 Å off the real site); and the **Tier-D blind box still fires** for any target with no co-crystal and no fpocket | ◑ |
-| 3 | **`tox_flag` is a drug-likeness heuristic priced as a safety signal** — it is ≥2 Lipinski violations, which predicts *oral absorption*, not toxicity | Charges **−0.15 PoS as if a safety finding had occurred**. It fires on sotorasib — an **approved** drug — because it is a large lipophilic oncology molecule | ○ |
+| 3 | **Drug-likeness flag no longer priced as safety** — the ≥2-Lipinski-violation flag (predicts *oral absorption*, not toxicity) is renamed `druglikeness_flag` and surfaced as informational provenance only | **Fixed:** the −0.15 "safety" penalty is removed from `pos_breakdown`; the flag still fires on sotorasib but no longer moves the PoS delta or the call (KRAS rises to `strong`, +0.45) | ✅ |
 | 4 | **ΔG is documented as *relative* but consumed as *absolute*** — converted to `Kd = exp(ΔG/RT)` and branched on hard cutoffs (`Kd ≤ 100 nM`, `ΔG ≤ −9.0`) | The code and the docs disagree about what the number *is*. The conversion also uses 310.15 K where Vina's calibration assumes 298.15 K, making every Kd **~1.75× looser** | ○ |
 | 7 | **Sponsor→ticker resolution is a hand-maintained 6-entry file** with hardcoded competitors | Real resolution is **entity resolution** (messy sponsor strings, listed parents, private/pre-IPO sponsors with no ticker and therefore no trade). **The system runs on a watchlist, not a universe** — the scaling claim is not yet earned | ○ |
-| 8 | **Webhook signature verification fails open** when `WATCHER_SHARED_SECRET` is unset | Accepts *any* caller's trial event, each of which spends a Devin session. Mitigated: logs a loud startup warning. Production should require the secret | ◑ |
-| 9 | **The blind fallback box is computed over atoms that are not docked** — `compute_docking_box` (Tier-D only) spans `ATOM`+`HETATM`, but the receptor is `ATOM`-only | Small in practice, wrong in principle. Now scoped to the last-resort blind fallback; the pocket-aware tiers box the ligand/residue directly and are unaffected | ○ |
-| 10 | **Structure choice is pinned only for curated/discovered routes** — curated classes pin a holo (KRAS 6OIM, CFTR 6O2P) and reversible drugs can discover a co-crystal, but an uncurated/undiscovered target still uses whatever PDBe/SIFTS ranks first *at run time* | Routed runs are reproducible-by-construction; unrouted ones could dock a **different structure** on re-run. Discovery also takes the first hit rather than ranking by resolution/method (a **look-ahead leakage vector** for any backtest — see [THESIS.md](THESIS.md)) | ◑ |
+| 8 | **Webhook signature verification now fails closed** — an unset `WATCHER_SHARED_SECRET` makes `/webhook/trial-update` reject *every* request (`503`) | **Fixed:** the endpoint requires the secret, so an unset secret can no longer accept unsigned callers or spend a Devin session; startup still warns loudly that the endpoint is dark | ✅ |
+| 9 | **The blind fallback box now spans only docked atoms** — `compute_docking_box` (Tier-D only) computes the centroid box over `ATOM` records, matching the `ATOM`-only receptor prep (was `ATOM`+`HETATM`, so it stretched onto waters/ions/co-crystal ligands that are stripped before docking) | **Fixed:** the last-resort blind box no longer parks on undocked hetero atoms. The pocket-aware tiers box the ligand/residue directly and are unaffected; no published artifact uses the blind tier, so no numbers changed | ✅ |
+| 10 | **Structure choice is resolved live, not pinned point-in-time** — curated classes *name* a holo (KRAS 6OIM, CFTR 6O2P) but fetch it from live PDBe/SIFTS/RCSB at run time | **Mitigated:** the silent-structure-swap half is fixed. `select_binding_site` now **commits to a curated structure** once its holo + reactive residue resolve — a *tether-prep* failure (e.g. Meeko missing) degrades to reversible scoring in the **same** holo's reactive-residue box (`covalent-residue`, recorded), and no longer falls through to discovery + fpocket on a *different* PDB (the path that changed KRAS from 6OIM/covalent-tethered **−7.202** to 7VVB/fpocket **−5.91**). Discovery now ranks its drug-bound hits by **how faithfully each resolves the pocket** — sharpest experimental method, then best resolution, then a deterministic id tiebreak — so the pick is both reproducible *and* scientifically principled (the box is only as good as the structure that resolves the site), not RCSB's drifting relevance order. Every fetched structure now records a **`structure_sha256`** in provenance, so upstream drift (a re-released/remediated PDB) is *observable* by diffing runs — deliberately **not enforced**, since a routine remediation should not hard-fail a run. **Still open:** structures are not *pinned* point-in-time (only observed), and a *structure-level* fetch failure still falls through — now recorded loudly, both as a warning and as a queryable `curated_route_degraded` + `intended_route` in the box provenance ("NOT the curated route"). Remaining fix, if a live backtest ever needs strict point-in-time integrity: vendor the curated holo files in-repo (also removes the live-fetch dependency) or an immutable `(pdb_id, checksum)` snapshot | ◑ |
 
 > **Note on `cmax_ng_ml` / AUC (was folded into #11):** `cmax_ng_ml` is a *tissue* concentration,
 > not plasma Cmax, and AUC is AUC(0–48 h), not AUC(0–∞). This is a property of the generic PK
@@ -539,7 +596,9 @@ This PR then adds **pocket-aware routing** (`app/binding_site.py`: covalent-teth
 discovered co-crystal → fpocket → blind), **covalent tethering** for curated covalent classes
 (reversible-scored lower bound), and **conda-lock** as the canonical sim environment — so #2 drops
 from a blind-slab defect to the routed-with-caveats state above, and the corrected CFTR pin (6O2P,
-not the mis-labelled 9MXL) fixes the structure too. The design lives under
+not the mis-labelled 9MXL) fixes the structure too. A later iteration additionally fixes **#3**
+(the drug-likeness heuristic priced as toxicity — now the informational `druglikeness_flag`, never
+a PoS penalty) and **#8** (webhook fail-open → fail-closed on an unset secret). The design lives under
 [Estimators](trial-impact-service/README.md#estimators-one-interface-many-models-vina-is-not-the-architecture)
 and [Limitations](trial-impact-service/README.md#limitations--modeling-caveats); the residual
 caveats (control ≠ validated model, reproducibility ≠ validity, seed sd measures sampling noise
@@ -548,8 +607,8 @@ bound, fpocket is geometric, the blind Tier-D box survives) are in Limitations.
 
 **Fixed earlier, kept on the record:** the AlphaFold fallback URL was stale and *every*
 fallback 404'd; Vina ran with `seed=0`, which it reads as *random*, so repeat runs drifted; a
-tox flag on an `unknown`-outcome trial scored −0.1425, cleared the 0.10 alert threshold and
-emitted a directional call on chemistry with **no clinical readout** behind it (and `unknown`
+drug-likeness (then `tox_flag`) flag on an `unknown`-outcome trial scored −0.1425, cleared the
+0.10 alert threshold and emitted a directional call on chemistry with **no clinical readout** behind it (and `unknown`
 is the default for un-enriched trials, so that was the *common* path); PubChem schema drift
 silently broke ligand fetching; a covalent SMARTS false-positived on ivacaftor; and
 `run_real.py` posted unsigned webhooks that would 401 against the shipped `.env.example`.

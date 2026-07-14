@@ -34,7 +34,6 @@
     "cmax_ng_ml": 5015.482,
     "auc_ng_h_ml": 37341.375,
     "target_occupancy_pct": 2.06,
-    "tox_flag": false,
     "covalent_flag": false,
     "confidence": 0.897,
     "provenance": {
@@ -82,7 +81,8 @@
     "error": null,
     "estimator": "vina-docking-pkpd@2",
     "code_patched": false,
-    "patch_summary": null
+    "patch_summary": null,
+    "druglikeness_flag": false
   },
   "commentary": "Trial NCT-VERIFY-002 \u2014 Vertex Pharmaceuticals (ivacaftor / CFTR): endpoint met.\nModelled probability-of-success delta: +0.38.\n  \u25b2 VRTX (Vertex Pharmaceuticals, sponsor): up / strong\n  \u25bc CRSP (CRISPR Therapeutics, competitor): down / moderate\n  \u25bc BLUE (bluebird bio, competitor): down / moderate\n\nAutomated research signal derived from a biophysical simulation and trial metadata. NOT investment advice; for informational purposes only.",
   "price_calls": [
@@ -111,8 +111,8 @@
       "rationale": "Second-order read-through: a up move for Vertex Pharmaceuticals on CFTR typically implies a down move for rivals."
     }
   ],
-  "created_at": "2026-07-14T05:49:41+00:00",
-  "updated_at": "2026-07-14T07:41:51+00:00",
+  "created_at": "2026-07-14T14:38:12+00:00",
+  "updated_at": "2026-07-14T14:38:12+00:00",
   "error_message": null,
   "alert_sent": 1
 }

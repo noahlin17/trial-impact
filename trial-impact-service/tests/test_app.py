@@ -42,7 +42,7 @@ STRONG_WIN = {
     "binding_affinity_kcal_mol": -9.5,
     "kd_nM": 90.0,
     "target_occupancy_pct": 80.0,
-    "tox_flag": False,
+    "druglikeness_flag": False,
     "confidence": 0.9,
 }
 
@@ -51,7 +51,7 @@ RICH_SIM = {
     "target": "KRAS", "drug": "sotorasib", "tissue": "tumor", "dose_mg": 960.0,
     "binding_affinity_kcal_mol": -8.585, "kd_nM": 892.54,
     "cmax_ng_ml": 19259.45, "auc_ng_h_ml": 143963.8,
-    "target_occupancy_pct": 97.47, "tox_flag": True, "confidence": 0.9,
+    "target_occupancy_pct": 97.47, "druglikeness_flag": True, "confidence": 0.9,
     "provenance": {
         "uniprot": "P01116", "structure_source": "RCSB", "pdb_id": "7VVB",
         "smiles": "C[C@H]1CN(...)C(=O)C=C",
@@ -171,6 +171,39 @@ def test_webhook_rejects_bad_signature(ctx):
         headers={"Content-Type": "application/json", SIGNATURE_HEADER: "sha256=bad"},
     )
     assert resp.status_code == 401
+
+
+def test_webhook_fails_closed_without_secret(tmp_path):
+    """With no shared secret the endpoint fails *closed* (issue #8).
+
+    A signed request that would be accepted under a configured secret must be rejected
+    (503) when WATCHER_SHARED_SECRET is unset, rather than silently accepting unsigned
+    callers who each spend a Devin session."""
+    cfg = Config(
+        devin_api_key="test-devin", devin_api_base="http://devin.test",
+        sim_repo_url="https://example.test/repo", sim_repo_commit="a" * 40,
+        watcher_shared_secret="",  # unset
+        slack_webhook_url="", smtp_host="", smtp_port=587, smtp_user="",
+        smtp_password="", email_from="", email_to="",
+        tickers_path="tickers.json", market_moving_threshold=0.10,
+        database_path=str(tmp_path / "noauth.db"),
+    )
+    app = create_app(cfg, db=Database(cfg.database_path), devin=FakeDevin(),
+                     alerter=FakeAlerter(), tickers=TICKERS)
+    app.testing = True
+    client = app.test_client()
+    body = json.dumps(_payload()).encode()
+    # Even a body signed under some secret is refused — the server has no secret to check.
+    resp = client.post(
+        "/webhook/trial-update", data=body,
+        headers={"Content-Type": "application/json", SIGNATURE_HEADER: sign(SECRET, body)},
+    )
+    assert resp.status_code == 503
+    # And an unsigned request is refused too (never falls through to processing).
+    resp2 = client.post(
+        "/webhook/trial-update", data=body, headers={"Content-Type": "application/json"}
+    )
+    assert resp2.status_code == 503
 
 
 def test_webhook_rejects_missing_nct(ctx):
@@ -299,7 +332,7 @@ def test_extract_ignores_prompt_echo_and_takes_last_result():
     SIM_RESULT_JSON). The extractor must skip that echo and return Devin's real,
     final result — the exact bug seen in the first live Devin run."""
     example = '{"binding_affinity_kcal_mol": -9.2, "kd_nM": 180.4}'  # from the prompt
-    real = '{"binding_affinity_kcal_mol": -8.585, "kd_nM": 892.54, "tox_flag": true}'
+    real = '{"binding_affinity_kcal_mol": -8.585, "kd_nM": 892.54, "druglikeness_flag": true}'
     data = {
         "status_enum": "blocked",
         "structured_output": None,
@@ -311,46 +344,52 @@ def test_extract_ignores_prompt_echo_and_takes_last_result():
     }
     out = extract_sim_result(data)
     assert out["kd_nM"] == 892.54  # Devin's real value, NOT the prompt example 180.4
-    assert out["tox_flag"] is True
+    assert out["druglikeness_flag"] is True
 
 
-def test_missed_trial_tox_increases_downside():
-    """A tox flag must make a *failed* trial worse, never better — and molecular
-    potency must not rescue a miss (efficacy modifiers drop out for a miss)."""
+def test_druglikeness_flag_does_not_change_the_delta():
+    """The drug-likeness flag is informational, not a priced safety term (issue #3).
+
+    A ≥2-Lipinski-violation flag predicts oral absorption, not toxicity, and fires on
+    approved drugs (sotorasib), so it must move the PoS delta by exactly nothing — for
+    a win *and* for a miss. Efficacy modifiers still drop out for a miss."""
+    for outcome in ("met", "missed"):
+        ev = {"nct_id": "N", "endpoint_outcome": outcome, "target": "KRAS", "sponsor": "Amgen"}
+        flagged = dict(RICH_SIM)                       # druglikeness_flag True
+        clean = {**RICH_SIM, "druglikeness_flag": False}
+        assert market_model.pos_delta(ev, flagged) == market_model.pos_delta(ev, clean)
+        b = market_model.pos_breakdown(ev, flagged)
+        assert b["druglikeness_flag"] is True
+        assert "druglikeness_penalty" not in b and "tox_penalty" not in b
+    # potency does not rescue a miss: efficacy modifiers drop out.
     ev_miss = {"nct_id": "N", "endpoint_outcome": "missed", "target": "KRAS", "sponsor": "Amgen"}
-    tox_sim = dict(RICH_SIM)                      # tox_flag True, potent binder
-    clean_sim = {**RICH_SIM, "tox_flag": False}
-    d_tox = market_model.pos_delta(ev_miss, tox_sim)
-    d_clean = market_model.pos_delta(ev_miss, clean_sim)
-    assert d_tox < d_clean < 0                    # tox deepens the downside
-    b = market_model.pos_breakdown(ev_miss, clean_sim)
-    assert b["binding_modifier"] == 0.0 and b["occupancy_modifier"] == 0.0
+    b_miss = market_model.pos_breakdown(ev_miss, RICH_SIM)
+    assert b_miss["binding_modifier"] == 0.0 and b_miss["occupancy_modifier"] == 0.0
+    assert b_miss["final"] < 0
 
 
-def test_met_trial_unchanged_by_fix():
-    """Regression guard: the fix must not move the met-trial numbers (the demo runs
-    are both 'met')."""
+def test_met_trial_breakdown_numbers():
+    """Pin the met-trial arithmetic with drug-likeness no longer priced (issue #3)."""
     ev_met = {"nct_id": "N", "endpoint_outcome": "met", "target": "KRAS", "sponsor": "Amgen"}
     b = market_model.pos_breakdown(ev_met, RICH_SIM)
     # met: base .5, binding 0 (dg -8.585, kd 892 -> neither potent nor weak),
-    # occ +.15 (97%), tox -.15 (flag) -> subtotal .5 ; scale .95 -> .475
-    assert round(b["subtotal"], 3) == 0.5
-    assert abs(b["final"] - 0.475) < 1e-9
+    # occ +.15 (97%), drug-likeness flag not priced -> subtotal .65 ; scale .95 -> .6175
+    assert round(b["subtotal"], 3) == 0.65
+    assert abs(b["final"] - 0.6175) < 1e-9
 
 
 def test_unknown_outcome_does_not_emit_a_call_on_chemistry_alone():
     """No readout means no call.
 
     `unknown` is the default for every trial the watchlist has not enriched, so this
-    is the *common* path in production. A tox flag alone used to score
-    -0.15 × 0.95 = -0.1425, clear the 0.10 market-moving threshold, and emit a "down"
+    is the *common* path in production. A (then-priced) drug-likeness flag alone used to
+    score -0.15 × 0.95 = -0.1425, clear the 0.10 market-moving threshold, and emit a "down"
     call on a trial that had reported nothing — a spurious alert on the majority path.
     """
     ev = {"nct_id": "N", "endpoint_outcome": "unknown", "target": "KRAS", "sponsor": "Amgen"}
-    b = market_model.pos_breakdown(ev, RICH_SIM)   # RICH_SIM carries tox_flag=True
+    b = market_model.pos_breakdown(ev, RICH_SIM)   # RICH_SIM carries druglikeness_flag=True
 
     assert b["outcome_base"] == 0.0
-    assert b["tox_penalty"] == 0.0                 # was -0.15
     assert b["final"] == 0.0                       # was -0.1425
     assert abs(market_model.pos_delta(ev, RICH_SIM)) < 0.10   # below the threshold
 
@@ -376,7 +415,7 @@ def test_pos_breakdown_reduces_to_delta():
             # exact invariants on the raw components
             assert abs(
                 b["outcome_base"] + b["binding_modifier"]
-                + b["occupancy_modifier"] + b["tox_penalty"] - b["subtotal"]
+                + b["occupancy_modifier"] - b["subtotal"]
             ) < 1e-12
             assert abs(b["final"] - market_model.pos_delta(ev, sim)) < 1e-12
             # display components sum to the final (within rounding)
@@ -438,7 +477,7 @@ def test_fu_correction_flips_the_market_call():
     ev = {"nct_id": "NCT-VERIFY-002", "endpoint_outcome": "met",
           "target": "CFTR", "drug": "ivacaftor"}
     base_sim = {"binding_affinity_kcal_mol": -8.702, "kd_nM": 738.217,
-                "tox_flag": False, "confidence": 0.7}
+                "druglikeness_flag": False, "confidence": 0.7}
     total = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 94.54})
     free = market_model.pos_breakdown(ev, {**base_sim, "target_occupancy_pct": 14.76})
     assert total["occupancy_modifier"] == 0.15 and free["occupancy_modifier"] == -0.10
@@ -757,24 +796,25 @@ def _holo_pdb(n_ligand_atoms=8):
     return "".join(out)
 
 
-def test_docking_box_is_blind_not_ligand_centered(tmp_path):
+def test_docking_box_is_blind_and_spans_only_docked_atoms(tmp_path):
     """``compute_docking_box`` is the **Tier-D fallback** (blind, centroid-centered) box,
     used only when no curated/discovered co-crystal and no fpocket pocket is available
-    (see ``app.binding_site``). The default path is now pocket-aware; this asserts the
-    fallback still behaves as documented — enclosing every atom on a small receptor
-    rather than parking on an arbitrary ligand.
+    (see ``app.binding_site``). It now spans only ``ATOM`` records — matching what the
+    receptor prep actually docks — so it no longer stretches onto the co-crystal ligand,
+    waters, or ions (which are ``HETATM`` and are stripped before docking; issue #9).
     """
     pytest.importorskip("numpy")
     from app.simulation import compute_docking_box
 
     p = tmp_path / "holo.pdb"
-    p.write_text(_holo_pdb())
+    p.write_text(_holo_pdb())          # protein ATOMs at x=0; HETATM ligand at x=10
     center, size = compute_docking_box(str(p))
 
     lo, hi = center[0] - size[0] / 2, center[0] + size[0] / 2
-    assert lo <= 0.0 and hi >= 10.0     # spans protein (x=0) *and* ligand (x=10)
-    assert size != [22.5, 22.5, 22.5]   # not the reverted ligand-centered box
-    assert max(size) < 40.0             # the cap is NOT what produced this coverage
+    assert lo <= 0.0 <= hi              # encloses the protein (x=0)
+    assert hi < 10.0                    # but NOT the HETATM ligand at x=10 (#9)
+    assert center[0] == pytest.approx(0.0, abs=1e-6)  # centroid of ATOM records only
+    assert max(size) < 40.0            # the cap is NOT what produced this coverage
 
 
 def test_docking_box_stops_covering_the_receptor_once_the_40A_cap_binds(tmp_path):
@@ -823,7 +863,7 @@ def test_analysis_payload_and_route(ctx):
 
     payload = client.get("/analysis.json").get_json()
     assert payload["summary"]["analyzed"] == 2
-    assert payload["summary"]["tox_rate"] == 1.0
+    assert payload["summary"]["druglikeness_rate"] == 1.0
     assert len(payload["relationships"]["points"]) == 2
     run = payload["runs"][0]
     assert run["detail"]["pkpd_curve"] is not None
@@ -1036,6 +1076,109 @@ def test_select_binding_site_unsupported_warhead_warns_and_falls_back(tmp_path, 
     assert site.mode == "covalent-residue (curated holo, reversible fallback)"
     assert site.ligand_pdbqt is None
     assert any("not a tetherable" in w for w in site.warnings)
+
+
+def test_covalent_tether_prep_failure_stays_on_curated_structure(tmp_path, monkeypatch):
+    """A tether-prep failure must NOT re-resolve a different structure (issue #10).
+
+    The non-determinism we hit was: a curated covalent target (KRAS→6OIM) found its
+    reactive Cys, then Meeko tether prep failed in that environment, and the router
+    *silently degraded through discovery+fpocket to a different PDB* (7VVB) with a
+    materially different ΔG. Once the curated holo + reactive residue resolve we commit
+    to that structure: a tether-prep failure degrades to reversible scoring in the SAME
+    6OIM reactive-residue box, and never calls discovery/fpocket/fetch_structure.
+    """
+    pytest.importorskip("rdkit")
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+    from app.simulation import embed_ligand
+
+    holo = tmp_path / "6OIM.pdb"
+    holo.write_text(_covalent_holo_pdb())
+    monkeypatch.setattr(bs, "_fetch_experimental_pdb", lambda pdb_id, wd: (str(holo), "pdb"))
+
+    def _tether_boom(*a, **k):
+        raise RuntimeError("mk_prepare_ligand.py not on PATH (meeko not installed)")
+
+    monkeypatch.setattr(bs, "prepare_covalent_ligand", _tether_boom)
+    # If the router degrades correctly it must never reach these lower tiers.
+    def _reresolved(*a, **k):
+        pytest.fail("re-resolved a different structure instead of staying on the curated holo")
+
+    monkeypatch.setattr(bs, "discover_holo", _reresolved)
+    monkeypatch.setattr(bs, "fetch_structure", _reresolved)
+    monkeypatch.setattr(bs, "fpocket_box", _reresolved)
+
+    site = bs.select_binding_site(
+        target="KRAS", uniprot="P01116", smiles="C=CC(=O)Nc1ccccc1",
+        mol=embed_ligand("C=CC(=O)Nc1ccccc1"), covalent=True, workdir=str(tmp_path),
+    )
+    assert site.mode == "covalent-residue (curated holo, reversible fallback)"
+    assert site.structure_prov["pdb_id"] == "6OIM"        # same curated structure
+    assert site.center == [9.0, 10.0, 10.0]               # same reactive-residue box
+    assert site.ligand_pdbqt is None                      # reversible, not tethered
+    assert site.box_provenance["tether_failed"]
+    assert any("structure unchanged" in w for w in site.warnings)
+    # Structure checksum is recorded (not enforced) so drift is observable across runs.
+    assert len(site.structure_prov["structure_sha256"]) == 64
+
+
+def test_curated_route_structure_failure_marks_degradation(tmp_path, monkeypatch):
+    """A *structure-level* curated failure that falls through to a different PDB must be
+    queryable in provenance, not just a warning string (issue #10, 'fail loud')."""
+    pytest.importorskip("rdkit")
+    pytest.importorskip("numpy")
+    import app.binding_site as bs
+    from app.simulation import embed_ligand
+
+    def _cannot_fetch(pdb_id, wd):
+        raise RuntimeError("RCSB 503 for curated holo")
+
+    recep = tmp_path / "af.pdb"
+    recep.write_text(_reversible_holo_pdb())
+    monkeypatch.setattr(bs, "_fetch_experimental_pdb", _cannot_fetch)
+    monkeypatch.setattr(
+        bs, "fetch_structure",
+        lambda uni, wd: (str(recep), {"structure_source": "AlphaFold", "pdb_id": f"AF-{uni}-F1"}),
+    )
+    monkeypatch.setattr(bs, "fpocket_box", lambda pdb, wd: None)
+
+    site = bs.select_binding_site(
+        target="KRAS", uniprot="P01116", smiles="C=CC(=O)Nc1ccccc1",
+        mol=embed_ligand("C=CC(=O)Nc1ccccc1"), covalent=True, workdir=str(tmp_path),
+    )
+    assert site.mode == "blind"                                   # fell through
+    assert site.box_provenance["curated_route_degraded"] is True  # ...and says so
+    assert "covalent-tethered" in site.box_provenance["intended_route"]
+
+
+def test_discover_holo_ranks_by_pocket_quality_not_id_order(monkeypatch):
+    """Discovery picks the best-resolved drug-bound structure, deterministically.
+
+    Every hit already co-crystallises the drug, so among them the router must prefer the
+    structure that most faithfully resolves the pocket — sharpest method, then best
+    resolution — not RCSB's (drifting) relevance order or an arbitrary id. Here a 1.4 Å
+    X-ray beats a 3.5 Å cryo-EM and a lexicographically-smaller 2.9 Å X-ray.
+    """
+    pytest.importorskip("rdkit")
+    import app.binding_site as bs
+
+    def _ids(query):
+        return ["9ZZZ", "1AAA", "5MID"] if query["return_type"] == "entry" else ["LIG"]
+
+    quality = {
+        "9ZZZ": (0, 1.4),   # X-ray, high res  → best
+        "1AAA": (0, 2.9),   # X-ray, lower res (but smallest id)
+        "5MID": (1, 3.5),   # cryo-EM, low res
+    }
+    monkeypatch.setattr(bs, "_rcsb_ids", _ids)
+    monkeypatch.setattr(bs, "_entry_quality", lambda pid: quality[pid])
+
+    found = bs.discover_holo("P00000", "CC(=O)Oc1ccccc1C(=O)O")
+    assert found is not None
+    pdb_id, comps = found
+    assert pdb_id == "9ZZZ"        # best pocket, not min-id "1AAA" nor relevance-first
+    assert comps == ["LIG"]
 
 
 def test_fpocket_box_parses_top_pocket(tmp_path, monkeypatch):

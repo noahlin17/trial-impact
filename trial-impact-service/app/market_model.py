@@ -60,9 +60,10 @@ def pos_delta(event: dict[str, Any], sim: dict[str, Any] | None) -> float:
     """Probability-of-success delta in [-1, 1] from the readout + physics.
 
     The clinical readout dominates; the simulation corroborates or tempers it
-    (strong target engagement + high occupancy strengthen a win; weak binding or a
-    tox flag discount it). The whole signal is scaled by the simulation's
-    confidence when physics is available.
+    (strong target engagement + high occupancy strengthen a win; weak binding
+    discounts it). The whole signal is scaled by the simulation's confidence when
+    physics is available. The drug-likeness flag is informational and is *not* priced
+    (it predicts oral absorption, not safety — see ``run_simulation``).
     """
     return pos_breakdown(event, sim)["final"]
 
@@ -71,9 +72,10 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
     """Decompose the PoS delta into its contributions (the reasoning trace).
 
     Returns the ordered pieces that make up ``pos_delta`` — clinical base, binding,
-    occupancy, tox, and the confidence scaling — plus a ``components`` list for
-    display. ``pos_delta`` is exactly ``breakdown["final"]``, so the headline number
-    and the trace shown on the analysis dashboard can never disagree.
+    occupancy, and the confidence scaling — plus a ``components`` list for display.
+    ``pos_delta`` is exactly ``breakdown["final"]``, so the headline number and the
+    trace shown on the analysis dashboard can never disagree. The drug-likeness flag
+    is carried for display but contributes 0.0 — it is not a priced term.
     """
     outcome = (event.get("endpoint_outcome") or "unknown").lower()
     base = {"met": 0.5, "missed": -0.5}.get(outcome, 0.0)
@@ -87,7 +89,7 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
             "outcome_base": base,
             "binding_modifier": 0.0,
             "occupancy_modifier": 0.0,
-            "tox_penalty": 0.0,
+            "druglikeness_flag": False,
             "subtotal": base,
             "confidence_scale": 0.6,
             "final": final,
@@ -115,32 +117,50 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
         elif occ < 30:
             occ_raw = -0.10
 
-    tox_raw = -0.15 if sim.get("tox_flag") else 0.0
+    druglike = bool(sim.get("druglikeness_flag"))
 
-    # Apply modifiers by *meaning*, not by mirroring the readout sign. (The old code
-    # multiplied every modifier by direction=-1 for a miss, which let a tox flag
-    # perversely *reduce* the downside of a failed trial.)
+    # Apply modifiers by *meaning*, not by mirroring the readout sign.
     #   - Efficacy corroboration (binding, occupancy) only strengthens a WIN;
     #     molecular potency doesn't rescue a missed clinical endpoint, so it is
     #     dropped for a miss. The met path is therefore byte-identical to before.
-    #   - Tox is always a risk term (negative) — for wins and misses alike.
+    #   - The drug-likeness flag (≥2 Lipinski violations) is *not priced*: it predicts
+    #     oral absorption, not toxicity, and fires on approved drugs (sotorasib). It was
+    #     previously charged -0.15 as if a safety finding had occurred; that conflated a
+    #     drug-likeness heuristic with a safety event, so it is now surfaced for display
+    #     only and contributes nothing to the delta.
     #
     # Every term here is a *modifier on a readout*. With no readout (outcome unknown,
     # base 0.0) there is nothing to modify, so they are all dropped and the model
-    # declines to call. Otherwise a tox flag alone scored -0.15 × 0.95 = -0.1425,
-    # cleared the 0.10 market-moving threshold, and emitted a "down" call on chemistry
-    # with no clinical news behind it — and `unknown` is the default for every trial
-    # the watchlist has not enriched, so that was the common path, not an edge case.
+    # declines to call — the no-call gate falls out of the design, it is not a patch.
     is_win = base > 0
     has_readout = outcome in ("met", "missed")
     binding = binding_raw if is_win else 0.0
     occupancy = occ_raw if is_win else 0.0
-    tox = tox_raw if has_readout else 0.0
-    subtotal = base + binding + occupancy + tox
+    subtotal = base + binding + occupancy
 
     confidence = sim.get("confidence") or 0.7
     scale = 0.5 + 0.5 * confidence
     final = _clamp(subtotal * scale)
+
+    if has_readout:
+        components = [
+            {"label": f"Endpoint {outcome}", "value": round(base, 3)},
+            {"label": "Binding (ΔG / Kd)", "value": round(binding, 3)},
+            {"label": "Target occupancy", "value": round(occupancy, 3)},
+            {"label": f"× confidence {round(scale, 2)}", "value": round(final - subtotal, 3)},
+        ]
+        if druglike:
+            components.append(
+                {"label": "Drug-likeness flag (informational, not priced)", "value": 0.0}
+            )
+    else:
+        components = [
+            {"label": f"Endpoint {outcome} — no call", "value": 0.0},
+            {
+                "label": "Physics is a modifier on a readout, not a signal on its own",
+                "value": 0.0,
+            },
+        ]
 
     return {
         "outcome": outcome,
@@ -148,25 +168,11 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
         "outcome_base": base,
         "binding_modifier": binding,
         "occupancy_modifier": occupancy,
-        "tox_penalty": tox,
+        "druglikeness_flag": druglike,
         "subtotal": subtotal,
         "confidence_scale": scale,
         "final": final,
-        "components": [
-            {"label": f"Endpoint {outcome}", "value": round(base, 3)},
-            {"label": "Binding (ΔG / Kd)", "value": round(binding, 3)},
-            {"label": "Target occupancy", "value": round(occupancy, 3)},
-            {"label": "Tox flag", "value": round(tox, 3)},
-            {"label": f"× confidence {round(scale, 2)}", "value": round(final - subtotal, 3)},
-        ]
-        if has_readout
-        else [
-            {"label": f"Endpoint {outcome} — no call", "value": 0.0},
-            {
-                "label": "Physics is a modifier on a readout, not a signal on its own",
-                "value": 0.0,
-            },
-        ],
+        "components": components,
     }
 
 
@@ -273,8 +279,11 @@ def _sponsor_rationale(event: dict[str, Any], sim: dict[str, Any] | None, delta:
             parts.append(f"Docking ΔG {dg_txt} kcal/mol (Kd {sim.get('kd_nM')} nM).")
         if occ is not None:
             parts.append(f"Peak target occupancy {occ}%.")
-        if sim.get("tox_flag"):
-            parts.append("Structural tox flag raised.")
+        if sim.get("druglikeness_flag"):
+            parts.append(
+                "Drug-likeness flag (≥2 Lipinski violations) — informational, "
+                "predicts oral absorption, not toxicity; not priced into the call."
+            )
     else:
         parts.append("Simulation unavailable; call based on the readout alone.")
     parts.append(f"PoS delta {delta:+.2f}.")

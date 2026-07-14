@@ -47,7 +47,7 @@
   <div class="cards" id="cards"></div>
 
   <h2>Physics → price relationships</h2>
-  <p class="legend">Each point is one run (hover for drug/target). Red = structural tox flag.</p>
+  <p class="legend">Each point is one run (hover for drug/target). Red = drug-likeness flag (≥2 Lipinski violations; informational, not a safety signal).</p>
   <div class="charts">
     <div class="chart"><h3>Binding ΔG vs PoS delta</h3><div id="c_dg_pos"></div></div>
     <div class="chart"><h3>Kd (log) vs target occupancy</h3><div id="c_kd_occ"></div></div>
@@ -69,7 +69,7 @@
         <th data-key="dg">ΔG</th>
         <th data-key="kd">Kd (nM)</th>
         <th data-key="occupancy">Occ %</th>
-        <th data-key="tox">Tox</th>
+        <th data-key="druglikeness">Drug-likeness</th>
         <th data-key="pos_delta">PoS Δ</th>
         <th data-key="sponsor_ticker">Call</th>
         <th data-key="pdb_id">Structure</th>
@@ -96,7 +96,7 @@
       const s = DATA.summary;
       const items = [
         ["Runs", s.analyzed], ["Mean ΔG", num(s.mean_dg, 2)],
-        ["Mean occ %", num(s.mean_occupancy, 1)], ["Tox rate", s.tox_rate === null ? "—" : num(s.tox_rate * 100, 0) + "%"],
+        ["Mean occ %", num(s.mean_occupancy, 1)], ["Drug-likeness rate", s.druglikeness_rate === null ? "—" : num(s.druglikeness_rate * 100, 0) + "%"],
         ["Mean PoS Δ", s.mean_pos_delta === null ? "—" : (s.mean_pos_delta > 0 ? "+" : "") + num(s.mean_pos_delta, 2)],
         ["Market-moving", s.market_moving],
       ];
@@ -120,7 +120,7 @@
       const p = DATA.relationships.points;
       if (!p.length) { document.querySelector(".charts").innerHTML = '<p class="muted">No completed runs yet.</p>'; return; }
       const txt = p.map(d => `${d.target} × ${d.drug}`);
-      const col = p.map(d => d.tox ? "#a11f1f" : "#2a6df4");
+      const col = p.map(d => d.druglikeness ? "#a11f1f" : "#2a6df4");
       scatter("c_dg_pos", p.map(d => d.dg), p.map(d => d.pos), txt, col, "ΔG (kcal/mol)", "PoS Δ", false);
       scatter("c_kd_occ", p.map(d => d.kd), p.map(d => d.occ), txt, col, "Kd (nM)", "occupancy %", true);
       scatter("c_occ_pos", p.map(d => d.occ), p.map(d => d.pos), txt, col, "occupancy %", "PoS Δ", false);
@@ -165,7 +165,7 @@
           <td><strong>${r.target ?? "—"}</strong></td><td>${r.drug ?? "—"}</td>
           <td>${(r.phase || "—").replace("PHASE", "P")}</td>
           <td>${num(r.dg, 2)}${r.dg_sd != null ? "±" + num(r.dg_sd, 2) : ""}</td><td>${num(r.kd, 0)}</td><td>${num(r.occupancy, 1)}</td>
-          <td>${r.tox ? "⚠︎" : "·"}</td>
+          <td>${r.druglikeness ? "⚠︎" : "·"}</td>
           <td>${r.pos_delta > 0 ? "+" : ""}${num(r.pos_delta, 2)}</td>
           <td class="${r.direction}">${arrow(r.direction)} ${r.sponsor_ticker ?? "—"}</td>
           <td>${r.pdb_id ? `<code>${r.pdb_id}</code>` : "—"}</td>

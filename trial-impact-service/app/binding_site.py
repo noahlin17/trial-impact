@@ -9,11 +9,21 @@ instead picks the box by **chemistry and target class**, and records which tier 
 
   ``covalent-tethered``  a covalent warhead + a curated covalent target class: the free
       drug is tethered to the class's reactive cysteine (auto-detected from the curated
-      drug-bound holo structure) and docked in a box centred on that residue.
+      drug-bound holo structure) and docked in a box centred on that residue. Once the
+      curated holo + reactive residue resolve, the router **commits to that structure**: if
+      only the tether *preparation* fails (e.g. Meeko missing in an environment), it degrades
+      to ``covalent-residue`` on the *same* structure/box rather than re-resolving a
+      different PDB, so a toolchain hiccup never silently changes the structure or its ΔG.
+  ``covalent-residue``   the curated covalent holo resolved but the warhead is not tetherable
+      (or tether prep failed): reversible docking in the reactive-residue box of that same
+      curated structure (recorded, and its ``ligand_pdbqt`` is ``None``).
   ``holo (curated)``     a curated drug-bound structure for the target class: box on the
       co-crystallised ligand.
   ``holo (discovered)``  no curated entry, but a PDB of this target co-crystallises this
-      drug (matched by chemical graph via the RCSB search API): box on that ligand.
+      drug (matched by chemical graph via the RCSB search API): box on that ligand. Among
+      the drug-bound hits the router picks the one that best resolves the pocket (sharpest
+      experimental method, then best resolution, then a deterministic id tiebreak), so the
+      choice is both reproducible and scientifically principled.
   ``fpocket``            no co-crystal: the top geometric pocket from fpocket. Geometry
       ranks pockets, not biology — it can miss the real site (fpocket's top CFTR pocket is
       ~79 Å from the ivacaftor site), so this is a **caveated** fallback.
@@ -50,6 +60,7 @@ from .simulation import (
     _log,
     compute_docking_box,
     fetch_structure,
+    structure_checksum,
 )
 
 # Covalent-bond distance: a Cys Sγ within this of a bound hetero atom *is* the covalent
@@ -63,6 +74,20 @@ _LIGAND_BOX_PAD_A = 8.0
 _LIGAND_BOX_CAP_A = 30.0
 
 _RCSB_SEARCH = "https://search.rcsb.org/rcsbsearch/v2/query"
+_RCSB_ENTRY = "https://data.rcsb.org/rest/v1/core/entry/"
+
+# How faithfully a method resolves a small-molecule pocket, best first. High-resolution
+# X-ray gives the sharpest side-chain/ligand coordinates that define a docking box; cryo-EM
+# is usually lower-resolution for small molecules; a solution-NMR ensemble has no single
+# well-defined pocket. This orders *which drug-bound structure best represents the geometry
+# binding actually occurs in* — not an arbitrary id order.
+_METHOD_RANK: dict[str, int] = {
+    "X-RAY DIFFRACTION": 0,
+    "ELECTRON MICROSCOPY": 1,
+    "ELECTRON CRYSTALLOGRAPHY": 1,
+    "SOLUTION NMR": 2,
+    "SOLID-STATE NMR": 2,
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -313,8 +338,37 @@ def discover_holo(uniprot: str, smiles: str) -> tuple[str, list[str]] | None:
         return None
     if not comps:
         return None
-    _log(f"discovered holo {entries[0]} for drug (ligand candidates {comps})")
-    return entries[0], comps
+    # Every hit already co-crystallises the drug (chem + UniProt filter), so choose the one
+    # that best captures the drug-bound pocket geometry: sharpest experimental method, then
+    # best (lowest) resolution, with the PDB id as a final deterministic tiebreak. This is
+    # both reproducible (RCSB's own relevance order drifts) and scientifically principled —
+    # the box is only as good as the structure that resolves the binding site.
+    ranked = sorted(entries, key=lambda pid: (*_entry_quality(pid), pid))
+    pdb_id = ranked[0]
+    comps = sorted(comps)
+    _log(f"discovered holo {pdb_id} for drug (ranked {ranked}; ligand candidates {comps})")
+    return pdb_id, comps
+
+
+def _entry_quality(pdb_id: str) -> tuple[int, float]:
+    """``(method_rank, resolution_Å)`` for ranking drug-bound holo candidates.
+
+    Fetches the RCSB entry metadata and scores it by how faithfully it resolves a
+    small-molecule pocket (see :data:`_METHOD_RANK`): experimental method first, then
+    resolution ascending. A fetch/parse failure or a resolution-less method sorts last
+    (``inf``) so a well-characterised structure always wins, and the caller still applies a
+    deterministic PDB-id tiebreak — so ranking degrades gracefully, never crashes.
+    """
+    try:
+        resp = requests.get(_RCSB_ENTRY + pdb_id, timeout=_HTTP_TIMEOUT)
+        resp.raise_for_status()
+        info = resp.json().get("rcsb_entry_info", {})
+    except (requests.RequestException, ValueError):
+        return (99, float("inf"))
+    method = (info.get("experimental_method") or "").upper()
+    res_list = info.get("resolution_combined") or []
+    resolution = float(res_list[0]) if res_list else float("inf")
+    return (_METHOD_RANK.get(method, 50), resolution)
 
 
 def _rcsb_ids(query: dict) -> list[str]:
@@ -394,8 +448,18 @@ def select_binding_site(
     """Pick structure + docking box by chemistry/target class (see module docstring)."""
     warnings: list[str] = []
     entry = resolve_target_class(target)
+    # When a *curated* route fails at the structure level and we fall through to a
+    # different structure, this records what we intended so the degradation is queryable
+    # in provenance (``curated_route_degraded``), not just a warning string (issue #10).
+    intended_route: str | None = None
 
-    # Tier A/covalent — curated covalent class + a tetherable warhead.
+    # Tier A/covalent — curated covalent class + a tetherable warhead. Once the curated
+    # holo resolves and its reactive residue is located, the router *commits to that
+    # structure*: only a structure-level failure (can't fetch it / no reactive Cys) falls
+    # through to a different PDB. A failure in the tether *preparation* (e.g. Meeko absent
+    # in a given environment) degrades to reversible scoring in the **same** reactive-
+    # residue box — so a toolchain hiccup can change the pose method but never silently
+    # swap the structure and its ΔG provenance (the non-determinism behind issue #10).
     if covalent and entry and entry.covalent:
         tether = covalent_tether(mol)
         if tether is None:
@@ -404,34 +468,50 @@ def select_binding_site(
                 "configured); docking reversibly in the reactive pocket"
             )
         try:
-            pdb_path, prov = _fetch_experimental_pdb(entry.holo_pdb, workdir)
-            prov = {"structure_source": "RCSB", "pdb_id": entry.holo_pdb,
-                    "structure_format": prov}
+            pdb_path, fmt = _fetch_experimental_pdb(entry.holo_pdb, workdir)
             reactive = detect_reactive_cys(pdb_path)
             if reactive is None:
                 raise RuntimeError("no reactive cysteine found in curated holo")
             chain, resnum = reactive
             center, size = residue_box(pdb_path, chain, resnum)
-            box_prov = {"target_class": entry.label,
-                        "reactive_residue": f"{chain}:CYS:{resnum}"}
+        except Exception as exc:  # noqa: BLE001 — structure unusable: this is the ONLY
+            # covalent failure allowed to change the structure, and it is recorded loudly.
+            intended_route = f"covalent-tethered (curated holo {entry.holo_pdb})"
+            warnings.append(
+                f"curated covalent holo {entry.holo_pdb} is unusable ({exc}); falling "
+                "through to a different structure — result is NOT the curated covalent route"
+            )
+        else:
+            prov = {"structure_source": "RCSB", "pdb_id": entry.holo_pdb,
+                    "structure_format": fmt,
+                    "structure_sha256": structure_checksum(pdb_path)}
+            box_prov: dict[str, Any] = {"target_class": entry.label,
+                                        "reactive_residue": f"{chain}:CYS:{resnum}"}
             ligand_pdbqt = None
             mode = "covalent-residue (curated holo, reversible fallback)"
             if tether is not None:
                 family, tether_smarts, indices = tether
-                # Meeko's tether prep parses the receptor with ProDy for the residue
-                # geometry; give it a protein-only PDB so bound hetero groups (GDP/MOV)
-                # do not trip its residue-template generation.
-                clean = _write_clean_receptor(pdb_path, os.path.join(workdir, "cov_rec.pdb"))
-                ligand_pdbqt = prepare_covalent_ligand(
-                    mol, clean, chain, resnum, tether_smarts, indices, workdir
-                )
-                box_prov["tether"] = {"warhead": family, "smarts": tether_smarts}
-                mode = "covalent-tethered (curated holo)"
+                try:
+                    # Meeko's tether prep parses the receptor with ProDy for the residue
+                    # geometry; give it a protein-only PDB so bound hetero groups (GDP/MOV)
+                    # do not trip its residue-template generation.
+                    clean = _write_clean_receptor(
+                        pdb_path, os.path.join(workdir, "cov_rec.pdb")
+                    )
+                    ligand_pdbqt = prepare_covalent_ligand(
+                        mol, clean, chain, resnum, tether_smarts, indices, workdir
+                    )
+                    box_prov["tether"] = {"warhead": family, "smarts": tether_smarts}
+                    mode = "covalent-tethered (curated holo)"
+                except Exception as exc:  # noqa: BLE001 — degrade WITHIN this structure
+                    warnings.append(
+                        f"covalent tether prep failed ({exc}); docking reversibly in the "
+                        f"same {entry.holo_pdb} reactive-residue box (structure unchanged)"
+                    )
+                    box_prov["tether_failed"] = str(exc)
             return DockingSite(pdb_path, prov, center, size, mode,
                                ligand_pdbqt=ligand_pdbqt, box_provenance=box_prov,
                                warnings=warnings)
-        except Exception as exc:  # noqa: BLE001 — degrade to a lower tier, never crash
-            warnings.append(f"covalent docking unavailable ({exc}); using a fallback box")
 
     # Tier A (reversible) — curated co-crystal ligand box.
     if entry and entry.holo_ligand:
@@ -440,12 +520,14 @@ def select_binding_site(
             center, size, code = ligand_box(pdb_path, entry.holo_ligand)
             return DockingSite(
                 pdb_path,
-                {"structure_source": "RCSB", "pdb_id": entry.holo_pdb, "structure_format": fmt},
+                {"structure_source": "RCSB", "pdb_id": entry.holo_pdb, "structure_format": fmt,
+                 "structure_sha256": structure_checksum(pdb_path)},
                 center, size, "holo-ligand (curated)",
                 box_provenance={"target_class": entry.label, "co_crystal_ligand": code},
                 warnings=warnings,
             )
         except Exception as exc:  # noqa: BLE001
+            intended_route = f"holo-ligand (curated {entry.holo_pdb})"
             warnings.append(f"curated holo box unavailable ({exc}); trying discovery")
 
     # Tier B — auto-discovered co-crystal (reversible drugs only; adducts won't match).
@@ -462,9 +544,11 @@ def select_binding_site(
                 center, size, code = ligand_box(pdb_path, comps)
                 return DockingSite(
                     pdb_path,
-                    {"structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt},
+                    {"structure_source": "RCSB", "pdb_id": pdb_id, "structure_format": fmt,
+                     "structure_sha256": structure_checksum(pdb_path)},
                     center, size, "holo-ligand (discovered)",
-                    box_provenance={"co_crystal_ligand": code, "discovered": True},
+                    box_provenance={"co_crystal_ligand": code, "discovered": True,
+                                    **_degraded(intended_route)},
                     warnings=warnings,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -477,12 +561,26 @@ def select_binding_site(
         center, size = pocket
         return DockingSite(pdb_path, prov, center, size, "fpocket",
                            box_provenance={"pocket_source": "fpocket",
-                                           "caveat": "geometric ranking, not proven site"},
+                                           "caveat": "geometric ranking, not proven site",
+                                           **_degraded(intended_route)},
                            warnings=warnings)
     center, size = compute_docking_box(pdb_path)
     return DockingSite(
         pdb_path, prov, [round(c, 3) for c in center], [round(s, 3) for s in size],
         "blind", box_provenance={"caveat": "centroid box; searches a central slab of a "
-                                 "large receptor, not a resolved pocket"},
+                                 "large receptor, not a resolved pocket",
+                                 **_degraded(intended_route)},
         warnings=warnings,
     )
+
+
+def _degraded(intended_route: str | None) -> dict[str, Any]:
+    """Provenance marking a curated route that fell through to a *different* structure.
+
+    Empty when nothing degraded, so the fields only appear when a curated covalent/holo
+    route failed at the structure level and a lower tier picked a different PDB — making
+    the degradation queryable (``curated_route_degraded``), not just a warning string.
+    """
+    if intended_route is None:
+        return {}
+    return {"curated_route_degraded": True, "intended_route": intended_route}

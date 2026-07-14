@@ -107,12 +107,17 @@ On that view, scoring readouts is not the product. It is how the training set ge
 
 ### 3.1 The seam
 
-The market model currently gates every physics modifier on `has_readout`: with no clinical
-result, it returns no call. This was a bug fix — the earlier version emitted a directional
-call from chemistry alone, on trials that had reported nothing.
+The market model gates every physics modifier on `has_readout`: with no clinical result it
+returns no call. This is a founding contract, not a patch — **the chemistry is an *input* to a
+probability estimate, never a standalone directional call.** A ΔG is not evidence that a stock
+should move; only a clinical readout (or, later, a calibrated forecast) is entitled to a
+directional call, and the physics enters as one term inside it. An early build violated this
+invariant — it emitted a directional call from chemistry alone on trials that had reported
+nothing — and the fact that that read as a *bug* is the point: the no-call gate is the correct
+behaviour falling out of the design, not a special case bolted on.
 
-That gate is where a predictive model would attach. At present, "no readout" correctly means
-"no call." A predictive version would replace that refusal with a forecast, and would only be
+That gate is also where a predictive model would attach. At present, "no readout" means "no
+call." A predictive version would replace that refusal with a forecast, and would only be
 entitled to do so once the underlying estimates are good enough to stand without a clinical
 result behind them. They are not currently.
 
@@ -141,18 +146,41 @@ anything the docking produces. Open Targets exposes a genetic-association score 
 target–indication pair at no cost. Combining a target-validation axis with a molecule axis
 seems defensible; either alone does not.
 
-### 3.3 Phase 1 and Phase 2 are different problems
+### 3.3 The chemistry is a preclinical / Phase 1 instrument by construction
 
-Phase 1 endpoints are predominantly safety, tolerability, maximum tolerated dose and
-pharmacokinetics rather than efficacy, with oncology dose-expansion cohorts a partial
-exception. If the physics is more useful in Phase 1, it is for a narrower reason than it
-first appears: what it can speak to is whether free drug concentration can plausibly exceed
-Kd at the target at a tolerated dose. That is a therapeutic-index question, and it is within
-the reach of chemistry and PK.
+The system is built for one tier — **preclinical / Phase 1** — and that follows directly from what it
+measures. The question this pipeline answers — *does the molecule engage its target at a tolerated
+exposure?* — is a molecular property that is fixed from the start and is largely resolved by the time
+a drug clears Phase 1. Nothing that happens in Phase 2 or Phase 3 makes the *binding* more
+interesting, so the actionable scope is Phase 1; Phase 2/3 events are educational illustrations and
+there is rarely a reason to run the chemistry on them:
 
-Phase 2 is an efficacy question, and therefore largely a target-validation question. The
-physics is necessary but not close to sufficient, and the genetics axis would carry most of
-the weight.
+- **Binding affinity is a property of the molecule and the structure, not of the trial.** ΔG does
+  not change between phases; only our knowledge of the downstream *clinical* consequences does.
+- **Engagement is effectively proven out by end of Phase 1.** Phase 1 (plus preclinical) is where
+  human PK, tolerated dose and — increasingly — direct target-occupancy readouts establish whether
+  free drug reaches and occupies the target. That is exactly the therapeutic-index question chemistry
+  and PK can speak to: can free drug concentration plausibly exceed Kd at a tolerated dose.
+- **What P2/P3 add is orthogonal to what we model.** Phase 2 tests whether engaging the target
+  helps patients (efficacy → a *target-validation* / disease-biology question); Phase 3 tests whether
+  that effect replicates at scale with adequate statistics and safety (trial-execution / statistical
+  questions). None of these is a binding question, so the docking output becomes progressively more
+  redundant as clinical data accumulates and the market prices it in.
+
+So the incremental information from the physics is highest exactly when clinical uncertainty about
+engagement is highest — at preclinical / Phase 1 — and decays to near-zero by Phase 2/3, where the
+genetics/target-validation axis (§3.2) and the trial result itself carry the call. The one way
+later-phase data would *sharpen* the chemistry is indirect: measured human PK / plasma-protein
+binding can replace our generic PK and `fu` placeholders — but that improves the *inputs*, it does
+not make binding a more relevant question at that stage.
+
+**Practical rule:** run and act on preclinical / Phase 1. Treat any Phase 2/3 run as an
+illustration of the pipeline, not a tradeable signal.
+
+A single-tier scope means **there is no phase weighting anywhere in the model** —
+`market_model.assess` is phase-agnostic. Phase decides only *whether* an event is actionable
+(Phase 1) or educational (Phase 2/3); it never scales the call. Phase-dependent coefficients would
+only make sense across multiple tradeable tiers, and there is only one here.
 
 ### 3.4 A retrospective check the current build does not pass
 
