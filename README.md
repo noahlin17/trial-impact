@@ -123,11 +123,14 @@ are engagement-count and PoS, not Kd/occupancy; occupancy is shown only when a c
 > *could* eventually feed; nothing here is a tradeable claim. The defensible, tested core of the
 > project is the biophysics validation above.
 
-A desk watching a readout receives a label: the endpoint was met, or it was not. That label is
-public within minutes and priced quickly, and it says little about whether the molecule should
-have been expected to work. This system produces a second input for the same event — a
-continuous estimate of target engagement — which can be scored against realized outcomes,
-entered into a probability model as one feature among several, and accumulated into a dataset.
+The goal is **predictive intelligence in the window between a trial's design becoming public and
+its readout** — using computational chemistry (and, over time, the other structure-derived axes
+below) to estimate a quantity the trial is *testing but has not yet reported*, before the outcome
+is known. That estimate is scored against the realized outcome, entered into a probability model as
+one feature among several, and accumulated into a dataset. Reacting to a readout *after* it prints
+is a possible secondary use — the label is public within minutes and priced quickly, and says
+little about whether the molecule *should* have been expected to work — but it is not the aim; the
+value is in the estimate formed *ahead* of the event.
 
 The reason to attempt it now is cost. Structure-based chemistry per trial has historically
 required a computational chemist. An agent sandbox does it per event, in minutes, for roughly
@@ -266,39 +269,29 @@ and the rendered dashboards — open the `.html` files in a browser). Docking ru
 `regen_artifacts.py` against the pinned stack; `run_real.py` runs the same pipeline in a live
 Devin session.)
 
-**Read the engagement + exposure columns as the product and the model call as scaffolding.** The
-**geometric engagement** classification and exposure (Cmax/AUC) are the pipeline's structured readout
-— the *modality* a pricing model would eventually consume — but as computed today they are **not
-net-new**: engagement is a confirmatory *public* preclinical fact (an entry criterion, issue #4) and
-the exposure comes from a generic PK model, so neither is an un-priced signal. What would make this
-modality net-new is the future work in [What it would take to be edge-generating](#what-it-would-take-to-be-edge-generating--compute-the-unknowns-not-the-knowns)
-(calibrated affinity, human PK, occupancy), not these confirmatory outputs. The docking ΔG beside
-them is a *docking-objective diagnostic*, not an affinity and not comparable across the two rows
-(issue #4). The `Model call` column is the transparent rules-based placeholder described above; it
-shows that the pipeline runs end to end, and it is not a trade.
+**Read the engagement + exposure columns as the product, the ΔG as a diagnostic, and the model call
+as scaffolding.** Engagement + exposure are the pipeline's structured readout — the *modality* a
+pricing model would eventually consume — but as computed today they are **not net-new** (engagement
+is a confirmatory public fact; exposure is generic PK). The ΔG beside them is a docking-objective
+diagnostic, not an affinity and not comparable across rows (issue #4), and the `Model call` is the
+rules-based placeholder — it shows the pipeline runs end to end, not a trade.
 
 | Drug (status) | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call *(rules-based demo — not a prediction)* |
 |-------|---------------|-----------|-----------|---------------|-----|-----------|
 | **Approved** (Lumakras, 2021) | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | AMGN ↑ · REGN/NVS ↓ *(illustrative)* |
 | **Approved** (Kalydeco, 2012) | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | VRTX ↑ · CRSP/BLUE ↓ *(illustrative)* |
 
-**Both are *approved* drugs, chosen precisely because the answer is already known — this is a
-backtest of the pipeline against ground truth, not a forecast.** Each has a resolved co-crystal and a
-public clinical history, so a correct run is *expected* to recover a clean `experimental-site`
-engagement; the point is to confirm the pipeline does so end to end and reproducibly, not to predict
-anything. That is exactly why these two rows carry **no tradeable signal**: engagement is a
-confirmatory preclinical fact here, and re-deriving a public fact about an approved drug is a
-**retrospective known-readout re-simulation** — a benchmark, not an edge. (Why an event's *phase*
-would only shift a *live* run's information timing, never what the chemistry computes, is in
-[Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument).)
+**Both are *approved* drugs, chosen because the answer is already known — this is a backtest against
+ground truth, not a forecast.** A correct run is *expected* to recover a clean `experimental-site`
+engagement, so these rows carry **no tradeable signal**: re-deriving a public fact about an approved
+drug is a benchmark of the pipeline, not an edge.
 
-The *scoring* layer is deterministic from committed source (engagement class, Cmax, and both PoS
-deltas fall out of the mean ΔG and route by fixed arithmetic), **but the ΔG numbers carry no
-provenance as measurements — read them as illustrative outputs.** They are not point-in-time
-reproducible (the structure is resolved *live*, issue #10 — routing KRAS to 7VVB/fpocket gives −5.91
-vs 6OIM's −7.202), and even a stable number is a docking-objective score, cognate here and only a
-reversible lower bound for covalent KRAS — not an affinity. What *is* verifiable is integrity:
-`code_patched: false` confirms the number came from `simulation.py` unpatched (see below).
+The scoring layer is deterministic from committed source, **but the ΔG numbers carry no measurement
+provenance** — they are not point-in-time reproducible (structure resolved *live*, issue #10 —
+routing KRAS to 7VVB/fpocket gives −5.91 vs 6OIM's −7.202), and even a stable number is a
+docking-objective score (cognate, and a reversible lower bound for covalent KRAS), not an affinity.
+What *is* verifiable is integrity: `code_patched: false` confirms the number came from
+`simulation.py` unpatched (see below).
 
 **‡ The engagement column is *geometry, not strength*.** It records that the ligand docked into the
 *experimentally-resolved* binding site (a curated holo / covalent-tethered residue) with a
@@ -389,69 +382,34 @@ same mechanism as `endpoint_outcome`) or a structure→PK model.
 
 ### Trial phase — a preclinical / discovery-stage instrument
 
-The pipeline answers *does the molecule engage its target at a plausible exposure?* — and that is a
-**preclinical / discovery-stage** question, not one a clinical trial is designed to answer. It is
-important to be precise about what a trial actually resolves:
+The pipeline answers *does the molecule engage its target at a plausible exposure?* — a
+**preclinical / discovery-stage** question. Target engagement is an **entry criterion proven before
+Phase 1** (preclinical potency, selectivity, often a co-crystal), and ΔG is a fixed molecular
+property, so at any trial the docking is **confirmatory of an already-public fact**, not new
+information. What Phase 1 actually tests — human safety, PK, tolerated dose — is orthogonal to the
+chemistry and *not computed here* (occupancy unset, PK generic, `F`=1); Phase 2/3 test efficacy and
+disease biology the physics does not touch.
 
-- **Target engagement is proven *before* Phase 1.** A molecule only reaches the clinic after
-  preclinical potency, selectivity, and often co-crystal / cell target-engagement data. Engagement is
-  an **entry criterion**, and ΔG is a fixed molecular property that does not change between phases —
-  so the docking result is **confirmatory of an already-established preclinical fact**, not new
-  information generated at the trial.
-- **What Phase 1 genuinely tests is orthogonal to the chemistry:** human safety / tolerability,
-  human PK, and the tolerated dose. The pipeline does **not** compute these — occupancy is unset, and
-  exposure comes from a *generic* PK model (fixed `ka`/`Vd`/`CL`, `F`=1), not a human-calibrated one.
-- **Phase 2 / 3** ask further questions the physics does not touch: P2 efficacy (a
-  target-validation / disease-biology question), P3 replication at scale with statistics and safety.
+The system runs on clinical events only because ClinicalTrials.gov is the available **event feed**,
+so phase governs only *information timing*, never what the chemistry computes. A Phase 1 event's
+outcome is not yet public but its engagement is, so the pipeline as-is surfaces **no un-priced
+signal**; a later-phase run is an explicit **retrospective known-readout re-simulation** (a
+benchmark, see [THESIS §3.3](THESIS.md)). The market model is phase-agnostic by design.
 
-So the chemistry is most informative in **discovery / lead optimisation — before the clinic** — where
-engagement is genuinely uncertain. The system runs it on clinical events only because
-ClinicalTrials.gov is the available **event feed**; that is an operational trigger, not a claim that a
-trial is where the physics carries the most information. The phase of an event therefore matters only
-for *information timing*, not for what the chemistry can compute:
+This is not a dead end: the reproducible pocket route + docked pose is the **first validated
+primitive** the predictive pieces consume ([Next steps](#next-steps)). **Phase 1 is the
+*hypothesised* tier to build toward** — first-in-human (least public data), and what it validates is
+chemistry-grounded (human PK, tolerability, occupancy), so those quantities *might* be estimable from
+structure before the readout prints, unlike the disease biology Phase 2/3 tests. This is a hypothesis,
+not a result: the current build computes none of it, and even built it would be a wide-error prior
+unproven until the backtest runs.
 
-- **Phase 1 event** — the trial's *outcome* is not yet public, but engagement (all the chemistry
-  computes) already is, so the pipeline as-is surfaces **no un-priced signal** here; it is simply not
-  yet benchmarking against a public readout. Any genuine un-priced signal would have to come from the
-  *tested* unknowns (below), not from re-deriving engagement.
-- **Phase 2 / 3 event** — the drug already cleared Phase 1 and (often) has a public outcome, so
-  re-running the fixed chemistry is a **retrospective known-readout re-simulation**, a benchmark of
-  the pipeline, not a trade. See [THESIS.md §3.3](THESIS.md).
-
-Because the chemistry's claim is phase-invariant, **the market model is phase-agnostic by design** —
-there is no phase weighting. Phase determines only *whether* an event's outcome is still unpublished
-(Phase 1) or already public (Phase 2/3); it never scales the call.
-
-None of this makes the engagement result a dead end. It is the **first validated building block**: a
-reproducible pocket route and docked pose are the inputs every genuinely predictive downstream piece
-consumes ([Next steps](#next-steps)). Shipping the confirmatory primitive first — and validating it
-honestly — is what makes it possible to compute the net-new, not-yet-priced data later.
-
-**Why Phase 1 is the *hypothesised* tier to build toward.** This is a hypothesis to test, not an
-established result. Two reasons make it the natural first candidate, and they compound. First, it is
-*first-in-human*, so the least clinical information is public — the most room for a well-founded
-estimate to be ahead of the price. Second, **what Phase 1 validates is chemistry- and
-pharmacology-grounded**: human PK, tolerability, the tolerated dose, and (increasingly) human target
-occupancy — quantities that *might* be estimable from structure and preclinical data **before the
-readout is published**, unlike the disease-biology question Phase 2/3 tests. If that holds, the
-predictive pieces above target it directly: a calibrated affinity + structure-derived human PK would
-give a free-Cmax / occupancy estimate, and off-target / ADMET models a tolerability prior — an
-estimate of the trial's *actual* unknown, formed before it is public. Two honest limits: **the current
-build computes none of this** (engagement is public, PK is generic, occupancy needs a calibrated Kd
-this pipeline has not produced, issue #4), and even built it would be a *probabilistic prior with wide
-error bars* whose edge is unproven until the backtest runs. The broader open question is whether *any*
-stage lets public inputs extrapolate an un-priced quantity; earlier-is-better is the guess, not a
-finding.
-
-**The practical upshot.** The *binding* half is defensible today for a **reversible small molecule
-against a small globular protein with an experimental structure**, and — via pocket-aware routing —
-for **covalent small molecules against a curated covalent class** (a reversible-scored lower bound)
-or any drug with a discoverable co-crystal; both published runs sit inside this routed universe.
-Everything else degrades to fpocket/blind (and says so), and biologics are out of scope. The
-*pharmacology* half is weaker — generic PK constants, no bioavailability term, so exposure is
-order-of-magnitude scene-setting, not a prediction — and occupancy is no longer reported at all,
-since it rested on a Kd the score cannot support (issue #4). The surviving claim is *geometric
-engagement*, which the method can back.
+**The practical upshot.** The *binding* half is defensible today for a reversible small molecule
+against a small globular protein with an experimental structure, and — via pocket-aware routing — for
+covalent small molecules against a curated class (a reversible-scored lower bound); everything else
+degrades to fpocket/blind, and biologics are out of scope. The *pharmacology* half is weaker (generic
+PK, no bioavailability term → order-of-magnitude exposure), and occupancy is not reported at all. The
+surviving claim is *geometric engagement*.
 
 ### What it would take to be edge-generating — compute the *unknowns*, not the *knowns*
 
@@ -479,25 +437,12 @@ model make a claim beyond "it runs." Even assembled, the realistic first-pass ed
 **breadth and speed** (systematically scoring many events cheaply), not a single decisive number —
 and it stays unproven until the backtest in [THESIS §3.5](THESIS.md) is actually run.
 
-**"Unpublished" is not "un-priced" — the distinction that decides whether any of this is edge.** A
-tempting theory is that the first unlock is a quantity that *could* be computed (by intense simulation
-or a computational chemist) but has not been published. That is the right *hunting ground* but the
-wrong *stopping condition*, for two reasons:
-
-- **The informed party usually already computed it.** The sponsor running the trial employs
-  computational chemists and runs FEP / MD / PBPK / ADMET internally — they simply do not publish it.
-  So "unpublished" data is often *not unknown to the party that sets the price*, and that private
-  knowledge leaks into the price through their own actions (dose choice, trial design, guidance). The
-  binding condition is **un-priced**, which is strictly stronger than **unpublished** — and
-  computability alone guarantees neither materiality to the readout nor a mispriced consensus.
-- **Depth-per-name favours the sponsor; breadth-across-names favours a systematic pipeline.** A deep
-  sim of a heavily-followed drug is the *worst* case (maximum coverage, sponsor knows everything). The
-  plausible edge is the opposite: a *cheap, calibrated* estimate applied **broadly** across many
-  under-covered / small-cap events where no informed party has done the work — the breadth argument of
-  [THESIS §4.2](THESIS.md), many weak independent signals rather than one deep one.
-
-Whether a given quantity is actually un-priced is an **empirical** question only the point-in-time
-backtest can answer; it cannot be reasoned into existence.
+**"Unpublished" is not "un-priced."** A tempting theory is that the first unlock is a quantity that
+*could* be computed but has not been published. That is the right hunting ground but the wrong
+stopping condition: the sponsor usually computed it privately (FEP/MD/PBPK/ADMET) and it leaks into
+the price through their actions, and depth-per-name favours them while breadth-across-many-events
+favours a cheap systematic pipeline. Whether a quantity is actually un-priced is **empirical** — only
+the point-in-time backtest answers it. (Full argument: [THESIS §4](THESIS.md).)
 
 ---
 
