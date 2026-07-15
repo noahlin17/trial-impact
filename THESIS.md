@@ -180,7 +180,8 @@ the clinic**, and is largely settled by the time any trial exists. The system ru
 only because ClinicalTrials.gov is the available **event feed** — an operational trigger, not a claim
 that a trial is where the physics is most informative. Phase therefore governs only *information
 timing*: a Phase 1 trial's *outcome* is not yet public while a Phase 2/3 drug's is — but engagement
-itself is public in both, so the chemistry surfaces **nothing un-priced** at either. A Phase 2/3 run
+itself is public in both and routinely priced, so the chemistry surfaces **nothing net-new the market
+does not already have** at either. A Phase 2/3 run
 is simply an explicit **retrospective known-readout re-simulation** — a benchmark of the pipeline,
 not a trade.
 
@@ -268,9 +269,12 @@ produce an encouraging and false result. Four problems seem material:
 **North Star.** Intake a Phase 1 trial's design plus *all* public information — structure, target,
 indication, planned dose, and any published in-vitro, PK, or prior computational results — and
 estimate a quantity the trial is *testing but has not yet read out* (human PK, tolerability, human
-occupancy) *before* it is published. The estimate only counts if it is **net-new against everything
-already public**: recreating a disclosed in-vitro potency, a reported PK value, or a prior docking
-result is already priced and adds nothing, no matter how cheaply we reproduce it. This is not built
+occupancy) *before* it is published. The estimate only counts if it makes our probability **more
+accurate than the one already in the price**: recreating a disclosed in-vitro potency, a reported PK
+value, or a prior docking result adds nothing (those are public and, as a rule, already priced), so
+the bar is *price, not publication* — the harder and more valuable case is resolving genuine
+uncertainty on a quantity the market has *not* confidently priced, whether or not its raw inputs are
+public. This is not built
 today — the current output is confirmatory engagement — and the eventual output is a probabilistic
 prior, not a precise prediction; the two constraints below (§4.1 beating the implied probability, and
 the point-in-time backtest of §3.5) are what would turn such a prior into an actual edge.
