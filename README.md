@@ -436,6 +436,19 @@ reproducible pocket route and docked pose are the inputs every genuinely predict
 consumes ([Next steps](#next-steps)). Shipping the confirmatory primitive first — and validating it
 honestly — is what makes it possible to compute the net-new, not-yet-priced data later.
 
+**Why Phase 1 is the tier to build toward.** Two reasons that compound. First, it is *first-in-human*,
+so the least clinical information is public — the most room for a well-founded estimate to be ahead of
+the price. Second, and more important, **what Phase 1 actually validates is chemistry- and
+pharmacology-grounded**: human PK, tolerability, the tolerated dose, and (increasingly) human target
+occupancy. Those are quantities that are *in principle* estimable from structure and preclinical data
+**before the readout is published** — unlike the disease-biology question Phase 2/3 tests. That is the
+real target for the predictive pieces above: a calibrated affinity + structure-derived human PK would
+give a free-Cmax / occupancy estimate, and off-target / ADMET models a tolerability prior — an
+estimate of the trial's *actual* unknown, formed before it is public. **The current build computes
+none of this** — engagement is public, PK is generic, and occupancy needs a calibrated Kd this
+pipeline has not produced (issue #4) — and any such estimate would be a *probabilistic prior with wide
+error bars*, not a precise prediction. It is simply the concrete thing the roadmap is for.
+
 **The practical upshot.** The *binding* half of the pipeline is defensible today for a
 **reversible, non-covalent small molecule against a small globular protein with an
 experimental structure** — and, with the pocket-aware routing, also for **covalent small
