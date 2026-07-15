@@ -93,7 +93,7 @@
     function cards() {
       const s = DATA.summary;
       const items = [
-        ["Runs", s.analyzed], ["Mean ΔG", num(s.mean_dg, 2)],
+        ["Runs", s.analyzed], ["Mean ΔG (diagnostic)", num(s.mean_dg, 2)],
         ["Engagement rate", s.engagement_rate === null ? "—" : num(s.engagement_rate * 100, 0) + "%"], ["Drug-likeness rate", s.druglikeness_rate === null ? "—" : num(s.druglikeness_rate * 100, 0) + "%"],
         ["Mean PoS Δ", s.mean_pos_delta === null ? "—" : (s.mean_pos_delta > 0 ? "+" : "") + num(s.mean_pos_delta, 2)],
         ["Market-moving", s.market_moving],
