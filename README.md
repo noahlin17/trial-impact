@@ -45,11 +45,13 @@ Scientifically, this is a **preclinical / discovery-stage engagement instrument*
 is a molecular property established *before* the clinic (it is an entry criterion for Phase 1), so by
 the time a molecule has a trial the chemistry is **confirmatory, not predictive** of the trial's real
 unknowns. It is run on clinical events only because ClinicalTrials.gov is the available event feed —
-an operational choice, not a claim that a trial is where the physics is most informative. For a
-Phase 1 event the outcome is at least *not yet public*, so an engagement-consistent readout can be
-un-priced (a timing argument, not a forecast of human safety/PK/dose); for a later-phase drug the
-outcome is already public, so the run is a **retrospective known-readout re-simulation**, not a
-tradeable signal (see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument)).
+an operational choice, not a claim that a trial is where the physics is most informative. The
+Phase 1 vs later-phase distinction is only whether the trial's *outcome* is already public —
+**engagement itself is public preclinical information in both cases.** So the chemistry, which only
+re-derives engagement, surfaces **nothing un-priced** at either: a Phase 1 event is not a tradeable
+signal from the pipeline as-is (it is simply the case where you are not yet benchmarking against a
+public readout), and a later-phase run is an explicit **retrospective known-readout re-simulation**
+(see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument)).
 
 This is deliberately a **first pass**: engagement is not itself net-new predictive information, but it
 is the **first validated primitive** the rest of the pipeline is built on. A reproducible pocket
@@ -285,8 +287,8 @@ end to end, and it is not a trade.
 
 The two rows differ only in **information timing**, not in what the chemistry computes — engagement is
 confirmatory of a preclinical fact in both. The Phase 1 KRAS × sotorasib row is the case where the
-clinical outcome is *not yet public*, so an engagement-consistent readout could be un-priced; the
-Phase 3 CFTR × ivacaftor row already has a public outcome, so it is a **retrospective known-readout
+clinical *outcome* is not yet public — but engagement already is, so the pipeline surfaces nothing
+un-priced; the Phase 3 CFTR × ivacaftor row already has a public outcome, so it is a **retrospective known-readout
 re-simulation**, a benchmark of the pipeline rather than a tradeable signal — see
 [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) for why the chemistry is a
 preclinical/discovery-stage instrument regardless of the event's phase.
@@ -417,9 +419,10 @@ ClinicalTrials.gov is the available **event feed**; that is an operational trigg
 trial is where the physics carries the most information. The phase of an event therefore matters only
 for *information timing*, not for what the chemistry can compute:
 
-- **Phase 1 event** — the clinical outcome is not yet public, so an engagement-consistent readout can
-  be un-priced. This is a **timing** argument (the market may not have integrated the public
-  structural evidence), **not** a forecast of the trial's real unknowns (human safety/PK/dose).
+- **Phase 1 event** — the trial's *outcome* is not yet public, but engagement (all the chemistry
+  computes) already is, so the pipeline as-is surfaces **no un-priced signal** here; it is simply not
+  yet benchmarking against a public readout. Any genuine un-priced signal would have to come from the
+  *tested* unknowns (below), not from re-deriving engagement.
 - **Phase 2 / 3 event** — the drug already cleared Phase 1 and (often) has a public outcome, so
   re-running the fixed chemistry is a **retrospective known-readout re-simulation**, a benchmark of
   the pipeline, not a trade. See [THESIS.md §3.3](THESIS.md).
