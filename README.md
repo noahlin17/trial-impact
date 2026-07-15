@@ -504,6 +504,26 @@ model make a claim beyond "it runs." Even assembled, the realistic first-pass ed
 **breadth and speed** (systematically scoring many events cheaply), not a single decisive number —
 and it stays unproven until the backtest in [THESIS §3.5](THESIS.md) is actually run.
 
+**"Unpublished" is not "un-priced" — the distinction that decides whether any of this is edge.** A
+tempting theory is that the first unlock is a quantity that *could* be computed (by intense simulation
+or a computational chemist) but has not been published. That is the right *hunting ground* but the
+wrong *stopping condition*, for two reasons:
+
+- **The informed party usually already computed it.** The sponsor running the trial employs
+  computational chemists and runs FEP / MD / PBPK / ADMET internally — they simply do not publish it.
+  So "unpublished" data is often *not unknown to the party that sets the price*, and that private
+  knowledge leaks into the price through their own actions (dose choice, trial design, guidance). The
+  binding condition is **un-priced**, which is strictly stronger than **unpublished** — and
+  computability alone guarantees neither materiality to the readout nor a mispriced consensus.
+- **Depth-per-name favours the sponsor; breadth-across-names favours a systematic pipeline.** A deep
+  sim of a heavily-followed drug is the *worst* case (maximum coverage, sponsor knows everything). The
+  plausible edge is the opposite: a *cheap, calibrated* estimate applied **broadly** across many
+  under-covered / small-cap events where no informed party has done the work — the breadth argument of
+  [THESIS §4.2](THESIS.md), many weak independent signals rather than one deep one.
+
+Whether a given quantity is actually un-priced is an **empirical** question only the point-in-time
+backtest can answer; it cannot be reasoned into existence.
+
 ---
 
 ## Catching a bug: when the result was too clean
