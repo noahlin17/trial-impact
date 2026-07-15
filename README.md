@@ -158,7 +158,9 @@ carry the argument.
 By Grinold's fundamental law, `IR ≈ IC × √breadth`: a weak but genuine signal applied to many
 decisions can be worth more than a strong one applied to few. A commoditized input does not need to
 be a good signal — only a slightly informative one produced at scale, which is what the sandbox
-provides. It also says where to look: specialist coverage concentrates on a few high-profile
+provides. The bar is not a *great* signal but a **good-enough aggregate**: no single input has to be
+strong, only the full set of factors has to make our P(success)/EV estimate more accurate than the
+market-implied one. It also says where to look: specialist coverage concentrates on a few high-profile
 catalysts, so the **less-covered tail** is where a systematic estimate is most likely to add
 something — a coverage argument, not an insight one. (The illustrative IR arithmetic is in
 [THESIS §4.2](THESIS.md).)
@@ -179,26 +181,12 @@ own, and the physics must beat it — a cheap experiment that should run before 
 
 ### The wider view
 
-[THESIS.md](THESIS.md) §5 sets out a broader position — held as a hypothesis rather than a
-finding, and formed from following the recent wave of AI-for-biology companies rather than from
-outcome data. In short: AI tooling is plausibly changing the outcome distribution of drug
-development, through patient selection, biomarker stratification and adaptive trial design, while
-pricing remains anchored to the historical distribution. If AI-enhanced trials have genuinely
-different odds and the market does not separate them from conventional ones, that gap is the
-opportunity. The evidence for the underlying claim is currently thin, and §5.2 says where I think
-it is most likely to be wrong.
-
-The weak point in that argument is not the economics but the **observability**: sponsors do not
-label trials as AI-enhanced, and without a classifier that identifies them from public data there
-is no trade, however real the effect. That classifier would be built from **trial protocol
-data** — eligibility criteria, stratification, adaptive-design features, endpoint choice — which
-ClinicalTrials.gov publishes and which the watcher here already ingests. On that view the more
-valuable direction for this project is not better docking but a move from *the molecule* to *the
-trial design*.
-
-📄 The full argument — defensibility, the two axes of drug failure, the pre-readout case, what a
-credible backtest would require, where the thesis is weakest, and the order in which its
-assumptions could be falsified — is in **[THESIS.md](THESIS.md)**.
+A broader and more speculative hypothesis motivates the longer-term direction: AI tooling may be
+shifting the *outcome distribution* of drug development while pricing stays anchored to historical
+base rates — which would move the most valuable target from *the molecule* to *the trial design* the
+watcher already ingests. It is held as a hypothesis, not a finding. The full argument — the pre-readout
+case, what a credible backtest would require, where it is weakest, and the order its assumptions
+could be falsified — is in **[THESIS §5–6](THESIS.md)**.
 
 ---
 
@@ -264,8 +252,9 @@ pipeline is the part that is built.
 Genuine outputs from the committed pipeline (raw JSON + rendered dashboards in
 [`results/`](results/)). Docking runs a fixed seed set (42, 43, 44) and reports mean ± sd —
 deterministic *given the same resolved structure*, but the structure is fetched live and not pinned,
-so the ΔG is not point-in-time reproducible (issue #10; routing KRAS to 7VVB/fpocket gives −5.91 vs
-6OIM's −7.202).
+so the ΔG is not point-in-time reproducible (issue #10 — a silent degrade to a different
+structure/pocket, e.g. KRAS routing to 7VVB instead of the curated 6OIM, yields a materially
+different ΔG).
 
 | Drug (status) | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call *(rules-based demo — not a prediction)* |
 |-------|---------------|-----------|-----------|---------------|-----|-----------|
@@ -341,26 +330,16 @@ same mechanism as `endpoint_outcome`) or a structure→PK model.
 ### Trial phase — a preclinical / discovery-stage instrument
 
 The pipeline answers *does the molecule engage its target at a plausible exposure?* — a
-**preclinical / discovery-stage** question. Target engagement is an **entry criterion proven before
-Phase 1** (preclinical potency, selectivity, often a co-crystal), and ΔG is a fixed molecular
-property, so at any trial the docking is **confirmatory of an already-public fact**, not new
-information. What Phase 1 actually tests — human safety, PK, tolerated dose — is orthogonal to the
-chemistry and *not computed here* (occupancy unset, PK generic, `F`=1); Phase 2/3 test efficacy and
-disease biology the physics does not touch.
-
-The system runs on clinical events only because ClinicalTrials.gov is the available **event feed**,
-so phase governs only *information timing*, never what the chemistry computes. A Phase 1 event's
-outcome is not yet public but its engagement is, so the pipeline as-is surfaces **no un-priced
-signal**; a later-phase run is an explicit **retrospective known-readout re-simulation** (a
-benchmark, see [THESIS §3.3](THESIS.md)). The market model is phase-agnostic by design.
-
-This is not a dead end: the reproducible pocket route + docked pose is the **first validated
-primitive** the predictive pieces consume ([Next steps](#next-steps)). **Phase 1 is the
-*hypothesised* tier to build toward** — first-in-human (least public data), and what it validates is
-chemistry-grounded (human PK, tolerability, occupancy), so those quantities *might* be estimable from
-structure before the readout prints, unlike the disease biology Phase 2/3 tests. This is a hypothesis,
-not a result: the current build computes none of it, and even built it would be a wide-error prior
-unproven until the backtest runs.
+**preclinical / discovery-stage** question. Engagement is an entry criterion proven before Phase 1,
+so at any trial the docking is **confirmatory of an already-public fact**, not new information; the
+system runs on clinical events only because ClinicalTrials.gov is the available event feed, so phase
+governs *information timing*, not what the chemistry computes (a later-phase run is a retrospective
+known-readout benchmark). The *hypothesised* payoff is to build toward Phase 1 — first-in-human,
+least public data, and what it validates is chemistry-grounded (human PK, tolerability, occupancy),
+so those quantities *might* be estimable from structure before the readout, unlike the disease
+biology Phase 2/3 tests. That is a hypothesis, not a result — the reproducible pose is the first
+validated primitive the predictive pieces consume ([Next steps](#next-steps)), and the rest is
+unbuilt.
 
 **The practical upshot.** The *binding* half is defensible today for a reversible small molecule
 against a small globular protein with an experimental structure, and — via pocket-aware routing — for
@@ -369,14 +348,17 @@ degrades to fpocket/blind, and biologics are out of scope. The *pharmacology* ha
 PK, no bioavailability term → order-of-magnitude exposure), and occupancy is not reported at all. The
 surviving claim is *geometric engagement*.
 
-### What it would take to be edge-generating — compute the *unknowns*, not the *knowns*
+### What it would take to be edge-generating — improve on the market's estimate, don't re-derive the knowns
 
-Edge can only come from computing something (a) genuinely uncertain and (b) **not already public** —
-which includes any in-vitro measurement, reported PK, or computational result disclosed with the
-drug/trial; recreating those is not signal. Engagement fails this: it is known going into Phase 1,
-public, and routinely published alongside potency and structures. Net-new signal can only live in
-what a trial is actually **testing** and has not yet published — each needing new chemistry or data
-the current build lacks (honest that any early edge would be thin):
+Edge does not require secret data. It comes from making our estimate of P(success)/EV **more accurate
+than the market-implied one** — either by (i) resolving more certainty on a quantity that is genuinely
+*uncertain* (even when its raw inputs are public), or (ii) computing something not yet published, or
+published but **not already priced in**. What earns nothing is re-deriving a fact the market already
+has and weights correctly: engagement fails on that count — it is known going into Phase 1, public,
+and routinely published alongside potency and structures, so re-computing it moves no probability.
+The gains therefore live in the quantities a trial is actually **testing** — still uncertain at the
+readout — most of which need new chemistry or data the current build lacks (honest that any early
+edge would be thin):
 
 | What the trial actually tests (unknown going in) | What it would take to compute it | Chemistry-computable? | Edge realism |
 |---|---|---|---|
