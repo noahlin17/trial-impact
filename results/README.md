@@ -58,11 +58,17 @@ that field exists and what it caught.)
 
 | File | Trial | Result |
 |------|-------|--------|
-| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, **Phase 1 (outcome not yet public)**, endpoint met | ΔG **−7.202 ± 0.187** kcal/mol (n=3) — a *docking-objective diagnostic, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), drug-likeness flagged (informational, not priced), **covalent** (acrylamide warhead). Route **covalent-tethered** to Cys A:12 of curated holo **6OIM** (confidence 0.806). PoS **+0.50** → AMGN up/strong · REGN, NVS down/moderate. |
-| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, **Phase 3 (retrospective, known readout)**, endpoint met | ΔG −7.404 ± 0.007 kcal/mol † (n=3) — a *docking-objective diagnostic, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), clean, not covalent. Route **holo-ligand** boxed on co-crystal **VX7** in curated **6O2P** (confidence 0.897). PoS **+0.52** → VRTX up/strong · CRSP, BLUE down. A **retrospective re-simulation**: ivacaftor already cleared Phase 1 and its outcome is public, so re-running the fixed chemistry benchmarks the pipeline against a known readout — it differs from the Phase 1 row only in **information timing** (the outcome is already public), not in what the chemistry computes (see root README). |
+| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, **approved (Lumakras, 2021)**; backtest anchor (a `results_posted` Phase 1 event, endpoint met) | ΔG **−7.202 ± 0.187** kcal/mol (n=3) — a *docking-objective diagnostic, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), drug-likeness flagged (informational, not priced), **covalent** (acrylamide warhead). Route **covalent-tethered** to Cys A:12 of curated holo **6OIM** (confidence 0.806). PoS **+0.50** → AMGN up/strong · REGN, NVS down/moderate. |
+| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, **approved (Kalydeco, 2012)**; backtest anchor (a `results_posted` Phase 3 event, endpoint met) | ΔG −7.404 ± 0.007 kcal/mol † (n=3) — a *docking-objective diagnostic, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), clean, not covalent. Route **holo-ligand** boxed on co-crystal **VX7** in curated **6O2P** (confidence 0.897). PoS **+0.52** → VRTX up/strong · CRSP, BLUE down. |
 | `dashboard_kras_6OIM.html` | ″ | Rendered `/status` with the 3D viewer; docking ΔG shown as mean ± sd. |
 | `dashboard_cftr_6O2P.html` | ″ | Rendered `/status`; the 6O2P cryo-EM structure rendered from RCSB. |
 | `analysis_dashboard.html` | both | Rendered `/analysis`: physics→price scatter, an estimator head-to-head (empty here — single-estimator corpus), sortable table (ΔG columns carry ± sd), and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). Open it and click a row. |
+
+Both drugs are **approved**, so their clinical outcomes are already public — each row is a
+**retrospective known-readout re-simulation** that benchmarks the pipeline against ground truth, not
+a forecast. A correct run is *expected* to recover a clean `experimental-site` engagement; that is the
+point of a backtest. Engagement is a confirmatory preclinical fact in both, so neither row carries any
+tradeable signal (see root README).
 
 Each JSON holds the trial event, the resolved sponsor/competitor tickers, the full
 `sim_result` (docking ΔG with per-seed replicates and sd, the geometric `binding_engagement`
