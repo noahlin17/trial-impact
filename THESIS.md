@@ -187,11 +187,14 @@ not a trade.
 validated primitive** — a reproducible pocket route and docked pose — that every genuinely predictive
 downstream piece consumes. The pieces that would actually address the *tested* unknowns (and so could
 generate edge) are set out in §4 (and the README's *What it would take to be edge-generating* table).
-Phase 1 is the tier to build toward precisely because it is first-in-human (least public data) *and*
-because what it validates — human PK, tolerability, tolerated dose, sometimes human occupancy — is
-chemistry/pharmacology-grounded and therefore *in principle* estimable from structure before the
-readout is public, unlike the disease-biology question Phase 2/3 tests. The current build estimates
-none of these; any such estimate would be a probabilistic prior, not a precise prediction.
+Phase 1 is the *hypothesised* tier to build toward — a guess to test, not a result — because it is
+first-in-human (least public data) *and* because what it validates (human PK, tolerability, tolerated
+dose, sometimes human occupancy) is chemistry/pharmacology-grounded and so *might* be estimable from
+structure before the readout is public, unlike the disease-biology question Phase 2/3 tests. The real
+axis is what is *known* versus what is *being tested*, and the standing conjecture is that the earliest
+stages — where least is public — leave the most room for a SIM to extrapolate an un-priced quantity.
+Whether any stage actually does is empirical: the current build estimates none of these, any estimate
+would be a probabilistic prior rather than a precise prediction, and only the backtest settles it.
 
 Because the chemistry's claim is phase-invariant, **there is no phase weighting anywhere in the
 model** — `market_model.assess` is phase-agnostic. Phase decides only *whether* an event's outcome is
