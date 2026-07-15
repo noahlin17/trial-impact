@@ -1,0 +1,117 @@
+{
+  "target": "tyk2",
+  "structure_pdb_id": "4GIH",
+  "n": 13,
+  "source": {
+    "dataset": "OpenFF Protein-Ligand Benchmark (Schrodinger JACS / Wang 2015)",
+    "repo": "https://github.com/openforcefield/protein-ligand-benchmark",
+    "pinned_commit": "fd88824f9114244f95a14b485e6d6c96c1de716d",
+    "note": "Congeneric same-target series on a single scaffold with a measurement DOI per ligand. Affinities are real; none invented. paffinity = -log10(value in molar); higher = tighter."
+  },
+  "rows": [
+    {
+      "id": "lig_jmc_23",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "paffinity": 8.602,
+      "vina_dg": -8.335,
+      "dg_mmgbsa": -17.837
+    },
+    {
+      "id": "lig_ejm_46",
+      "heavy_atoms": 23,
+      "affinity_type": "ki",
+      "paffinity": 8.319,
+      "vina_dg": -7.92,
+      "dg_mmgbsa": -13.141
+    },
+    {
+      "id": "lig_jmc_27",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "paffinity": 8.292,
+      "vina_dg": -8.406,
+      "dg_mmgbsa": -19.274
+    },
+    {
+      "id": "lig_jmc_28",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "paffinity": 8.071,
+      "vina_dg": -8.309,
+      "dg_mmgbsa": -24.016
+    },
+    {
+      "id": "lig_ejm_54",
+      "heavy_atoms": 23,
+      "affinity_type": "ki",
+      "paffinity": 7.745,
+      "vina_dg": -7.911,
+      "dg_mmgbsa": -18.169
+    },
+    {
+      "id": "lig_ejm_42",
+      "heavy_atoms": 22,
+      "affinity_type": "ki",
+      "paffinity": 7.194,
+      "vina_dg": -8.003,
+      "dg_mmgbsa": -21.538
+    },
+    {
+      "id": "lig_ejm_47",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "paffinity": 7.131,
+      "vina_dg": -8.334,
+      "dg_mmgbsa": -19.01
+    },
+    {
+      "id": "lig_ejm_45",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "paffinity": 7.027,
+      "vina_dg": -7.934,
+      "dg_mmgbsa": -18.587
+    },
+    {
+      "id": "lig_ejm_31",
+      "heavy_atoms": 21,
+      "affinity_type": "ki",
+      "paffinity": 7.018,
+      "vina_dg": -8.141,
+      "dg_mmgbsa": -18.603
+    },
+    {
+      "id": "lig_ejm_55",
+      "heavy_atoms": 22,
+      "affinity_type": "ki",
+      "paffinity": 6.77,
+      "vina_dg": -7.91,
+      "dg_mmgbsa": -23.14
+    },
+    {
+      "id": "lig_ejm_48",
+      "heavy_atoms": 25,
+      "affinity_type": "ki",
+      "paffinity": 6.62,
+      "vina_dg": -8.493,
+      "dg_mmgbsa": -20.265
+    },
+    {
+      "id": "lig_ejm_50",
+      "heavy_atoms": 22,
+      "affinity_type": "ki",
+      "paffinity": 6.602,
+      "vina_dg": -8.135,
+      "dg_mmgbsa": -22.213
+    },
+    {
+      "id": "lig_ejm_43",
+      "heavy_atoms": 23,
+      "affinity_type": "ki",
+      "paffinity": 6.076,
+      "vina_dg": -8.229,
+      "dg_mmgbsa": -21.66
+    }
+  ]
+}
