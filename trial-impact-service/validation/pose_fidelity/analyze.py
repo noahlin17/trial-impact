@@ -48,6 +48,7 @@ def main() -> int:
 
     med = float(np.median(top))
     # Does tight seed agreement flag correct poses? Positive rho(spread, rmsd) => yes.
+    # Observed result: seed agreement did not cleanly separate correct from incorrect poses.
     rho_spread = spearman(spread, top)
     correct = [s for s, r in zip(spread, top, strict=True) if r < SUCCESS_A]
     wrong = [s for s, r in zip(spread, top, strict=True) if r >= SUCCESS_A]

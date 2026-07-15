@@ -104,8 +104,9 @@ require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stag
 
 A trial event is routed to the right structure and pocket, docked, and classified as *geometric
 engagement*; a PK/PD solve adds exposure. Each estimator runs head-to-head against a size-only
-baseline it must beat — and the validation experiment (bottom-left) is what tests, and falsifies,
-the affinity premise. The market layer is an illustrative downstream demo.
+baseline it must beat — and the validation suite (with the bottom-left panel showing the cross-target
+test) is what tests, and falsifies, the affinity premise across two ranking regimes, with a
+complementary pose-geometry control. The market layer is an illustrative downstream demo.
 
 ---
 

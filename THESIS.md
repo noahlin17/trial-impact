@@ -17,23 +17,19 @@ literature and standard results, not from direct experience. Where I am reasonin
 evidence, from first principles, or simply guessing, I have tried to say so.
 
 **Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
-The one falsifiable scientific claim this project actually tests — *does the docking score rank
-binding strength?* — was tested on 8 approved drugs with measured ChEMBL affinities and found **not to
-hold**: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size, ρ ≈ +0.45), and a CPU MM-GBSA
-rescore did not improve on it (ρ = −0.24, still size-tracking). At n = 8 the confidence intervals are
-wide and span zero, so this is **directional, not a powered refutation** — but it points the same way
-as long-standing docking literature, so the pipeline ships only a *geometric engagement* claim. The
-negative result — reproducible via `make validate` — is the substantive finding. A complementary
-[pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md) redocked **6/7 native
-ligands within 2 Å (86%), median top-pose RMSD 0.68 Å**: positive evidence for pose geometry only,
-not affinity or binding strength. The companion [Experiment A congeneric
-ranking](trial-impact-service/validation/congeneric/README.md) was negative too: on 13 Tyk2
-ligands, cheap single-snapshot MM-GBSA gave ρ = −0.54 (95% CI [−0.86, +0.08]) versus measured
-affinity, failing to beat size or raw Vina even within one target. The A+C thresholds were fixed
-in the [pre-registration](trial-impact-service/validation/PREREGISTRATION.md) before scores were
-computed. Together with the earlier cross-target negative, these are two honest affinity negatives
-and one positive geometry control — the boundary is explicit and pose fidelity does not rescue
-affinity.
+The central falsifiable claim this project tests — *does the docking score rank binding strength?* —
+was tested from two angles: an 8-drug cross-target panel and a 13-ligand within-target Tyk2 series.
+Both were negative. In the cross-target panel, Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand
+size, ρ ≈ +0.45), and a CPU MM-GBSA rescore did not improve on it (ρ = −0.24, still size-tracking).
+At n = 8 the confidence intervals are wide and span zero, so this is **directional, not a powered
+refutation**. In the Tyk2 series, cheap single-snapshot MM-GBSA gave ρ = −0.54 (95% CI
+[−0.86, +0.08]) versus measured affinity, failing to beat size or raw Vina; n = 13 is still small
+and its CI spans zero. The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md)
+redocked **6/7 native ligands within 2 Å (86%), median top-pose RMSD 0.68 Å**: positive evidence for
+pose geometry only, not affinity or binding strength. The A+C thresholds were fixed in the
+[pre-registration](trial-impact-service/validation/PREREGISTRATION.md) before scores were computed.
+Together, the two ranking negatives and one positive geometry control define the boundary; pose
+fidelity does not rescue affinity.
 
 ---
 
