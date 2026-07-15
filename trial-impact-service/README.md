@@ -305,7 +305,7 @@ addressed; ○ = documented, future work.)
   [issue #4](../README.md#known-issues). The code used to convert the Vina score to an absolute
   `Kd = exp(ΔG/RT)` and branch on hard thresholds (`Kd ≤ 100 nM`, `ΔG ≤ −9.0`). An 8-anchor
   calibration through this exact pipeline showed the raw score does **not** rank measured affinity
-  (`r(−ΔG, affinity) ≈ −0.39`) and instead tracks ligand size (`r(−ΔG, heavy-atoms) ≈ +0.64`);
+  (Spearman `ρ(−ΔG, pKd) = −0.24`) and instead tracks ligand size (`ρ(−ΔG, heavy-atoms) = +0.45`);
   ligand-efficiency normalization did not rescue it, and `exp()` being monotonic means no
   post-transform can recover affinity the score lacks. **Fix (implemented):** the docking
   estimator no longer emits an absolute Kd or a Kd-derived occupancy (both `None`); the ΔG is kept
