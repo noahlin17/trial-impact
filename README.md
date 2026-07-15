@@ -42,26 +42,19 @@ potency; or a validated market prediction — the market/stock layer further dow
 un-backtested downstream demo**, not a result.
 
 Scientifically, this is a **preclinical / discovery-stage engagement instrument**: target engagement
-is a molecular property established *before* the clinic (it is an entry criterion for Phase 1), so by
-the time a molecule has a trial the chemistry is **confirmatory, not predictive** of the trial's real
-unknowns. It is run on clinical events only because ClinicalTrials.gov is the available event feed —
-an operational choice, not a claim that a trial is where the physics is most informative. The axis
-that matters is **what is already known versus what is still being tested**, not the phase label.
-Today the chemistry only re-derives *engagement* — public preclinical information — so the pipeline
-as-is surfaces **nothing un-priced**, and a later-phase run is simply an explicit **retrospective
-known-readout re-simulation** (see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument)).
-The **working hypothesis** — to be tested, not assumed — is that computational chemistry is most
-likely to generate un-priced signal at the **earliest stages, where the least is public**: the earlier
-you are, the more room a SIM has to *extrapolate* a quantity the field has not yet measured or priced.
-Whether *any* stage actually admits public inputs → un-priced edge is an open, empirical question the
-backtest has to settle.
+is established *before* the clinic (an entry criterion for Phase 1), so by the time a molecule has a
+trial the chemistry is **confirmatory, not predictive** of the trial's real unknowns. It runs on
+clinical events only because ClinicalTrials.gov is the available event feed. Because engagement is
+public preclinical information, the pipeline as-is surfaces **nothing un-priced** — a later-phase run
+is an explicit **retrospective known-readout re-simulation**.
 
-This is deliberately a **first pass**: engagement is not itself net-new predictive information, but it
-is the **first validated primitive** the rest of the pipeline is built on. A reproducible pocket
-route + docked pose is the input the genuinely predictive pieces need — calibrated affinity within a
-regime, structure-derived human PK, target-validation / genetics features, and a calibrated
-P(success) — each of which *would* add information the market has not already priced (see
-[Next steps](#next-steps)).
+This is deliberately a **first pass**: engagement is not itself net-new information, but it is the
+**first validated primitive** — a reproducible pocket route + docked pose — that the genuinely
+predictive pieces build on (calibrated affinity, structure-derived human PK, target-validation /
+genetics, a calibrated P(success)). Why an event's *phase* is only an information-timing distinction,
+why Phase 1 is the *hypothesised* tier to build toward, and what net-new data an edge would actually
+require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) and
+[What it would take to be edge-generating](#what-it-would-take-to-be-edge-generating--compute-the-unknowns-not-the-knowns).
 
 > **North Star.** Take a Phase 1 trial's design plus *all* public information — structure, target,
 > indication, planned dose, and any **published in-vitro, PK, or prior computational results** — and
@@ -150,27 +143,13 @@ carry the argument.
 
 ### Why a weak signal might still be usable
 
-Grinold's fundamental law relates the information ratio to skill per decision and the number of
-independent decisions: `IR ≈ IC × √breadth`. A specialist analyst has a relatively high
-information coefficient across few names; a system of this kind would have a low one across many.
-
-The table below is **illustrative, not measured** — the IC values are assumptions chosen to show
-the shape of the relationship, not estimates:
-
-| | IC (assumed) | decisions/yr | IR ≈ IC·√N |
-|---|---|---|---|
-| Specialist, concentrated coverage | 0.15 | 15 | 0.58 |
-| This system, modest edge, broad coverage | 0.05 | 200 | 0.71 |
-| …with chemistry adding some IC | 0.07 | 200 | 0.99 |
-| …and coverage extended further | 0.07 | 400 | 1.40 |
-
-The implication is that a weak but genuine signal applied to many decisions may be worth more
-than a strong one applied to few. A commoditized input does not need to be a good signal — it
-needs to be a slightly informative one that can be produced at scale, and scale is what the
-sandbox provides. It also suggests where to look: specialist coverage concentrates on a small
-number of high-profile catalysts, so the less-covered part of the universe is where a systematic
-estimate is more likely to add something. That is a coverage argument rather than an insight
-argument.
+By Grinold's fundamental law, `IR ≈ IC × √breadth`: a weak but genuine signal applied to many
+decisions can be worth more than a strong one applied to few. A commoditized input does not need to
+be a good signal — only a slightly informative one produced at scale, which is what the sandbox
+provides. It also says where to look: specialist coverage concentrates on a few high-profile
+catalysts, so the **less-covered tail** is where a systematic estimate is most likely to add
+something — a coverage argument, not an insight one. (The illustrative IR arithmetic is in
+[THESIS §4.2](THESIS.md).)
 
 ### What this repository does and does not establish
 
@@ -184,12 +163,10 @@ is tethered to its reactive cysteine, a reversible drug is boxed on a curated or
 co-crystal ligand, and only an un-routable target falls back to fpocket then a blind centroid box
 (the tier is recorded in `docking_box.mode`). The PK model is still generic (single-dose,
 one-compartment, no bioavailability term) and the market model is uncalibrated and rules-based.
-The docking ΔG is **not** turned into an absolute Kd or a Kd-derived occupancy any more: an
-8-anchor calibration through this exact pipeline found the raw Vina score does not rank measured
-affinity (r(−ΔG, affinity) ≈ −0.4) and instead tracks ligand size/contact area (r(−ΔG,
-heavy-atoms) ≈ +0.6), and ligand-efficiency normalization did not rescue it — so docking is
-reported only as *geometric engagement* (issue #4). These caveats are set out in
-[Known issues](#known-issues). The current numbers are not tradeable.
+The docking ΔG is **no longer** turned into an absolute Kd or a Kd-derived occupancy: the 8-anchor
+calibration (headline result above; full detail in [issue #4](#known-issues)) showed the raw Vina
+score does not rank measured affinity — it tracks ligand size — so docking is reported only as
+*geometric engagement*. The current numbers are not tradeable.
 
 The assumption most likely to be fatal is not "can we compute the chemistry," which works, but
 "does the chemistry carry information the market does not already have," which is untested. A
@@ -356,8 +333,8 @@ documented as such.
 
 A **results-analysis view** (`GET /analysis`, exported to
 [`results/analysis_dashboard.html`](results/analysis_dashboard.html)) lets you
-inspect the whole corpus and learn from it: cross-run charts (docking ΔG *score* vs the
-market call, and geometric-engagement counts), a sortable comparison table, and a per-run
+inspect the whole corpus and learn from it: cross-run charts (docking ΔG *diagnostic* vs PoS
+delta, and geometric-engagement counts), a sortable comparison table, and a per-run
 drill-down with the 3D docked structure, the reconstructed PK/PD exposure curve (occupancy is
 shown only when a calibrated Kd exists — the docking estimator reports none), and a step-by-step
 **reasoning trace** of how each probability-of-success delta was built.
