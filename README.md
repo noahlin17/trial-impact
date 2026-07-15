@@ -45,13 +45,16 @@ Scientifically, this is a **preclinical / discovery-stage engagement instrument*
 is a molecular property established *before* the clinic (it is an entry criterion for Phase 1), so by
 the time a molecule has a trial the chemistry is **confirmatory, not predictive** of the trial's real
 unknowns. It is run on clinical events only because ClinicalTrials.gov is the available event feed —
-an operational choice, not a claim that a trial is where the physics is most informative. The
-Phase 1 vs later-phase distinction is only whether the trial's *outcome* is already public —
-**engagement itself is public preclinical information in both cases.** So the chemistry, which only
-re-derives engagement, surfaces **nothing un-priced** at either: a Phase 1 event is not a tradeable
-signal from the pipeline as-is (it is simply the case where you are not yet benchmarking against a
-public readout), and a later-phase run is an explicit **retrospective known-readout re-simulation**
-(see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument)).
+an operational choice, not a claim that a trial is where the physics is most informative. The axis
+that matters is **what is already known versus what is still being tested**, not the phase label.
+Today the chemistry only re-derives *engagement* — public preclinical information — so the pipeline
+as-is surfaces **nothing un-priced**, and a later-phase run is simply an explicit **retrospective
+known-readout re-simulation** (see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument)).
+The **working hypothesis** — to be tested, not assumed — is that computational chemistry is most
+likely to generate un-priced signal at the **earliest stages, where the least is public**: the earlier
+you are, the more room a SIM has to *extrapolate* a quantity the field has not yet measured or priced.
+Whether *any* stage actually admits public inputs → un-priced edge is an open, empirical question the
+backtest has to settle.
 
 This is deliberately a **first pass**: engagement is not itself net-new predictive information, but it
 is the **first validated primitive** the rest of the pipeline is built on. A reproducible pocket
@@ -449,18 +452,21 @@ reproducible pocket route and docked pose are the inputs every genuinely predict
 consumes ([Next steps](#next-steps)). Shipping the confirmatory primitive first — and validating it
 honestly — is what makes it possible to compute the net-new, not-yet-priced data later.
 
-**Why Phase 1 is the tier to build toward.** Two reasons that compound. First, it is *first-in-human*,
-so the least clinical information is public — the most room for a well-founded estimate to be ahead of
-the price. Second, and more important, **what Phase 1 actually validates is chemistry- and
+**Why Phase 1 is the *hypothesised* tier to build toward.** This is a hypothesis to test, not an
+established result. Two reasons make it the natural first candidate, and they compound. First, it is
+*first-in-human*, so the least clinical information is public — the most room for a well-founded
+estimate to be ahead of the price. Second, **what Phase 1 validates is chemistry- and
 pharmacology-grounded**: human PK, tolerability, the tolerated dose, and (increasingly) human target
-occupancy. Those are quantities that are *in principle* estimable from structure and preclinical data
-**before the readout is published** — unlike the disease-biology question Phase 2/3 tests. That is the
-real target for the predictive pieces above: a calibrated affinity + structure-derived human PK would
+occupancy — quantities that *might* be estimable from structure and preclinical data **before the
+readout is published**, unlike the disease-biology question Phase 2/3 tests. If that holds, the
+predictive pieces above target it directly: a calibrated affinity + structure-derived human PK would
 give a free-Cmax / occupancy estimate, and off-target / ADMET models a tolerability prior — an
-estimate of the trial's *actual* unknown, formed before it is public. **The current build computes
-none of this** — engagement is public, PK is generic, and occupancy needs a calibrated Kd this
-pipeline has not produced (issue #4) — and any such estimate would be a *probabilistic prior with wide
-error bars*, not a precise prediction. It is simply the concrete thing the roadmap is for.
+estimate of the trial's *actual* unknown, formed before it is public. Two honest limits: **the current
+build computes none of this** (engagement is public, PK is generic, occupancy needs a calibrated Kd
+this pipeline has not produced, issue #4), and even built it would be a *probabilistic prior with wide
+error bars* whose edge is unproven until the backtest runs. The broader open question is whether *any*
+stage lets public inputs extrapolate an un-priced quantity; earlier-is-better is the guess, not a
+finding.
 
 **The practical upshot.** The *binding* half of the pipeline is defensible today for a
 **reversible, non-covalent small molecule against a small globular protein with an
