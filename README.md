@@ -420,22 +420,15 @@ its actual molecular weight and logP — then flowed through correctly. (The pro
 example result is now a set of typed placeholders that *cannot* parse as JSON, so an
 echoed example can never be mistaken for a result in the first place.)
 
-This is the habit behind the validation section below, and behind the `code_patched`
+This is the habit behind the validation section above, and behind the `code_patched`
 field in the result contract: a plausible number is not a correct number until it's
 been checked. The same instinct later caught a run reporting numbers the committed code
 could not have produced — because the agent had quietly patched around a broken
-upstream API. See the service README.
-
----
-
-## Nothing to "check against literature" per run — by design
-
-The pipeline emits no absolute Kd, affinity, or occupancy (issue #4), so there is no per-run number to
-hold against a literature Kd/IC50 — the outputs are a geometric-engagement class, a labelled
-docking-objective diagnostic ΔG, and exposure. The one claim that *can* be checked — *does the score
-rank affinity?* — was tested separately and honestly on the 8-anchor set and did not hold (headline
-above; [Known issues #4](#known-issues)). No numbers, prompts, or behaviour were tuned to make any
-result come out a particular way.
+upstream API. See the service README. **No numbers, prompts, or behaviour were tuned to
+make any result come out a particular way** — and since the pipeline emits no absolute
+Kd/affinity/occupancy (issue #4), there is no per-run number to check against a literature
+Kd/IC50 anyway; the one claim that *can* be checked — *does the score rank affinity?* — is
+the 8-anchor test in the headline.
 
 ---
 
