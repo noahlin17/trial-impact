@@ -158,12 +158,15 @@ seems defensible; either alone does not.
 
 ### 3.3 The chemistry is a preclinical / Phase 1 instrument by construction
 
-The system is built for one tier — **preclinical / Phase 1** — and that follows directly from what it
-measures. The question this pipeline answers — *does the molecule engage its target at a tolerated
-exposure?* — is a molecular property that is fixed from the start and is largely resolved by the time
-a drug clears Phase 1. Nothing that happens in Phase 2 or Phase 3 makes the *binding* more
-interesting, so the actionable scope is Phase 1; Phase 2/3 events are educational illustrations and
-there is rarely a reason to run the chemistry on them:
+The system is built for one *forward-looking* tier — **preclinical / Phase 1** — and that follows
+directly from what it measures. The question this pipeline answers — *does the molecule engage its
+target at a tolerated exposure?* — is a molecular property that is fixed from the start and is largely
+resolved by the time a drug clears Phase 1. Nothing that happens in Phase 2 or Phase 3 makes the
+*binding* more interesting, so the tier where the chemistry carries genuinely new information is
+Phase 1. A Phase 2/3 event is not "educational" but **retrospective**: the drug already went through
+Phase 1, its binding is settled, and (often) its outcome is public — so running the chemistry on it
+is a *known-readout re-simulation* of the molecular hypothesis, a benchmark of the pipeline against a
+result that already exists, not a forward-looking tradeable signal:
 
 - **Binding affinity is a property of the molecule and the structure, not of the trial.** ΔG does
   not change between phases; only our knowledge of the downstream *clinical* consequences does.
@@ -184,41 +187,36 @@ later-phase data would *sharpen* the chemistry is indirect: measured human PK / 
 binding can replace our generic PK and `fu` placeholders — but that improves the *inputs*, it does
 not make binding a more relevant question at that stage.
 
-**Practical rule:** run and act on preclinical / Phase 1. Treat any Phase 2/3 run as an
-illustration of the pipeline, not a tradeable signal.
+**Practical rule:** run and act on preclinical / Phase 1. A Phase 2/3 run is a *retrospective
+re-simulation* against a known readout — useful as a benchmark of the pipeline, not a tradeable
+signal.
 
 A single-tier scope means **there is no phase weighting anywhere in the model** —
-`market_model.assess` is phase-agnostic. Phase decides only *whether* an event is actionable
-(Phase 1) or educational (Phase 2/3); it never scales the call. Phase-dependent coefficients would
-only make sense across multiple tradeable tiers, and there is only one here.
+`market_model.assess` is phase-agnostic. Phase decides only *whether* an event is forward-looking
+(Phase 1) or a retrospective known-readout case (Phase 2/3); it never scales the call.
+Phase-dependent coefficients would only make sense across multiple tradeable tiers, and there is
+only one here.
 
-### 3.4 A retrospective check the current build does not pass
+### 3.4 There is no longer an absolute number to check against the literature
 
-Before making any predictive claim, the chemistry should be run against a panel of drugs with
-known outcomes. Applying the pre-readout question — is free Cmax above Kd? — to the two drugs
-already in this repository, both of which are approved:
+An earlier form of the pipeline turned the docking ΔG into an absolute Kd (`Kd = exp(ΔG/RT)`) and a
+free-Cmax/Kd occupancy, then checked those against literature potency — and implied that *neither*
+of the two approved drugs in this repo engages its target, a clear failure. **That whole check is
+now moot, because the pipeline no longer produces any absolute quantity to check.** Once the docking
+claim was demoted to geometric engagement (issue #4), there is no docked Kd, no occupancy, and no
+binding-strength number — the ΔG that remains is a docking-objective diagnostic, explicitly not an
+affinity and not comparable across molecules or targets. So a per-drug "does the model recover the
+known potency?" comparison is not a meaningful test of the current build; it can only test a claim
+the build deliberately stopped making.
 
-| Drug | Docked Kd | Free Cmax | Free Cmax / Kd | Model implies | Actual |
-|---|---|---|---|---|---|
-| sotorasib | 8,412 nM | 3,779 nM | 0.45× | does not engage | approved |
-| ivacaftor | 6,061 nM | 128 nM | 0.02× | does not engage | approved |
-
-The table above is **the earlier, now-withdrawn form of the pipeline**, which turned the docking
-ΔG into an absolute Kd (`Kd = exp(ΔG/RT)`) and implied that *neither* approved drug engages its
-target — a clear failure. That check motivated a proper calibration: 8 potent approved reversible
-binders with clean ChEMBL Ki/Kd were docked through this exact pipeline. The result **falsified the
-premise that Vina ranks affinity at all** across diverse ligands — `r(−ΔG, measured affinity) ≈
-−0.39`, while `r(−ΔG, heavy-atom count) ≈ +0.64` (the score tracks ligand size, not Kd), and
-ligand-efficiency normalization did not rescue it. `exp()` is monotonic, so the invalid transform
-was not the root cause; the docking/scoring layer itself cannot supply the affinity information.
-
-The resolution (issue #4) is to **stop making a binding-strength claim at all**: the docking ΔG is
-kept only as a clearly-labelled relative *score*, no absolute Kd or Kd-derived occupancy is
-surfaced, and docking is reported as a geometric `binding_engagement` classification (did the
-ligand dock into an experimentally-resolved site with a reproducible pose). A cross-target
-"relative binding band" would have been size-in-disguise, so it is not shipped. The free-drug
-(`fu`) occupancy machinery remains in the pipeline for any future estimator that produces a real
-Kd, but the docking path leaves occupancy `None`.
+The reason the claim was dropped, rather than recalibrated, is worth stating: 8 potent approved
+reversible binders with clean ChEMBL Ki/Kd were docked through this exact pipeline, and the result
+**falsified the premise that Vina ranks affinity at all** across diverse ligands — `r(−ΔG, measured
+affinity) ≈ −0.39`, while `r(−ΔG, heavy-atom count) ≈ +0.64` (the score tracks ligand size, not Kd),
+and ligand-efficiency normalization did not rescue it. `exp()` is monotonic, so the invalid
+transform was not the root cause; the docking/scoring layer itself cannot supply affinity
+information. The free-drug (`fu`) occupancy machinery remains in the pipeline for any future
+estimator that produces a real Kd, but the docking path leaves occupancy `None`.
 
 This is the clearest reason to treat the chemistry and the market model here as placeholders.
 It also reorders the issue list: in the reactive system this is a documented scope limit, because

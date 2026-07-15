@@ -10,12 +10,14 @@ readout — alerts to Slack/email while surfacing everything on a dashboard.
 > **Not investment advice.** Output is an automated research signal for
 > informational purposes only. A disclaimer is attached to every assessment.
 
-> **Scope — preclinical / Phase 1 only.** The actionable tier is preclinical / Phase 1; Phase 2/3
-> runs are educational illustrations, not tradeable signals. The physics answers whether a molecule
-> *engages its target* — a fixed molecular property largely proven out by end of Phase 1 — so there
-> is rarely a reason to run the chemistry on a Phase 2/3 trial, where the open questions (efficacy,
+> **Scope — preclinical / Phase 1 is the forward-looking tier.** The physics answers whether a
+> molecule *engages its target* — a fixed molecular property largely proven out by end of Phase 1 —
+> so Phase 1 is the only tier where the chemistry carries new information. A Phase 2/3 run is not a
+> tradeable signal but a **retrospective re-simulation**: the drug already cleared Phase 1 and
+> (often) has a public outcome, so re-running the fixed chemistry on it benchmarks the pipeline
+> against a known readout rather than predicting one — the open Phase 2/3 questions (efficacy,
 > statistics, safety at scale) are ones the pipeline does not model. See the root
-> [README](../README.md#trial-phase--scoped-to-preclinical--phase-1) and
+> [README](../README.md#trial-phase--the-preclinical--phase-1-scope) and
 > [THESIS.md §3.3](../THESIS.md).
 
 ---
@@ -489,10 +491,11 @@ addressed; ○ = documented, future work.)
   was the majority path in production, not an edge case. The modifiers are now gated on
   `has_readout`, so no readout means no call. Both published runs are `met`, so their
   numbers are byte-identical — a regression test asserts exactly that.
-- **No phase weighting — by design** — the actionable scope is **preclinical / Phase 1
+- **No phase weighting — by design** — the forward-looking scope is **preclinical / Phase 1
   only** (binding is a molecular property established by end of Phase 1; Phase 2/3 test
   efficacy and trial statistics the physics does not model), so there is a *single*
-  actionable tier and nothing to weight. Phase 2/3 runs are educational only. See
+  actionable tier and nothing to weight. A Phase 2/3 run is a **retrospective re-simulation**
+  against a known readout — a pipeline benchmark, not a tradeable signal. See
   [the preclinical / Phase 1 scope](../README.md#trial-phase--the-preclinical--phase-1-scope).
 - **Naive competitor read-through** ○ — competitors are assumed to move opposite the
   sponsor, one magnitude bucket softer. Real read-through depends on mechanism /
