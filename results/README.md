@@ -1,25 +1,43 @@
 # Results
 
-Artifacts from two **real** runs of the committed pipeline — a real structure fetch, a
-real AutoDock Vina docking run (**three seeds**, reported as mean ± sd) into a
-**pocket-routed** box, a real PK/PD solve for exposure (Cmax/AUC). Docking is reported as a
-**geometric engagement** classification, not a calibrated affinity — the raw Vina score is a
-relative, size-confounded ranking, not a Kd ([issue #4](../README.md#known-issues)). The
-`.json` files are the exact records the service stored; open the `.html` files in a
-browser for the interactive 3D structure, the PK/PD curve, and the price calls.
+Artifacts from two runs of the committed pipeline. **Read these as a demonstration of what the
+chemistry pipeline *does*, not as measured quantities.**
 
-Every run below satisfies the result contract: **`code_patched: false`**, meaning the
-numbers came from `app/simulation.py` *as committed* — the run did not edit the script to
-make it work. (See "The result contract" in the service README for why that field exists
-and what it caught.)
+**What the chemistry can actually do** — route a target + ligand to an experimentally-resolved
+pocket, dock it (AutoDock Vina, **three seeds**, mean ± sd) into that **pocket-routed** box, classify
+the result as **geometric engagement**, and solve a directional PK/PD exposure (Cmax/AUC).
 
-> **How these were regenerated.** They were produced by running the committed pipeline
-> directly against the pinned **conda-lock** sim stack (`conda-sim.lock.yml`, via
-> `regen_artifacts.py`), not in a hosted Devin session — so the physics is real and
-> verifiable-from-source, and only the Devin *transport* is stubbed. `devin_session_id`
-> therefore reads `local-pinned-stack-regen`. Two independent full runs returned
-> byte-identical scientific numbers. Reproduce with `python regen_artifacts.py` (or
-> `run_real.py` for a live session).
+**What it reads out** — a geometric `binding_engagement` label (did the ligand dock into the
+experimentally-resolved site with a *reproducible* multi-seed pose), a docking-objective ΔG that is a
+**QC/diagnostic only** (not an affinity, not comparable across molecules or targets —
+[issue #4](../README.md#known-issues)), and exposure. No Kd, no occupancy, no binding-strength
+number.
+
+**Why it breaks moving forward, and why the ΔG carries no real provenance** — the ΔG magnitudes
+below are **not measurements you can trust or trace**: (1) they depend on whichever structure the
+router resolves from **live** PDBe/RCSB at run time (not pinned point-in-time —
+[issue #10](../README.md#known-issues)), so they are not point-in-time reproducible; and (2) even a
+stable number is not an affinity — cross-target Vina and CPU MM-GBSA both failed to rank affinity
+(they track ligand size), the covalent KRAS score is a reversible lower bound, and both rows are
+cognate (self-pocket) docking. So the ΔG is an illustrative pipeline output, not a provenance-grade
+result.
+
+The `.json` files are the exact records the service stored; open the `.html` files in a browser for
+the interactive 3D structure, the PK/PD curve, and the price calls.
+
+The one thing that *is* verifiable is **integrity, not meaning**: every run reports
+**`code_patched: false`**, meaning the numbers came from `app/simulation.py` *as committed* — the run
+did not edit the script to make it work. (See "The result contract" in the service README for why
+that field exists and what it caught.)
+
+> **How these were regenerated.** They were produced by running the committed pipeline directly
+> against the pinned **conda-lock** sim stack (`conda-sim.lock.yml`, via `regen_artifacts.py`), not in
+> a hosted Devin session, so `devin_session_id` reads `local-pinned-stack-regen`. Given the *same*
+> resolved structures the run is deterministic and reproduces; but because structures are fetched
+> live and not pinned (issue #10), a different environment can resolve a different structure and
+> return a materially different ΔG — so "reproducible" here means *from the committed code given the
+> same inputs*, not that the ΔG is a stable measurement. Reproduce with `python regen_artifacts.py`
+> (or `run_real.py` for a live session).
 
 > **Toolchain note (why ΔG shifted from earlier figures).** Two things moved the absolute
 > ΔG relative to the PR #3 numbers. (1) **The box is now routed to the pocket**, not a
@@ -40,11 +58,17 @@ and what it caught.)
 
 | File | Trial | Result |
 |------|-------|--------|
-| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, **Phase 1 (in scope)**, endpoint met | ΔG **−7.202 ± 0.187** kcal/mol (n=3) — a *relative docking score, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), drug-likeness flagged (informational, not priced), **covalent** (acrylamide warhead). Route **covalent-tethered** to Cys A:12 of curated holo **6OIM** (confidence 0.806). PoS **+0.50** → AMGN up/strong · REGN, NVS down/moderate. |
-| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, **Phase 3 (educational only)**, endpoint met | ΔG −7.404 ± 0.007 kcal/mol † (n=3) — a *relative docking score, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), clean, not covalent. Route **holo-ligand** boxed on co-crystal **VX7** in curated **6O2P** (confidence 0.897). PoS **+0.52** → VRTX up/strong · CRSP, BLUE down. Included to illustrate the pipeline on a well-characterized drug — a Phase 3 event is **outside the actionable preclinical / Phase 1 scope** (see root README). |
+| `sim_kras_sotorasib.json` | KRAS × sotorasib — Amgen, **approved (Lumakras, 2021)**; backtest anchor (a `results_posted` Phase 1 event, endpoint met) | ΔG **−7.202 ± 0.187** kcal/mol (n=3) — a *docking-objective diagnostic, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), drug-likeness flagged (informational, not priced), **covalent** (acrylamide warhead). Route **covalent-tethered** to Cys A:12 of curated holo **6OIM** (confidence 0.806). PoS **+0.50** → AMGN up/strong · REGN, NVS down/moderate. |
+| `sim_cftr_ivacaftor.json` | CFTR × ivacaftor — Vertex, **approved (Kalydeco, 2012)**; backtest anchor (a `results_posted` Phase 3 event, endpoint met) | ΔG −7.404 ± 0.007 kcal/mol † (n=3) — a *docking-objective diagnostic, not a Kd* ‡ — engagement **experimental-site** (reproducible pose), clean, not covalent. Route **holo-ligand** boxed on co-crystal **VX7** in curated **6O2P** (confidence 0.897). PoS **+0.52** → VRTX up/strong · CRSP, BLUE down. |
 | `dashboard_kras_6OIM.html` | ″ | Rendered `/status` with the 3D viewer; docking ΔG shown as mean ± sd. |
 | `dashboard_cftr_6O2P.html` | ″ | Rendered `/status`; the 6O2P cryo-EM structure rendered from RCSB. |
 | `analysis_dashboard.html` | both | Rendered `/analysis`: physics→price scatter, an estimator head-to-head (empty here — single-estimator corpus), sortable table (ΔG columns carry ± sd), and a per-run drill-down (3D structure + PK/PD curve + PoS reasoning waterfall). Open it and click a row. |
+
+Both drugs are **approved**, so their clinical outcomes are already public — each row is a
+**retrospective known-readout re-simulation** that benchmarks the pipeline against ground truth, not
+a forecast. A correct run is *expected* to recover a clean `experimental-site` engagement; that is the
+point of a backtest. Engagement is a confirmatory preclinical fact in both, so neither row carries any
+tradeable signal (see root README).
 
 Each JSON holds the trial event, the resolved sponsor/competitor tickers, the full
 `sim_result` (docking ΔG with per-seed replicates and sd, the geometric `binding_engagement`
@@ -89,11 +113,11 @@ with seed count (3× the docking time).
 
 ## ‡ How to read the ΔG / engagement and drug-likeness columns
 
-**The ΔG is a relative docking *score*, not an affinity, and no Kd or occupancy is derived from
-it.** An 8-anchor calibration through this exact pipeline ([issue #4](../README.md#known-issues))
-showed the raw Vina score does not rank measured affinity (r(−ΔG, affinity) ≈ −0.4) and instead
-tracks ligand size/contact area (r(−ΔG, heavy-atoms) ≈ +0.6). So the docking result is demoted to
-a **geometric `binding_engagement`** claim: `experimental-site` means the ligand docked into an
+**The ΔG is a docking-objective *diagnostic*, not an affinity — it is not comparable across
+molecules or targets, and no Kd or occupancy is derived from it.** An 8-anchor calibration through
+this exact pipeline ([issue #4](../README.md#known-issues)) showed the raw Vina score does not rank
+measured affinity (Spearman `ρ(−ΔG, pKd) = −0.24`) and instead tracks ligand size/contact area
+(`ρ(−ΔG, heavy-atoms) = +0.45`). So the docking result is demoted to a **geometric `binding_engagement`** claim: `experimental-site` means the ligand docked into an
 *experimentally-resolved* site (a curated holo / covalent-tethered residue) with a *reproducible*
 multi-seed pose (sd ≤ 0.75). Both runs above are `experimental-site`. `kd_nM` and
 `target_occupancy_pct` are `null`; the uncalibrated `exp(ΔG/RT)` value survives only as a
@@ -116,7 +140,7 @@ the flag (renamed from `tox_flag`) is surfaced as informational provenance only 
 ## † How to read the two ΔGs (pocket-resolved, but cognate and reversible-scored)
 
 Both runs now box the **real pocket**, which is the fix for the old blind-slab problem. But
-neither ΔG is a validated absolute affinity, for two reasons:
+neither ΔG is an absolute affinity, for two reasons:
 
 - **Cognate/holo docking is partly circular.** Redocking a drug into its own bound pocket
   (the switch-II site of 6OIM for sotorasib, the VX7 site of 6O2P for ivacaftor) inflates

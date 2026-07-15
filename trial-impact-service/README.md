@@ -10,12 +10,14 @@ readout — alerts to Slack/email while surfacing everything on a dashboard.
 > **Not investment advice.** Output is an automated research signal for
 > informational purposes only. A disclaimer is attached to every assessment.
 
-> **Scope — preclinical / Phase 1 only.** The actionable tier is preclinical / Phase 1; Phase 2/3
-> runs are educational illustrations, not tradeable signals. The physics answers whether a molecule
-> *engages its target* — a fixed molecular property largely proven out by end of Phase 1 — so there
-> is rarely a reason to run the chemistry on a Phase 2/3 trial, where the open questions (efficacy,
-> statistics, safety at scale) are ones the pipeline does not model. See the root
-> [README](../README.md#trial-phase--scoped-to-preclinical--phase-1) and
+> **Scope — a preclinical / discovery-stage engagement instrument.** The physics answers whether a
+> molecule *engages its target* — a molecular property established *preclinically*, before Phase 1,
+> so at any trial the docking result is **confirmatory, not new**. What a trial actually tests
+> (Phase 1: human safety/PK/dose; Phase 2/3: efficacy, statistics, safety at scale) is orthogonal to
+> what the pipeline computes. It runs on clinical events only because ClinicalTrials.gov is the event
+> feed; phase governs only *information timing* (Phase 1 outcome not yet public vs Phase 2/3 public →
+> a **retrospective known-readout re-simulation**), never what the chemistry can compute. See the root
+> [README](../README.md#trial-phase--a-preclinical--discovery-stage-instrument) and
 > [THESIS.md §3.3](../THESIS.md).
 
 ---
@@ -303,7 +305,7 @@ addressed; ○ = documented, future work.)
   [issue #4](../README.md#known-issues). The code used to convert the Vina score to an absolute
   `Kd = exp(ΔG/RT)` and branch on hard thresholds (`Kd ≤ 100 nM`, `ΔG ≤ −9.0`). An 8-anchor
   calibration through this exact pipeline showed the raw score does **not** rank measured affinity
-  (`r(−ΔG, affinity) ≈ −0.39`) and instead tracks ligand size (`r(−ΔG, heavy-atoms) ≈ +0.64`);
+  (Spearman `ρ(−ΔG, pKd) = −0.24`) and instead tracks ligand size (`ρ(−ΔG, heavy-atoms) = +0.45`);
   ligand-efficiency normalization did not rescue it, and `exp()` being monotonic means no
   post-transform can recover affinity the score lacks. **Fix (implemented):** the docking
   estimator no longer emits an absolute Kd or a Kd-derived occupancy (both `None`); the ΔG is kept
@@ -317,7 +319,7 @@ addressed; ○ = documented, future work.)
 - **A physics rescorer (MM-GBSA) was tested and also failed — so no strength estimator ships** ✅ —
   the natural next move was to rescore the docked poses with single-snapshot MM-GBSA (OpenMM /
   ff14SB / GAFF-2.11 / OBC2 implicit solvent, ligand minimized in a rigid receptor), which adds the
-  electrostatics + desolvation terms Vina omits. Validated on the **same 8 anchors** (see
+  electrostatics + desolvation terms Vina omits. Evaluated on the **same 8 anchors** (see
   [`validation/`](validation/README.md)): MM-GBSA does **not** beat Vina and does **not** rank
   measured affinity — Spearman ρ(MM-GBSA, pKd) = **−0.24** (95% CI [−0.93, +0.62]) vs ρ(Vina) =
   −0.24, and both still track ligand size (ρ ≈ +0.4). Applying the same discipline used on Vina, the
@@ -489,11 +491,12 @@ addressed; ○ = documented, future work.)
   was the majority path in production, not an edge case. The modifiers are now gated on
   `has_readout`, so no readout means no call. Both published runs are `met`, so their
   numbers are byte-identical — a regression test asserts exactly that.
-- **No phase weighting — by design** — the actionable scope is **preclinical / Phase 1
-  only** (binding is a molecular property established by end of Phase 1; Phase 2/3 test
-  efficacy and trial statistics the physics does not model), so there is a *single*
-  actionable tier and nothing to weight. Phase 2/3 runs are educational only. See
-  [the preclinical / Phase 1 scope](../README.md#trial-phase--the-preclinical--phase-1-scope).
+- **No phase weighting — by design** — the chemistry answers one phase-invariant,
+  **preclinical / discovery-stage** question (target engagement is established before the clinic;
+  Phase 2/3 test efficacy and statistics the physics does not model), so there is nothing to
+  weight. Phase governs only *information timing*: a Phase 2/3 run is a **retrospective known-readout
+  re-simulation** — a pipeline benchmark, not a tradeable signal. See
+  [the preclinical / discovery-stage scope](../README.md#trial-phase--a-preclinical--discovery-stage-instrument).
 - **Naive competitor read-through** ○ — competitors are assumed to move opposite the
   sponsor, one magnitude bucket softer. Real read-through depends on mechanism /
   target overlap and modality, not just "is a competitor."

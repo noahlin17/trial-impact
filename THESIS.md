@@ -18,27 +18,27 @@ evidence, from first principles, or simply guessing, I have tried to say so.
 
 **Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
 The one falsifiable scientific claim this project actually tests — *does the docking score rank
-binding strength?* — was tested on 8 approved drugs with measured ChEMBL affinities and **rejected**:
-Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size, ρ ≈ +0.45), and a CPU MM-GBSA rescore did
-not improve on it (ρ = −0.24, still size-tracking). So the pipeline ships only a *geometric
-engagement* claim, and the negative result — reproducible via `make validate` — is the substantive
-finding.
+binding strength?* — was tested on 8 approved drugs with measured ChEMBL affinities and found **not to
+hold**: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size, ρ ≈ +0.45), and a CPU MM-GBSA
+rescore did not improve on it (ρ = −0.24, still size-tracking). At n = 8 the confidence intervals are
+wide and span zero, so this is **directional, not a powered refutation** — but it points the same way
+as long-standing docking literature, so the pipeline ships only a *geometric engagement* claim. The
+negative result — reproducible via `make validate` — is the substantive finding.
 
 ---
 
 ## 1. The signal
 
 A desk watching a clinical-trial readout receives a label: the endpoint was met or it was
-not. The label is public within minutes and is priced quickly. It does not, on its own,
-say much about whether the molecule should have been expected to work.
+not. It does not, on its own, say much about whether the molecule should have been expected
+to work.
 
 The idea here is to produce a second input for the same event: an estimate of whether the
 drug engages its target, computed from the protein structure and the ligand chemistry
-rather than from the sponsor's description of the result. The output is a continuous
-quantity (a docking ΔG *score* plus a geometric target-engagement classification, and
-PK/PD-derived exposure) rather than a categorical one — note that the ΔG is *not* turned into
-an absolute Kd or occupancy, because it cannot support that claim (§3.4, issue #4). This has
-three consequences:
+rather than from the sponsor's description of the result. The output is a
+geometric target-engagement classification plus a docking ΔG *diagnostic* and PK/PD-derived
+exposure — note that the ΔG is *not* turned into an absolute Kd or occupancy, because it cannot
+support that claim (§3.4, issue #4). This has three consequences:
 
 - it can be scored against realized outcomes, so its value can be measured rather than
   argued;
@@ -61,7 +61,8 @@ A signal's value tends to decay with the cost of reproducing it. The cost here i
 AutoDock Vina is free and has been available since 2010; RDKit, the PDB, AlphaFold DB,
 PubChem and Open Targets are all free; and the pipeline in this repository was assembled in
 days with agent assistance. If a ΔG for a given trial is cheaply computable by anyone, it is
-reasonable to assume it is already reflected in the price, or will be shortly.
+reasonable to assume it is largely in the price already — though "cheap to compute" is not the same
+as "priced in," a distinction §4 returns to.
 
 So I do not think the docking is where an edge would come from. Candidates that seem more
 durable to me, in rough order of how much I believe them:
@@ -85,18 +86,16 @@ the harness no longer bakes in the model. What remains: `docking_box` is still a
 field on the shared contract, and the only estimators shipped are the docking pipeline and a
 deliberately naive **control** (a heavy-atom size proxy) — the point of assumptions 5–6 below.
 A real head-to-head against a *second physical* model, and the backtest that would make the
-comparison meaningful, are still ahead. The pinned commit buys reproducibility, not validity.
+comparison meaningful, are still ahead: the pinned commit buys reproducibility, not validity.
 
-The claim, then, is not that docking generates alpha. It is that this is a plausible
-substrate for finding out what might. That framing is also why the reproducibility work in
-this repo matters: a comparison across models whose outputs cannot be attributed to
-specific code is not a valid comparison.
+The claim, then, is not that docking generates alpha but that this is a plausible substrate for
+finding out what might — which is why reproducible-from-source outputs matter here, since a
+comparison across models whose numbers cannot be attributed to specific code is not a valid one.
 
-One caveat I would apply to my own reasoning: "we would license or build a proprietary
-model" is the weakest of the three rows. Frontier labs are unlikely to be out-modelled by a
-small team, a licensed model is not exclusive, and any model advantage appears to depreciate
-quickly as open alternatives catch up. The version of that argument I find defensible is a
-fine-tune on proprietary data — which returns to the first row.
+One caveat on the table above: any edge resting on the *model itself* is the weakest case —
+frontier labs are unlikely to be out-modelled by a small team and a licensed model is not
+exclusive, so the only version I find defensible is a fine-tune on proprietary data, which
+returns to the first row (the data, not the model).
 
 ---
 
@@ -154,71 +153,78 @@ replications) reports that targets with human genetic support succeed at roughly
 rate of those without, which would make genetic evidence a stronger single predictor than
 anything the docking produces. Open Targets exposes a genetic-association score per
 target–indication pair at no cost. Combining a target-validation axis with a molecule axis
-seems defensible; either alone does not.
+seems defensible; either alone does not — and a baseline built from that axis is the one the
+chemistry has to beat before it can be said to add anything (§4.3, and assumptions 5–6 in §6).
 
-### 3.3 The chemistry is a preclinical / Phase 1 instrument by construction
+### 3.3 The chemistry is a preclinical / discovery-stage instrument by construction
 
-The system is built for one tier — **preclinical / Phase 1** — and that follows directly from what it
-measures. The question this pipeline answers — *does the molecule engage its target at a tolerated
-exposure?* — is a molecular property that is fixed from the start and is largely resolved by the time
-a drug clears Phase 1. Nothing that happens in Phase 2 or Phase 3 makes the *binding* more
-interesting, so the actionable scope is Phase 1; Phase 2/3 events are educational illustrations and
-there is rarely a reason to run the chemistry on them:
+The right way to place this pipeline is to ask, for a given trial, **what is already known going in
+versus what the trial is actually testing** — and then see which side the chemistry sits on.
 
-- **Binding affinity is a property of the molecule and the structure, not of the trial.** ΔG does
-  not change between phases; only our knowledge of the downstream *clinical* consequences does.
-- **Engagement is effectively proven out by end of Phase 1.** Phase 1 (plus preclinical) is where
-  human PK, tolerated dose and — increasingly — direct target-occupancy readouts establish whether
-  free drug reaches and occupies the target. That is exactly the therapeutic-index question chemistry
-  and PK can speak to: can free drug concentration plausibly exceed Kd at a tolerated dose.
-- **What P2/P3 add is orthogonal to what we model.** Phase 2 tests whether engaging the target
-  helps patients (efficacy → a *target-validation* / disease-biology question); Phase 3 tests whether
-  that effect replicates at scale with adequate statistics and safety (trial-execution / statistical
-  questions). None of these is a binding question, so the docking output becomes progressively more
-  redundant as clinical data accumulates and the market prices it in.
+**Known *going into* Phase 1.** Target engagement / binding is a molecular property established
+*preclinically*: a molecule only reaches the clinic after in-vitro potency, selectivity, and often
+co-crystal or cell target-engagement data. Engagement is an **entry criterion**, and ΔG does not
+change between phases. So the docking result — *does the molecule engage its target?* — is
+**confirmatory of an already-established fact**, not information generated at the trial.
 
-So the incremental information from the physics is highest exactly when clinical uncertainty about
-engagement is highest — at preclinical / Phase 1 — and decays to near-zero by Phase 2/3, where the
-genetics/target-validation axis (§3.2) and the trial result itself carry the call. The one way
-later-phase data would *sharpen* the chemistry is indirect: measured human PK / plasma-protein
-binding can replace our generic PK and `fu` placeholders — but that improves the *inputs*, it does
-not make binding a more relevant question at that stage.
+**Being *tested* in Phase 1 (unknown going in).** Human safety / tolerability, human PK, and the
+tolerated dose — and, in some programmes, early human target-occupancy. These are exactly the
+quantities the pipeline does **not** compute: occupancy is unset (it needs a Kd the docking cannot
+supply, §3.4), and exposure comes from a *generic* Bateman model (fixed `ka`/`Vd`/`CL`, `F`=1), not a
+human-calibrated one. **Phase 2/3** then test efficacy (a target-validation / disease-biology
+question, §3.2) and replication at scale — also outside the physics.
 
-**Practical rule:** run and act on preclinical / Phase 1. Treat any Phase 2/3 run as an
-illustration of the pipeline, not a tradeable signal.
+So the chemistry answers a question that is **most uncertain in discovery / lead optimisation, before
+the clinic**, and is largely settled by the time any trial exists. The system runs on clinical events
+only because ClinicalTrials.gov is the available **event feed** — an operational trigger, not a claim
+that a trial is where the physics is most informative. Phase therefore governs only *information
+timing*: a Phase 1 trial's *outcome* is not yet public while a Phase 2/3 drug's is — but engagement
+itself is public in both and routinely priced, so the chemistry surfaces **nothing net-new the market
+does not already have** at either. A Phase 2/3 run
+is simply an explicit **retrospective known-readout re-simulation** — a benchmark of the pipeline,
+not a trade.
 
-A single-tier scope means **there is no phase weighting anywhere in the model** —
-`market_model.assess` is phase-agnostic. Phase decides only *whether* an event is actionable
-(Phase 1) or educational (Phase 2/3); it never scales the call. Phase-dependent coefficients would
-only make sense across multiple tradeable tiers, and there is only one here.
+**This is a first pass, not a dead end.** Engagement is confirmatory today, but it is the **first
+validated primitive** — a reproducible pocket route and docked pose — that every genuinely predictive
+downstream piece consumes. The pieces that would actually address the *tested* unknowns (and so could
+generate edge) are set out in §4 (and the README's *What it would take to be edge-generating* table).
+Phase 1 is the *hypothesised* tier to build toward — a guess to test, not a result — because it is
+first-in-human (least public data) *and* because what it validates (human PK, tolerability, tolerated
+dose, sometimes human occupancy) is chemistry/pharmacology-grounded and so *might* be estimable from
+structure before the readout is public, unlike the disease-biology question Phase 2/3 tests. The real
+axis is what is *known* versus what is *being tested*, and the standing conjecture is that the earliest
+stages — where least is public — leave the most room for a SIM to extrapolate an un-priced quantity.
+Whether any stage actually does is empirical: the current build estimates none of these, any estimate
+would be a probabilistic prior rather than a precise prediction, and only the backtest settles it.
 
-### 3.4 A retrospective check the current build does not pass
+Because the chemistry's claim is phase-invariant, **there is no phase weighting anywhere in the
+model** — `market_model.assess` is phase-agnostic. Phase decides only *whether* an event's outcome is
+still unpublished (Phase 1) or already public (Phase 2/3); it never scales the call. Phase-dependent
+coefficients would only make sense across multiple tradeable tiers, and there is only one question
+here.
 
-Before making any predictive claim, the chemistry should be run against a panel of drugs with
-known outcomes. Applying the pre-readout question — is free Cmax above Kd? — to the two drugs
-already in this repository, both of which are approved:
+### 3.4 There is no longer an absolute number to check against the literature
 
-| Drug | Docked Kd | Free Cmax | Free Cmax / Kd | Model implies | Actual |
-|---|---|---|---|---|---|
-| sotorasib | 8,412 nM | 3,779 nM | 0.45× | does not engage | approved |
-| ivacaftor | 6,061 nM | 128 nM | 0.02× | does not engage | approved |
+An earlier form of the pipeline turned the docking ΔG into an absolute Kd (`Kd = exp(ΔG/RT)`) and a
+free-Cmax/Kd occupancy, then checked those against literature potency — and implied that *neither*
+of the two approved drugs in this repo engages its target, a clear failure. **That whole check is
+now moot, because the pipeline no longer produces any absolute quantity to check.** Once the docking
+claim was demoted to geometric engagement (issue #4), there is no docked Kd, no occupancy, and no
+binding-strength number — the ΔG that remains is a docking-objective diagnostic, explicitly not an
+affinity and not comparable across molecules or targets. So a per-drug "does the model recover the
+known potency?" comparison is not a meaningful test of the current build; it can only test a claim
+the build deliberately stopped making.
 
-The table above is **the earlier, now-withdrawn form of the pipeline**, which turned the docking
-ΔG into an absolute Kd (`Kd = exp(ΔG/RT)`) and implied that *neither* approved drug engages its
-target — a clear failure. That check motivated a proper calibration: 8 potent approved reversible
-binders with clean ChEMBL Ki/Kd were docked through this exact pipeline. The result **falsified the
-premise that Vina ranks affinity at all** across diverse ligands — `r(−ΔG, measured affinity) ≈
-−0.39`, while `r(−ΔG, heavy-atom count) ≈ +0.64` (the score tracks ligand size, not Kd), and
-ligand-efficiency normalization did not rescue it. `exp()` is monotonic, so the invalid transform
-was not the root cause; the docking/scoring layer itself cannot supply the affinity information.
-
-The resolution (issue #4) is to **stop making a binding-strength claim at all**: the docking ΔG is
-kept only as a clearly-labelled relative *score*, no absolute Kd or Kd-derived occupancy is
-surfaced, and docking is reported as a geometric `binding_engagement` classification (did the
-ligand dock into an experimentally-resolved site with a reproducible pose). A cross-target
-"relative binding band" would have been size-in-disguise, so it is not shipped. The free-drug
-(`fu`) occupancy machinery remains in the pipeline for any future estimator that produces a real
-Kd, but the docking path leaves occupancy `None`.
+The reason the claim was dropped, rather than recalibrated, is worth stating: 8 potent approved
+reversible binders with clean ChEMBL Ki/Kd were docked through this exact pipeline, and the result
+showed **no evidence that Vina ranks affinity** across diverse ligands. The premise is a
+*ranking* claim, so the test is **Spearman ρ** (rank correlation): `ρ(−ΔG, measured pKd) = −0.24`,
+while `ρ(−ΔG, heavy-atom count) = +0.45` (the score tracks ligand size, not Kd), and
+ligand-efficiency normalization did not rescue it (`ρ ≈ −0.02`). At n = 8 the CIs span zero, so this
+is directional rather than definitive, but it is enough to withhold a strength claim. `exp()` is monotonic, so the invalid
+transform was not the root cause; the docking/scoring layer itself cannot supply affinity
+information. The free-drug (`fu`) occupancy machinery remains in the pipeline for any future
+estimator that produces a real Kd, but the docking path leaves occupancy `None`.
 
 This is the clearest reason to treat the chemistry and the market model here as placeholders.
 It also reorders the issue list: in the reactive system this is a documented scope limit, because
@@ -227,7 +233,7 @@ predictive system there is no readout to fall back on, so recovering a real *str
 (gnina CNN rescoring / MM-GBSA / FEP — §future work) becomes blocking.
 
 The obvious next candidate, a single-snapshot **MM-GBSA rescore** of the docked poses (which adds
-the electrostatics and desolvation terms Vina omits), was subsequently built CPU-only and validated
+the electrostatics and desolvation terms Vina omits), was subsequently built CPU-only and evaluated
 on the same eight anchors (`trial-impact-service/validation/`). It **also failed**: Spearman
 ρ(MM-GBSA, pKd) = −0.24 (95% CI [−0.93, +0.62]), no better than Vina's −0.24, and it still tracks
 ligand size (ρ ≈ +0.4). Applying the same discipline used on Vina, the cheap MM-GBSA is *not*
@@ -252,12 +258,24 @@ produce an encouraging and false result. Four problems seem material:
   disclosures.
 - **Survivorship.** Terminated and withdrawn trials have to remain in the sample.
 - **Base rates.** With attrition around 90%, "predict failure" is already a strong naive
-  baseline, and any model has to beat it — as well as beating a genetics-only baseline — before
-  the physics can be said to add anything.
+  baseline that any model has to beat (the incremental-value test is §4.3).
 
 ---
 
 ## 4. Where an edge would have to come from
+
+**North Star.** Intake a Phase 1 trial's design plus *all* public information — structure, target,
+indication, planned dose, and any published in-vitro, PK, or prior computational results — and
+estimate a quantity the trial is *testing but has not yet read out* (human PK, tolerability, human
+occupancy) *before* it is published. The estimate only counts if it makes our probability **more
+accurate than the one already in the price**: recreating a disclosed in-vitro potency, a reported PK
+value, or a prior docking result adds nothing (those are public and, as a rule, already priced), so
+the bar is *price, not publication* — the harder and more valuable case is resolving genuine
+uncertainty on a quantity the market has *not* confidently priced, whether or not its raw inputs are
+public. This is not built
+today — the current output is confirmatory engagement — and the eventual output is a probabilistic
+prior, not a precise prediction; the two constraints below (§4.1 beating the implied probability, and
+the point-in-time backtest of §3.5) are what would turn such a prior into an actual edge.
 
 I do not think the edge is in the chemistry. If there is one, it is in producing a
 better-calibrated estimate of P(success) — and therefore of expected value — than the one
@@ -267,6 +285,19 @@ estimate, and its job is to add incremental information rather than to carry the
 That reframing also disposes of the commoditization problem in §2. It does not matter much
 whether a ΔG is cheap to compute. It matters whether the resulting probability estimate is
 better than the one already in the price.
+
+It also disciplines a tempting but flawed theory of the first unlock: *"the edge is a quantity that
+could be computed by intense simulation or a computational chemist but has not been published."* That
+is the right hunting ground and the wrong stopping condition. **Unpublished is not un-priced.** The
+sponsor running the trial employs computational chemists and runs FEP / MD / PBPK / ADMET internally
+and simply does not publish it, so the unpublished quantity is usually *already known to the party
+that sets the price* and leaks into it through their actions (dose choice, trial design, guidance).
+Computability guarantees neither materiality to the readout nor a mispriced consensus. And depth
+compounds the problem: a deep sim of a heavily-followed drug is the worst case, because coverage is
+maximal and the sponsor knows everything. The plausible edge is the inverse — a cheap, calibrated
+estimate applied at **breadth** across many under-covered events (§4.2), where no informed party has
+done the work — and whether any specific quantity is un-priced is an empirical question the
+point-in-time backtest (§3.5) settles, not one that can be reasoned into existence.
 
 ### 4.1 The position
 
