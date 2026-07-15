@@ -1,4 +1,4 @@
-.PHONY: test lint validate
+.PHONY: test lint validate validate-posefidelity
 
 # Run the unit test suite (dev .venv).
 test:
@@ -15,3 +15,10 @@ lint:
 validate:
 	python validation/analyze.py
 	python validation/figure.py
+
+# Regenerate the pose-fidelity (Experiment C) stats + figure from the committed,
+# self-contained validation/pose_fidelity/results/selfdock.json (numpy + matplotlib).
+# Re-running the docking from scratch needs the trialsim conda env (see that README).
+validate-posefidelity:
+	python validation/pose_fidelity/analyze.py
+	python validation/pose_fidelity/figure.py
