@@ -63,7 +63,7 @@ predictive pieces build on (calibrated affinity, structure-derived human PK, tar
 genetics, a calibrated P(success)). Why an event's *phase* is only an information-timing distinction,
 why Phase 1 is the *hypothesised* tier to build toward, and what net-new data an edge would actually
 require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) and
-[What it would take to be edge-generating](#what-it-would-take-to-be-edge-generating--compute-the-unknowns-not-the-knowns).
+[What it would take to be edge-generating](#what-it-would-take-to-be-edge-generating--improve-on-the-markets-estimate-dont-re-derive-the-knowns).
 
 > **North Star.** Take a Phase 1 trial's design plus *all* public information — structure, target,
 > indication, planned dose, and any **published in-vitro, PK, or prior computational results** — and
@@ -233,7 +233,7 @@ trial event also keeps runs independently retryable and separately auditable.
 The tradeoff is that an agent will also fix things it was not asked to fix — including
 the science. That is not hypothetical: it has happened twice here, and it is why the
 result contract carries a `code_patched` field. See
-[the result contract](trial-impact-service/README.md#the-result-contract-and-why-it-has-a-code_patched-field).
+[the result contract](trial-impact-service/README.md#the-result-contract-and-why-it-has-estimator--code_patched-fields).
 
 ### On the label
 
