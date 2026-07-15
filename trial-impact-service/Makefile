@@ -1,4 +1,4 @@
-.PHONY: test lint validate validate-posefidelity validate-congeneric
+.PHONY: test lint validate validate-posefidelity validate-congeneric architecture
 
 # Run the unit test suite (dev .venv).
 test:
@@ -6,7 +6,7 @@ test:
 
 # Lint the app + tooling scripts.
 lint:
-	ruff check app/ validation/ regen_artifacts.py demo_e2e.py compare_estimators.py tests/
+	ruff check app/ validation/ tools/ regen_artifacts.py demo_e2e.py compare_estimators.py tests/
 
 # Regenerate the scoring-validation stats + head-to-head figure from the committed,
 # self-contained validation/results/scores.json (needs numpy + matplotlib; both are in
@@ -29,3 +29,8 @@ validate-posefidelity:
 validate-congeneric:
 	python validation/congeneric/analyze.py
 	python validation/congeneric/figure.py
+
+# Regenerate the tracked README architecture diagram (requires matplotlib from
+# requirements-dev.txt).
+architecture:
+	python tools/make_architecture.py
