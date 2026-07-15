@@ -105,8 +105,8 @@ require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stag
 A trial event is routed to the right structure and pocket, docked, and classified as *geometric
 engagement*; a PK/PD solve adds exposure. Each estimator runs head-to-head against a size-only
 baseline it must beat — and the validation suite (with the bottom-left panel showing the cross-target
-test) is what tests, and falsifies, the affinity premise across two ranking regimes, with a
-complementary pose-geometry control. The market layer is an illustrative downstream demo.
+test) tests the affinity premise across two ranking regimes and finds no evidence of affinity ranking,
+with a complementary pose-geometry control. The market layer is an illustrative downstream demo.
 
 ---
 
@@ -517,8 +517,9 @@ open violation; it is resolved by **re-scoping the docking claim**, not by calib
 
 **Issue #4 — why docking is now only a geometric claim.** #4 began as "ΔG documented as *relative* but
 consumed as *absolute* Kd." The plan was to keep Vina's *ranking* and demote only its magnitude — but
-docking the 8 anchors (pKd 7.4–10.1) through this exact pipeline falsified even the ranking (headline:
-Spearman ρ(−ΔG, pKd) = −0.24, ρ(−ΔG, size) = +0.45, LE ≈ −0.02). Two faults were separated: (a)
+docking the 8 anchors (pKd 7.4–10.1) through this exact pipeline found no evidence of affinity
+ranking (headline: Spearman ρ(−ΔG, pKd) = −0.24, ρ(−ΔG, size) = +0.45, LE ≈ −0.02). Two faults were
+separated: (a)
 `Kd = exp(ΔG/RT)` is invalid for a relative score, but `exp()` is monotonic so fixing it cannot inject
 affinity information; (b) the **scoring layer itself** is the primary cause (vdW-dominated,
 uncalibrated across pockets), so no downstream transform recovers absent information — a cross-target
