@@ -436,9 +436,9 @@ demonstration is honest about what it does; the scaling claim is not yet support
 
 ## 5. The broader thesis: AI is changing the outcome distribution, and pricing has not adjusted
 
-**This section is a thesis, not a finding.** It reflects my own view, formed from watching how this
-recent wave of AI-for-biology and life-sciences companies is built and financed — not from a
-bench-science or public-markets seat. It is a position I hold with some conviction and no proof. None of what follows is established from data I have gathered,
+**This section is a thesis, not a finding.** It reflects my own view, formed from following the
+recent wave of AI-for-biology and life-sciences companies — as a generalist reasoning from public
+evidence, not a seasoned biotech specialist. It is a position I hold with some conviction and no proof. None of what follows is established from data I have gathered,
 and §5.2 sets out where I think it is most likely to be wrong. I state it as a hypothesis because
 that is what it is, and because the value of writing it down is that it can then be tested.
 
