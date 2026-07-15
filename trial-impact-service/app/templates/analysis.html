@@ -47,10 +47,10 @@
   <div class="cards" id="cards"></div>
 
   <h2>Physics → price relationships</h2>
-  <p class="legend">Each point is one run (hover for drug/target). Red = drug-likeness flag (≥2 Lipinski violations; informational, not a safety signal). Docking ΔG is a <strong>relative, size-confounded score, not an affinity</strong> (issue #4): it is not converted to Kd and does not drive occupancy.</p>
+  <p class="legend">Each point is one run (hover for drug/target). Red = drug-likeness flag (≥2 Lipinski violations; informational, not a safety signal). The validated readout is the <strong>geometric engagement</strong> classification; docking ΔG is only a <strong>docking-objective diagnostic</strong> (issue #4) — not an affinity, not comparable across molecules/targets, not converted to Kd, and it does not drive occupancy.</p>
   <div class="charts">
-    <div class="chart"><h3>Docking ΔG (relative score) vs PoS delta</h3><div id="c_dg_pos"></div></div>
     <div class="chart"><h3>Geometric engagement (run count)</h3><div id="c_engagement"></div></div>
+    <div class="chart"><h3>Docking ΔG (diagnostic) vs PoS delta</h3><div id="c_dg_pos"></div></div>
     <div class="chart"><h3>Distribution of PoS deltas</h3><div id="c_hist"></div></div>
   </div>
 
@@ -65,7 +65,7 @@
         <th data-key="target">Target</th>
         <th data-key="drug">Drug</th>
         <th data-key="phase">Phase</th>
-        <th data-key="dg">ΔG (score)</th>
+        <th data-key="dg">ΔG (diagnostic)</th>
         <th data-key="engagement">Engagement</th>
         <th data-key="druglikeness">Drug-likeness</th>
         <th data-key="pos_delta">PoS Δ</th>
@@ -119,7 +119,7 @@
       if (!p.length) { document.querySelector(".charts").innerHTML = '<p class="muted">No completed runs yet.</p>'; return; }
       const txt = p.map(d => `${d.target} × ${d.drug}`);
       const col = p.map(d => d.druglikeness ? "#a11f1f" : "#2a6df4");
-      scatter("c_dg_pos", p.map(d => d.dg), p.map(d => d.pos), txt, col, "ΔG (kcal/mol, relative score)", "PoS Δ", false);
+      scatter("c_dg_pos", p.map(d => d.dg), p.map(d => d.pos), txt, col, "ΔG (kcal/mol · docking objective, not an affinity)", "PoS Δ", false);
       const eng = {};
       p.forEach(d => { const k = d.engagement || "—"; eng[k] = (eng[k] || 0) + 1; });
       Plotly.newPlot("c_engagement", [{ x: Object.keys(eng), y: Object.values(eng), type: "bar", marker: { color: "#2a6df4" } }],
@@ -142,7 +142,7 @@
         <h3 style="margin:1rem 0 0.2rem">${t.target} × ${t.drug} <span class="muted" style="font-weight:400">· ${t.nct_id}</span>
           <span class="muted" style="font-weight:400;font-size:0.8rem">· ΔG spread ${num(t.dg_spread, 2)} · PoS spread ${num(t.pos_spread, 2)}</span></h3>
         <table>
-          <thead><tr><th>Estimator</th><th>ΔG (score)</th><th>Engagement</th><th>Confidence</th><th>PoS Δ</th></tr></thead>
+          <thead><tr><th>Estimator</th><th>ΔG (diagnostic)</th><th>Engagement</th><th>Confidence</th><th>PoS Δ</th></tr></thead>
           <tbody>${t.arms.map(a => `
             <tr><td><code>${a.estimator}</code></td><td>${num(a.dg, 2)}${a.dg_sd != null ? "±" + num(a.dg_sd, 2) : ""}</td><td>${a.engagement ?? "—"}</td>
               <td>${num(a.confidence, 2)}</td>
