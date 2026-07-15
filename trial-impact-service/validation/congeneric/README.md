@@ -31,10 +31,10 @@ with the cheap single-snapshot MM-GBSA protocol. Spearman ρ vs measured pAffini
 
 | predictor | ρ vs pAffinity | 95% CI | Kendall τ |
 |---|--:|--:|--:|
-| heavy-atoms (size baseline) | +0.29 | [−0.29, +0.73] | +0.23 |
-| Vina ligand efficiency | −0.29 | [−0.66, +0.32] | −0.15 |
-| Vina (−ΔG) | +0.08 | [−0.51, +0.68] | +0.05 |
-| **MM-GBSA (−ΔG)** | **−0.54** | **[−0.86, +0.08]** | **−0.38** |
+| heavy-atoms (size baseline) | +0.29 | [−0.30, +0.73] | +0.23 |
+| Vina ligand efficiency | −0.29 | [−0.68, +0.33] | −0.15 |
+| Vina (−ΔG) | +0.08 | [−0.54, +0.68] | +0.05 |
+| **MM-GBSA (−ΔG)** | **−0.54** | **[−0.89, +0.07]** | **−0.38** |
 
 **NEGATIVE (pre-registered bar NOT met).** MM-GBSA ρ = −0.54 (target ≥ +0.5), its CI
 includes 0, and it beats neither the size baseline nor raw Vina — it is in fact *inversely*

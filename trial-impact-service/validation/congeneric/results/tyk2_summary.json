@@ -4,9 +4,9 @@
   "n": 13,
   "predictors": {
     "heavy-atoms (size baseline)": {
-      "rho": 0.286,
+      "rho": 0.292,
       "ci95": [
-        -0.29,
+        -0.3,
         0.73
       ],
       "kendall_tau": 0.226
@@ -14,15 +14,15 @@
     "Vina ligand efficiency": {
       "rho": -0.291,
       "ci95": [
-        -0.66,
-        0.32
+        -0.68,
+        0.33
       ],
       "kendall_tau": -0.154
     },
     "Vina (-dG)": {
       "rho": 0.077,
       "ci95": [
-        -0.51,
+        -0.54,
         0.68
       ],
       "kendall_tau": 0.051
@@ -30,8 +30,8 @@
     "MM-GBSA (-dG)": {
       "rho": -0.538,
       "ci95": [
-        -0.86,
-        0.08
+        -0.89,
+        0.07
       ],
       "kendall_tau": -0.385
     }

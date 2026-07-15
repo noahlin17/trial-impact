@@ -11,7 +11,7 @@ predictor recover the RELATIVE affinity ordering? Reports, per target (never poo
 
 Pre-registered POSITIVE (see ../PREREGISTRATION.md): MM-GBSA rho >= +0.5 AND its 95% CI
 excludes 0 AND it beats both the size baseline and raw Vina. Run: python analyze.py tyk2
-(numpy only).
+(numpy + scipy).
 """
 import json
 import math
@@ -19,6 +19,7 @@ import os
 import sys
 
 import numpy as np
+from scipy.stats import spearmanr
 
 HERE = os.path.dirname(__file__)
 RHO_THRESHOLD = 0.5
@@ -28,9 +29,7 @@ def spearman(x, y) -> float:
     x, y = np.asarray(x, float), np.asarray(y, float)
     if len(x) < 3 or x.std() == 0 or y.std() == 0:
         return float("nan")
-    rx = np.argsort(np.argsort(x)).astype(float)
-    ry = np.argsort(np.argsort(y)).astype(float)
-    return float(np.corrcoef(rx, ry)[0, 1])
+    return float(spearmanr(x, y).statistic)
 
 
 def kendall_tau(x, y) -> float:

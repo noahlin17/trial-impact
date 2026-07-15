@@ -25,6 +25,16 @@ def build(target: str) -> None:
             "affinity_type": r["affinity_type"], "paffinity": r["paffinity"],
             "vina_dg": r["vina_dg"], "dg_mmgbsa": r["dg_mmgbsa"],
         })
+    expected = {lig["id"] for lig in manifest["ligands"]}
+    actual = [r["id"] for r in rows]
+    missing = expected - set(actual)
+    unexpected = set(actual) - expected
+    duplicates = {lig_id for lig_id in actual if actual.count(lig_id) > 1}
+    if missing or unexpected or duplicates:
+        raise RuntimeError(
+            f"{target} result coverage mismatch: missing={sorted(missing)}, "
+            f"unexpected={sorted(unexpected)}, duplicates={sorted(duplicates)}"
+        )
     rows.sort(key=lambda x: -x["paffinity"])
     out_dir = os.path.join(HERE, "results")
     os.makedirs(out_dir, exist_ok=True)

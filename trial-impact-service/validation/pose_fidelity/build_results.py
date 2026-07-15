@@ -28,6 +28,16 @@ def main() -> int:
             "rmsd_seed_spread": r["rmsd_seed_spread"],
             "dg_per_seed": r["dg_per_seed"], "success_2A": r["success_2A"],
         })
+    expected = set(manifest)
+    actual = [r["pdb_id"] for r in rows]
+    missing = expected - set(actual)
+    unexpected = set(actual) - expected
+    duplicates = {pdb for pdb in actual if actual.count(pdb) > 1}
+    if missing or unexpected or duplicates:
+        raise RuntimeError(
+            f"self-docking result coverage mismatch: missing={sorted(missing)}, "
+            f"unexpected={sorted(unexpected)}, duplicates={sorted(duplicates)}"
+        )
     rows.sort(key=lambda x: x["rmsd_top"])
     out_dir = os.path.join(HERE, "results")
     os.makedirs(out_dir, exist_ok=True)

@@ -163,7 +163,7 @@ def selfdock_one(pdb_id: str, het: str) -> dict:
         "rmsd_median": round(statistics.median(rmsds), 3),
         "rmsd_seed_spread": round(max(rmsds) - min(rmsds), 3),
         "dg_per_seed": [round(x, 3) for x in top_dg],
-        "success_2A": bool(best < 2.0),
+        "success_2A": bool(rmsds[0] < 2.0),
     }
     json.dump(result, open(os.path.join(out_dir, "result.json"), "w"), indent=2)
     return result

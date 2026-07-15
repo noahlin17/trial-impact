@@ -54,6 +54,9 @@ rather than the confidence metric we hoped for.
 This validates pose reproduction under pocket-aware routing; it says **nothing** about
 affinity. It does not contradict the cross-target negative result — it maps the other
 side of the boundary (geometry Vina *can* do; cross-target affinity ranking it cannot).
+Because the native crystal ligand defines the docking box and the receptor is the native
+holo structure, this is a geometry/tool-reproduction control, not an independent or
+prospective docking test.
 
 ## Reproduce
 
