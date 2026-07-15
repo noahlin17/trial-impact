@@ -1,0 +1,65 @@
+{
+  "n": 7,
+  "source": {
+    "metadata": "RCSB REST API (https://data.rcsb.org)",
+    "note": "Self-docking (redock native ligand into own crystal receptor); reference pose = deposited crystallographic coordinates. All PDB IDs are real, validated entries; none invented."
+  },
+  "complexes": [
+    {
+      "pdb_id": "4GIH",
+      "resolution_A": 2.0,
+      "ligand_het_code": "0X5",
+      "ligand_name": "2,6-dichloro-N-{2-[(cyclopropylcarbonyl)amino]pyridin-4-yl}benzamide",
+      "ligand_formula_weight": 350.0,
+      "note": "TYK2 (FEP-series reference structure)"
+    },
+    {
+      "pdb_id": "2ZFF",
+      "resolution_A": 1.47,
+      "ligand_het_code": "53U",
+      "ligand_name": "D-phenylalanyl-N-benzyl-L-prolinamide",
+      "ligand_formula_weight": 351.0,
+      "note": "Thrombin (FEP-series reference structure)"
+    },
+    {
+      "pdb_id": "1IEP",
+      "resolution_A": 2.1,
+      "ligand_het_code": "STI",
+      "ligand_name": "4-(4-METHYL-PIPERAZIN-1-YLMETHYL)-N-[4-METHYL-3-(4-PYRIDIN-3-YL-PYRIMIDIN-2-YLAMINO)-PHENYL]-BENZAMIDE",
+      "ligand_formula_weight": 494.0,
+      "note": "ABL1 + imatinib"
+    },
+    {
+      "pdb_id": "1M17",
+      "resolution_A": 2.6,
+      "ligand_het_code": "AQ4",
+      "ligand_name": "[6,7-BIS(2-METHOXY-ETHOXY)QUINAZOLINE-4-YL]-(3-ETHYNYLPHENYL)AMINE",
+      "ligand_formula_weight": 393.0,
+      "note": "EGFR + erlotinib"
+    },
+    {
+      "pdb_id": "1UWH",
+      "resolution_A": 2.95,
+      "ligand_het_code": "BAX",
+      "ligand_name": "4-{4-[({[4-CHLORO-3-(TRIFLUOROMETHYL)PHENYL]AMINO}CARBONYL)AMINO]PHENOXY}-N-METHYLPYRIDINE-2-CARBOXAMIDE",
+      "ligand_formula_weight": 465.0,
+      "note": "BRAF + inhibitor"
+    },
+    {
+      "pdb_id": "3PP0",
+      "resolution_A": 2.25,
+      "ligand_het_code": "03Q",
+      "ligand_name": "2-{2-[4-({5-chloro-6-[3-(trifluoromethyl)phenoxy]pyridin-3-yl}amino)-5H-pyrrolo[3,2-d]pyrimidin-5-yl]ethoxy}ethanol",
+      "ligand_formula_weight": 494.0,
+      "note": "HER2/EGFR-family + inhibitor"
+    },
+    {
+      "pdb_id": "1STP",
+      "resolution_A": 2.6,
+      "ligand_het_code": "BTN",
+      "ligand_name": "BIOTIN",
+      "ligand_formula_weight": 244.0,
+      "note": "Streptavidin + biotin (well-defined control)"
+    }
+  ]
+}

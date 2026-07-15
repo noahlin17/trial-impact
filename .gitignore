@@ -21,6 +21,8 @@ venv/
 # Scoring-validation intermediates (receptor PDBs, PDBQT, docked poses); the
 # self-contained results/ (scores.json + figure) are committed instead.
 trial-impact-service/validation/work/
+trial-impact-service/validation/congeneric/work/
+trial-impact-service/validation/pose_fidelity/work/
 
 # Session-local scratch — experiment probes, seed/serve harnesses, one-off design
 # notes and test plans/reports that are not part of the published project.

@@ -107,7 +107,7 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
 
     # Docking is a GEOMETRIC engagement corroborator, not a binding-strength signal.
     # The Vina score ranks by ligand size/contact area, not affinity (issue #4: an
-    # 8-anchor calibration found r(−ΔG, affinity)≈−0.4 vs r(−ΔG, size)≈+0.6), so a
+    # 8-anchor calibration found Spearman ρ(−ΔG, pKd) = −0.24 vs ρ(−ΔG, size) = +0.45), so a
     # ΔG/Kd magnitude and a Kd-derived occupancy are NOT priced. The only thing docking
     # can honestly add is confirming the molecule docks into the experimentally-resolved
     # target site with a reproducible pose — a small, capped corroboration of a win.

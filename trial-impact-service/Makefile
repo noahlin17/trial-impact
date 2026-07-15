@@ -1,4 +1,4 @@
-.PHONY: test lint validate
+.PHONY: test lint validate validate-posefidelity validate-congeneric
 
 # Run the unit test suite (dev .venv).
 test:
@@ -15,3 +15,17 @@ lint:
 validate:
 	python validation/analyze.py
 	python validation/figure.py
+
+# Regenerate the pose-fidelity (Experiment C) stats + figure from the committed,
+# self-contained validation/pose_fidelity/results/selfdock.json (numpy + matplotlib).
+# Re-running the docking from scratch needs the trialsim conda env (see that README).
+validate-posefidelity:
+	python validation/pose_fidelity/analyze.py
+	python validation/pose_fidelity/figure.py
+
+# Regenerate the congeneric-ranking (Experiment A) stats + figure from the committed,
+# self-contained validation/congeneric/results/tyk2_scores.json (numpy + matplotlib).
+# Re-running the docking + MM-GBSA from scratch needs the trialsim + mmgbsa conda envs.
+validate-congeneric:
+	python validation/congeneric/analyze.py
+	python validation/congeneric/figure.py

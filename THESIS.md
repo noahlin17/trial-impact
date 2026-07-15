@@ -23,7 +23,17 @@ hold**: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size, ρ ≈ +
 rescore did not improve on it (ρ = −0.24, still size-tracking). At n = 8 the confidence intervals are
 wide and span zero, so this is **directional, not a powered refutation** — but it points the same way
 as long-standing docking literature, so the pipeline ships only a *geometric engagement* claim. The
-negative result — reproducible via `make validate` — is the substantive finding.
+negative result — reproducible via `make validate` — is the substantive finding. A complementary
+[pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md) redocked **6/7 native
+ligands within 2 Å (86%), median top-pose RMSD 0.68 Å**: positive evidence for pose geometry only,
+not affinity or binding strength. The companion [Experiment A congeneric
+ranking](trial-impact-service/validation/congeneric/README.md) was negative too: on 13 Tyk2
+ligands, cheap single-snapshot MM-GBSA gave ρ = −0.54 (95% CI [−0.86, +0.08]) versus measured
+affinity, failing to beat size or raw Vina even within one target. The A+C thresholds were fixed
+in the [pre-registration](trial-impact-service/validation/PREREGISTRATION.md) before scores were
+computed. Together with the earlier cross-target negative, these are two honest affinity negatives
+and one positive geometry control — the boundary is explicit and pose fidelity does not rescue
+affinity.
 
 ---
 
@@ -217,7 +227,7 @@ the build deliberately stopped making.
 
 The reason the claim was dropped, rather than recalibrated, is worth stating: 8 potent approved
 reversible binders with clean ChEMBL Ki/Kd were docked through this exact pipeline, and the result
-showed **no evidence that Vina ranks affinity** across diverse ligands. The premise is a
+showed **no evidence that Vina ranks affinity** across these anchors (mostly ATP-competitive kinase hinge binders plus one soluble-enzyme inhibitor) — reproducing, on our own scale, the size-confounding that fast docking scorers have shown since the mid-2000s, not a new finding. The premise is a
 *ranking* claim, so the test is **Spearman ρ** (rank correlation): `ρ(−ΔG, measured pKd) = −0.24`,
 while `ρ(−ΔG, heavy-atom count) = +0.45` (the score tracks ligand size, not Kd), and
 ligand-efficiency normalization did not rescue it (`ρ ≈ −0.02`). At n = 8 the CIs span zero, so this

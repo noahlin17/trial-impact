@@ -33,6 +33,18 @@ pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a C
   molecules score "best" while being weaker binders).
 - **A physics-based MM-GBSA rescore does not rescue it** — same ρ, still size-confounded ([`validation/`](trial-impact-service/validation/README.md), reproduce with `make validate`).
 
+The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md)
+redocked **6/7 native ligands within 2 Å (86%), median top-pose RMSD 0.68 Å**. That supports the
+geometric pose-reproduction claim only; it says nothing about affinity or binding strength. Together,
+the positive geometry control and negative affinity test are the honest boundary of the shipped claim.
+
+The second [pre-registered control](trial-impact-service/validation/PREREGISTRATION.md), [Experiment A
+(congeneric ranking)](trial-impact-service/validation/congeneric/README.md), is negative too: on the
+13-ligand Tyk2 series, cheap single-snapshot MM-GBSA gives ρ = −0.54 (95% CI [−0.86, +0.08]) versus
+measured affinity, failing to beat the size baseline or raw Vina even in the within-target regime.
+The A+C thresholds were fixed before scores were computed: two honest affinity negatives, one positive
+geometry control, and no claim that pose fidelity rescues affinity.
+
 **Read this as directional, not decisive.** At n = 8 the 95% CIs are wide and span zero (Vina ρ
 [−0.83, +0.62]), so this does not *prove* Vina is uninformative — it shows **no evidence** of affinity
 ranking on this set, exactly as the long-known size confound predicts. A powered refutation would need
@@ -68,9 +80,12 @@ require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stag
 > **North Star.** Take a Phase 1 trial's design plus *all* public information — structure, target,
 > indication, planned dose, and any **published in-vitro, PK, or prior computational results** — and
 > produce a model estimate of a quantity the trial is *testing but has not yet read out* (human PK,
-> tolerability / MTD, human target occupancy). The estimate is useful only if it is **net-new against
-> everything already public**: recreating a disclosed in-vitro potency, a reported PK parameter, or a
-> prior docking result is by definition already priced and adds nothing. Two honest bounds: **(1)** the
+> tolerability / MTD, human target occupancy). The estimate is useful only if it improves on the market's
+> own estimate — either by resolving genuine uncertainty on a quantity the market has not confidently
+> priced (its raw inputs may be public), or by computing something not yet published, or published but not
+> already priced in. Merely re-deriving a disclosed in-vitro potency, PK parameter, or prior docking result
+> that the market already weights correctly adds nothing: the bar is *price*, not *publication*. Two honest
+> bounds: **(1)** the
 > output is a *probabilistic prior with error bars*, and edge requires it to beat the market's implied
 > probability on a point-in-time backtest — the estimate alone is not a trade; **(2)** the idea
 > generalises to later phases only in *form* — Phase 2/3 test efficacy / disease biology the chemistry
