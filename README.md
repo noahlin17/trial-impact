@@ -254,9 +254,11 @@ pipeline is the part that is built.
 
 Genuine outputs from the committed pipeline (see [`results/`](results/) for the raw JSON
 and the rendered dashboards — open the `.html` files in a browser). Docking runs across a
-**fixed seed set (42, 43, 44)** and reports **mean ± sd**, so these reproduce: re-running a
-trial returns the same mean ΔG and sd. (Regenerated with `regen_artifacts.py` against the
-pinned stack; `run_real.py` runs the same pipeline in a live Devin session.)
+**fixed seed set (42, 43, 44)** and reports **mean ± sd**, so the docking is deterministic
+*given the same resolved structure* — but the structure is fetched live and not pinned, so the
+ΔG is not point-in-time reproducible (see the caveat below and issue #10). (Regenerated with
+`regen_artifacts.py` against the pinned stack; `run_real.py` runs the same pipeline in a live
+Devin session.)
 
 **Read the engagement + exposure columns as the product and the model call as scaffolding.** The
 **geometric engagement** classification and exposure (Cmax/AUC) are the net-new data modality a
@@ -271,12 +273,10 @@ end to end, and it is not a trade.
 | Phase 3 — *retrospective (known readout)* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
 
 **Only the Phase 1 row is in the forward-looking scope** — the tier the system is built for, where
-the readout is not yet known. The Phase 3 CFTR × ivacaftor row is a **retrospective re-simulation**:
-ivacaftor already cleared Phase 1 and its outcome is public, so re-running the (fixed) chemistry on it
-is a known-readout check of the pipeline, not a tradeable signal. As set out in
-[Trial phase — the preclinical / Phase 1 scope](#trial-phase--the-preclinical--phase-1-scope),
-binding is a molecular property fixed from the start and largely established by end of Phase 1, so a
-Phase 2/3 event adds efficacy / statistical evidence the physics does not model.
+the readout is not yet known. The Phase 3 CFTR × ivacaftor row is a **retrospective re-simulation**
+(ivacaftor already cleared Phase 1 and its outcome is public), included as a known-readout check of
+the pipeline, not a tradeable signal — see [Trial phase](#trial-phase--the-preclinical--phase-1-scope)
+for why binding stops being an open question after Phase 1.
 
 The *scoring* layer reproduces deterministically from committed source — the engagement
 classification, Cmax, and both PoS deltas fall out of the mean ΔG and the resolved route by fixed
@@ -291,16 +291,13 @@ covalent KRAS. What *is* verifiable is integrity, not meaning: `code_patched: fa
 number came from `simulation.py` as committed, not from a session that patched it around a broken
 upstream API — that field exists because it caught exactly that case (see below).
 
-**‡ The ΔG and engagement columns should be read as *geometry, not strength*** — [Known
-issues](#known-issues) #4 has the detail. The **engagement** column is a geometric claim: the
-ligand docked into the *experimentally-resolved* binding site (a curated holo / covalent-tethered
-residue) with a reproducible multi-seed pose (ΔG sd ≤ 0.75). It is deliberately **not** a
-binding-strength or affinity claim, because the Vina score ranks by size/contact, not affinity
-(the 8-anchor calibration in [issue #4](#known-issues)). The ΔG is retained as a docking score;
-an absolute Kd and a Kd-derived occupancy are **no longer surfaced** (the uncalibrated exp(ΔG/RT)
-value is kept, clearly labelled, in `provenance.vina_pseudo_kd_nM` only). The market model prices
-only a small, capped geometric corroboration of a positive readout — no ΔG/Kd magnitude, no
-occupancy. The `druglikeness_flag` is ≥2 Lipinski violations — a drug-likeness / oral-absorption
+**‡ The engagement column is *geometry, not strength*.** It records that the ligand docked into the
+*experimentally-resolved* binding site (a curated holo / covalent-tethered residue) with a
+reproducible multi-seed pose (ΔG sd ≤ 0.75) — deliberately **not** a binding-strength or affinity
+claim (why: [issue #4](#known-issues)). No absolute Kd or Kd-derived occupancy is surfaced (the
+uncalibrated exp(ΔG/RT) survives, clearly labelled, in `provenance.vina_pseudo_kd_nM` only), and the
+market model prices only a small, capped geometric corroboration of a positive readout — no ΔG/Kd
+magnitude, no occupancy. The `druglikeness_flag` is ≥2 Lipinski violations — a drug-likeness / oral-absorption
 heuristic, **not** a toxicity model — so it is surfaced as information only and is **not priced**
 into the call (issue #3, fixed). It fires on sotorasib, an approved drug; with the former −0.15
 "safety" penalty removed, the KRAS call is `strong` (PoS delta +0.50), while ivacaftor (one
