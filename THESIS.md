@@ -259,6 +259,13 @@ produce an encouraging and false result. Four problems seem material:
 - **Survivorship.** Terminated and withdrawn trials have to remain in the sample.
 - **Base rates.** With attrition around 90%, "predict failure" is already a strong naive
   baseline that any model has to beat (the incremental-value test is §4.3).
+- **Prior art on labels and reaction modeling.** Constructing outcome/reaction labels need not
+  be reinvented from scratch: published market-reaction work builds abnormal-return labels from
+  free data (daily prices plus a catalyst calendar) via an expected-return model and a fixed
+  post-event window. I treat that as an interesting template to borrow from — not settled truth,
+  and it models the reaction *to* an announcement rather than the outcome *ahead* of it — but
+  adopting its label machinery, under the same point-in-time discipline above, is a plausible next
+  step over a naive registry date.
 
 ---
 
@@ -373,6 +380,15 @@ chemistry has to demonstrate incremental value *over that baseline*, and it may 
 is cheap and should be run before any further investment in the physics. If the physics adds
 nothing, that is a finding worth having early.
 
+Published work is a useful sanity check on how strong that baseline could be — not as an
+authority, but as work to think against. One market-reaction model built purely on public,
+non-chemistry features (sentiment, company financials, market trend, and an event-graph) reports
+roughly 0.71 weighted ROC-AUC on a related task, and does not rank trial *phase* among its top
+features. Taken loosely, that is roughly the kind of all-public baseline the chemistry would have
+to improve on; and two independent studies de-emphasising phase is at least a caution against
+assuming the phase tier is where the signal lives. Neither result is decisive here — different
+task, different sample — but both are worth stress-testing the thesis against.
+
 Finally, capacity. Options on small- and mid-cap biotechs are illiquid, spreads are wide, and
 implied volatility collapses after a binary event. An edge that does not survive realistic
 transaction costs is not usable, and I have not modelled them.
@@ -382,7 +398,9 @@ transaction costs is not usable, and I have not modelled them.
 Not by accuracy. By calibration, measured against the market's implied probability — Brier score
 or log loss versus implied PoS, and a calibration curve. The question is not whether the model was
 right, but whether it was systematically right in the cases where the market was wrong, by a margin
-large enough to cover costs.
+large enough to cover costs — and, ideally, incremental over a reproducible all-public baseline of
+the kind already published (sentiment + financials + event-graph), not just over phase×indication
+base rates.
 
 ### 4.5 A gap that undercuts the argument above
 
@@ -392,6 +410,26 @@ entity-resolution problem — registry sponsor strings are inconsistent, sponsor
 subsidiaries of listed parents, and many are private or pre-IPO and therefore not tradeable at all.
 Until that is addressed, the system operates on a watchlist rather than a universe. The
 demonstration is honest about what it does; the scaling claim is not yet supported by the code.
+
+### 4.6 Prior work worth borrowing from (not treating as settled)
+
+Two market-reaction studies are useful to think against — as empirical grounding for the
+small-sponsor/breadth argument (§4.2) and as the *baseline family* the chemistry would have to
+beat (§4.3) — rather than as authority to lean on:
+
+- Singh, Rocafort, Cai, Siah & Lo, *The reaction of sponsor stock prices to clinical trial
+  outcomes: an event study analysis*, PLOS ONE (2022) — abnormal returns are far larger for
+  small/early-stage sponsors than for large pharma, with careful per-outcome event-date handling.
+- Kovtun et al. (AIRI group), *New drugs and stock market: a machine learning framework for
+  predicting pharma market reaction to clinical trial announcements*, Scientific Reports (2023) —
+  a reproducible, all-public predictive pipeline (BERT sentiment, an expected-return model for
+  abnormal returns, gradient boosting + event-graph) reaching ~0.71 weighted ROC-AUC, in which
+  sponsor drug-portfolio size dominates and trial phase does not make the top features.
+
+Both use restricted or proprietary trial feeds and model the reaction *to* a printed announcement,
+not the outcome *ahead* of it, so neither is directly the problem here, and neither says anything
+about whether chemistry adds information. They are borrowed as method templates and baselines, and
+as two independent data points that pressure the phase assumption — not as evidence for the thesis.
 
 ---
 
