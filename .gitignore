@@ -27,6 +27,7 @@ trial-impact-service/validation/pose_fidelity/work/
 # Session-local scratch — experiment probes, seed/serve harnesses, one-off design
 # notes and test plans/reports that are not part of the published project.
 _*.py
+!**/__init__.py
 trial-impact-service/_*.json
 DESIGN_NOTE_*.md
 TEST_PLAN_*.md
@@ -34,3 +35,6 @@ test-report.md
 
 # OS / editor
 .DS_Store
+
+# Tier-1 harness generated report (regenerate with `make tier1`)
+trial-impact-service/tier1/fixtures/report.json
