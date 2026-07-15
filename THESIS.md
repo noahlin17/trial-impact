@@ -30,8 +30,8 @@ negative result — reproducible via `make validate` — is the substantive find
 ## 1. The signal
 
 A desk watching a clinical-trial readout receives a label: the endpoint was met or it was
-not. The label is public within minutes and is priced quickly. It does not, on its own,
-say much about whether the molecule should have been expected to work.
+not. It does not, on its own, say much about whether the molecule should have been expected
+to work.
 
 The idea here is to produce a second input for the same event: an estimate of whether the
 drug engages its target, computed from the protein structure and the ligand chemistry
@@ -86,18 +86,16 @@ the harness no longer bakes in the model. What remains: `docking_box` is still a
 field on the shared contract, and the only estimators shipped are the docking pipeline and a
 deliberately naive **control** (a heavy-atom size proxy) — the point of assumptions 5–6 below.
 A real head-to-head against a *second physical* model, and the backtest that would make the
-comparison meaningful, are still ahead. The pinned commit buys reproducibility, not validity.
+comparison meaningful, are still ahead: the pinned commit buys reproducibility, not validity.
 
-The claim, then, is not that docking generates alpha. It is that this is a plausible
-substrate for finding out what might. That framing is also why the reproducibility work in
-this repo matters: a comparison across models whose outputs cannot be attributed to
-specific code is not a valid comparison.
+The claim, then, is not that docking generates alpha but that this is a plausible substrate for
+finding out what might — which is why reproducible-from-source outputs matter here, since a
+comparison across models whose numbers cannot be attributed to specific code is not a valid one.
 
-One caveat I would apply to my own reasoning: "we would license or build a proprietary
-model" is the weakest of the three rows. Frontier labs are unlikely to be out-modelled by a
-small team, a licensed model is not exclusive, and any model advantage appears to depreciate
-quickly as open alternatives catch up. The version of that argument I find defensible is a
-fine-tune on proprietary data — which returns to the first row.
+One caveat on the table above: any edge resting on the *model itself* is the weakest case —
+frontier labs are unlikely to be out-modelled by a small team and a licensed model is not
+exclusive, so the only version I find defensible is a fine-tune on proprietary data, which
+returns to the first row (the data, not the model).
 
 ---
 
@@ -155,7 +153,8 @@ replications) reports that targets with human genetic support succeed at roughly
 rate of those without, which would make genetic evidence a stronger single predictor than
 anything the docking produces. Open Targets exposes a genetic-association score per
 target–indication pair at no cost. Combining a target-validation axis with a molecule axis
-seems defensible; either alone does not.
+seems defensible; either alone does not — and a baseline built from that axis is the one the
+chemistry has to beat before it can be said to add anything (§4.3, and assumptions 5–6 in §6).
 
 ### 3.3 The chemistry is a preclinical / discovery-stage instrument by construction
 
@@ -259,8 +258,7 @@ produce an encouraging and false result. Four problems seem material:
   disclosures.
 - **Survivorship.** Terminated and withdrawn trials have to remain in the sample.
 - **Base rates.** With attrition around 90%, "predict failure" is already a strong naive
-  baseline, and any model has to beat it — as well as beating a genetics-only baseline — before
-  the physics can be said to add anything.
+  baseline that any model has to beat (the incremental-value test is §4.3).
 
 ---
 
