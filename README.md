@@ -273,21 +273,20 @@ diagnostic*, not an affinity and not comparable across the two rows (issue #4). 
 column is the transparent rules-based placeholder described above; it shows that the pipeline runs
 end to end, and it is not a trade.
 
-| Illustrative phase | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call |
+| Drug (status) | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call |
 |-------|---------------|-----------|-----------|---------------|-----|-----------|
-| Phase 1 *(illustrative)* | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
-| Phase 3 *(illustrative)* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
+| **Approved** (Lumakras, 2021) | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
+| **Approved** (Kalydeco, 2012) | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
 
-**Both are *approved* drugs — we are validating the pipeline against known answers, not forecasting
-anything.** Sotorasib and ivacaftor are on the market, so their real outcomes are public; the phase
-labels are **illustrative**, used only to show the information-timing distinction the pipeline draws,
-not the drugs' actual status. That distinction — a Phase 1 event's *outcome* is not yet public while a
-Phase 2/3 drug's is — is where a *live* run's timing would differ, but it changes nothing about what
-the chemistry computes: engagement is confirmatory of a preclinical fact in both, so the pipeline
-surfaces nothing un-priced either way. Run on a genuinely public readout like these, a row is a
-**retrospective known-readout re-simulation** — a benchmark of the pipeline, not a tradeable signal —
-see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) for why the chemistry is a
-preclinical/discovery-stage instrument regardless of the event's phase.
+**Both are *approved* drugs, chosen precisely because the answer is already known — this is a
+backtest of the pipeline against ground truth, not a forecast.** Each has a resolved co-crystal and a
+public clinical history, so a correct run is *expected* to recover a clean `experimental-site`
+engagement; the point is to confirm the pipeline does so end to end and reproducibly, not to predict
+anything. That is exactly why these two rows carry **no tradeable signal**: engagement is a
+confirmatory preclinical fact here, and re-deriving a public fact about an approved drug is a
+**retrospective known-readout re-simulation** — a benchmark, not an edge. (Why an event's *phase*
+would only shift a *live* run's information timing, never what the chemistry computes, is in
+[Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument).)
 
 The *scoring* layer reproduces deterministically from committed source — the engagement
 classification, Cmax, and both PoS deltas fall out of the mean ΔG and the resolved route by fixed
