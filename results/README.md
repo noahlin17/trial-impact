@@ -110,8 +110,8 @@ with seed count (3× the docking time).
 **The ΔG is a docking-objective *diagnostic*, not an affinity — it is not comparable across
 molecules or targets, and no Kd or occupancy is derived from it.** An 8-anchor calibration through
 this exact pipeline ([issue #4](../README.md#known-issues)) showed the raw Vina score does not rank
-measured affinity (r(−ΔG, affinity) ≈ −0.4) and instead tracks ligand size/contact area (r(−ΔG,
-heavy-atoms) ≈ +0.6). So the docking result is demoted to a **geometric `binding_engagement`** claim: `experimental-site` means the ligand docked into an
+measured affinity (Spearman `ρ(−ΔG, pKd) = −0.24`) and instead tracks ligand size/contact area
+(`ρ(−ΔG, heavy-atoms) = +0.45`). So the docking result is demoted to a **geometric `binding_engagement`** claim: `experimental-site` means the ligand docked into an
 *experimentally-resolved* site (a curated holo / covalent-tethered residue) with a *reproducible*
 multi-seed pose (sd ≤ 0.75). Both runs above are `experimental-site`. `kd_nM` and
 `target_occupancy_pct` are `null`; the uncalibrated `exp(ΔG/RT)` value survives only as a

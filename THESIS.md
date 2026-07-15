@@ -216,9 +216,10 @@ the build deliberately stopped making.
 
 The reason the claim was dropped, rather than recalibrated, is worth stating: 8 potent approved
 reversible binders with clean ChEMBL Ki/Kd were docked through this exact pipeline, and the result
-**falsified the premise that Vina ranks affinity at all** across diverse ligands — `r(−ΔG, measured
-affinity) ≈ −0.39`, while `r(−ΔG, heavy-atom count) ≈ +0.64` (the score tracks ligand size, not Kd),
-and ligand-efficiency normalization did not rescue it. `exp()` is monotonic, so the invalid
+**falsified the premise that Vina ranks affinity at all** across diverse ligands. The premise is a
+*ranking* claim, so the test is **Spearman ρ** (rank correlation): `ρ(−ΔG, measured pKd) = −0.24`,
+while `ρ(−ΔG, heavy-atom count) = +0.45` (the score tracks ligand size, not Kd), and
+ligand-efficiency normalization did not rescue it (`ρ ≈ −0.02`). `exp()` is monotonic, so the invalid
 transform was not the root cause; the docking/scoring layer itself cannot supply affinity
 information. The free-drug (`fu`) occupancy machinery remains in the pipeline for any future
 estimator that produces a real Kd, but the docking path leaves occupancy `None`.

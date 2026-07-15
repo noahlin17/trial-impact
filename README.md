@@ -273,17 +273,20 @@ diagnostic*, not an affinity and not comparable across the two rows (issue #4). 
 column is the transparent rules-based placeholder described above; it shows that the pipeline runs
 end to end, and it is not a trade.
 
-| Trial | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call |
+| Illustrative phase | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call |
 |-------|---------------|-----------|-----------|---------------|-----|-----------|
-| Phase 1 — **outcome not yet public** | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
-| Phase 3 — *public outcome (retrospective)* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
+| Phase 1 *(illustrative)* | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
+| Phase 3 *(illustrative)* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
 
-The two rows differ only in **information timing**, not in what the chemistry computes — engagement is
-confirmatory of a preclinical fact in both. The Phase 1 KRAS × sotorasib row is the case where the
-clinical *outcome* is not yet public — but engagement already is, so the pipeline surfaces nothing
-un-priced; the Phase 3 CFTR × ivacaftor row already has a public outcome, so it is a **retrospective known-readout
-re-simulation**, a benchmark of the pipeline rather than a tradeable signal — see
-[Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) for why the chemistry is a
+**Both are *approved* drugs — we are validating the pipeline against known answers, not forecasting
+anything.** Sotorasib and ivacaftor are on the market, so their real outcomes are public; the phase
+labels are **illustrative**, used only to show the information-timing distinction the pipeline draws,
+not the drugs' actual status. That distinction — a Phase 1 event's *outcome* is not yet public while a
+Phase 2/3 drug's is — is where a *live* run's timing would differ, but it changes nothing about what
+the chemistry computes: engagement is confirmatory of a preclinical fact in both, so the pipeline
+surfaces nothing un-priced either way. Run on a genuinely public readout like these, a row is a
+**retrospective known-readout re-simulation** — a benchmark of the pipeline, not a tradeable signal —
+see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) for why the chemistry is a
 preclinical/discovery-stage instrument regardless of the event's phase.
 
 The *scoring* layer reproduces deterministically from committed source — the engagement
@@ -686,12 +689,13 @@ docking claim** rather than by calibrating the number — see the anchor experim
 *relative* but consumed as *absolute* Kd." The plan was to keep Vina's *ranking* and demote only
 its *magnitude* to a calibrated relative band. To validate that, 8 potent approved reversible
 binders with clean ChEMBL Ki/Kd (kinase hinge binders across ABL1/EGFR/VEGFR2 + FXa/rivaroxaban,
-pKd 7.4–10.1) were docked **through this exact pipeline**. The result **falsified the ranking
-premise across diverse ligands**:
+pKd 7.4–10.1) were docked **through this exact pipeline**. The premise is a *ranking* claim, so the
+test is **Spearman ρ** (rank correlation) throughout — and the result **falsified it across diverse
+ligands**:
 
-- `r(−ΔG, measured affinity) ≈ −0.39` — no usable affinity signal (if anything, the wrong sign);
-- `r(−ΔG, heavy-atom count) ≈ +0.64` — the score tracks **ligand size / contact area**, not affinity;
-- `r(ligand-efficiency, affinity) ≈ +0.05` — size-normalizing the score does **not** rescue it.
+- `ρ(−ΔG, measured pKd) = −0.24` — no usable affinity signal (if anything, the wrong sign);
+- `ρ(−ΔG, heavy-atom count) = +0.45` — the score tracks **ligand size / contact area**, not affinity;
+- `ρ(ligand-efficiency, pKd) ≈ −0.02` — size-normalizing the score does **not** rescue it.
   (nilotinib docks *strongest* at −13.6 yet is one of the *weakest* anchors at 14.5 nM — because it
   is large, not because it binds tightly.)
 
