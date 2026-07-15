@@ -1,0 +1,156 @@
+{
+  "target": "tyk2",
+  "structure_pdb_id": "4GIH",
+  "n": 13,
+  "source": {
+    "dataset": "OpenFF Protein-Ligand Benchmark (Schrodinger JACS / Wang 2015)",
+    "repo": "https://github.com/openforcefield/protein-ligand-benchmark",
+    "pinned_commit": "fd88824f9114244f95a14b485e6d6c96c1de716d",
+    "note": "Congeneric same-target series on a single scaffold with a measurement DOI per ligand. Affinities are real; none invented. paffinity = -log10(value in molar); higher = tighter."
+  },
+  "ligands": [
+    {
+      "id": "lig_jmc_23",
+      "smiles": "O=C(Nc1ccnc(NC(=O)[C@H]2C[C@H]2F)c1)c1c(Cl)cccc1Cl",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "affinity_value": 2.5,
+      "affinity_unit": "nM",
+      "affinity_error": 0.75,
+      "paffinity": 8.602,
+      "measurement_doi": "10.1021/jm400266t"
+    },
+    {
+      "id": "lig_ejm_46",
+      "smiles": "O=C(Nc1ccnc(NC(=O)C2CC2)c1)c1c(Cl)cccc1Cl",
+      "heavy_atoms": 23,
+      "affinity_type": "ki",
+      "affinity_value": 0.0048,
+      "affinity_unit": "uM",
+      "affinity_error": 0.0014,
+      "paffinity": 8.319,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_jmc_27",
+      "smiles": "O=C(Nc1ccnc(NC(=O)[C@H]2C[C@H]2Cl)c1)c1c(Cl)cccc1Cl",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "affinity_value": 5.1,
+      "affinity_unit": "nM",
+      "affinity_error": 1.5,
+      "paffinity": 8.292,
+      "measurement_doi": "10.1021/jm400266t"
+    },
+    {
+      "id": "lig_jmc_28",
+      "smiles": "C[C@@H]1C[C@@H]1C(=O)Nc1cc(NC(=O)c2c(Cl)cccc2Cl)ccn1",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "affinity_value": 8.5,
+      "affinity_unit": "nM",
+      "affinity_error": 2.6,
+      "paffinity": 8.071,
+      "measurement_doi": "10.1021/jm400266t"
+    },
+    {
+      "id": "lig_ejm_54",
+      "smiles": "CCNC(=O)Nc1cc(NC(=O)c2c(Cl)cccc2Cl)ccn1",
+      "heavy_atoms": 23,
+      "affinity_type": "ki",
+      "affinity_value": 0.018,
+      "affinity_unit": "uM",
+      "affinity_error": 0.0054,
+      "paffinity": 7.745,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_ejm_42",
+      "smiles": "CCC(=O)Nc1cc(NC(=O)c2c(Cl)cccc2Cl)ccn1",
+      "heavy_atoms": 22,
+      "affinity_type": "ki",
+      "affinity_value": 0.064,
+      "affinity_unit": "uM",
+      "affinity_error": 0.019,
+      "paffinity": 7.194,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_ejm_47",
+      "smiles": "O=C(Nc1ccnc(NC(=O)C2CCC2)c1)c1c(Cl)cccc1Cl",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "affinity_value": 0.074,
+      "affinity_unit": "uM",
+      "affinity_error": 0.022,
+      "paffinity": 7.131,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_ejm_45",
+      "smiles": "O=C(CC1CC1)Nc1cc(NC(=O)c2c(Cl)cccc2Cl)ccn1",
+      "heavy_atoms": 24,
+      "affinity_type": "ki",
+      "affinity_value": 0.094,
+      "affinity_unit": "uM",
+      "affinity_error": 0.028,
+      "paffinity": 7.027,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_ejm_31",
+      "smiles": "CC(=O)Nc1cc(NC(=O)c2c(Cl)cccc2Cl)ccn1",
+      "heavy_atoms": 21,
+      "affinity_type": "ki",
+      "affinity_value": 0.096,
+      "affinity_unit": "uM",
+      "affinity_error": 0.029,
+      "paffinity": 7.018,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_ejm_55",
+      "smiles": "COC(=O)Nc1cc(NC(=O)c2c(Cl)cccc2Cl)ccn1",
+      "heavy_atoms": 22,
+      "affinity_type": "ki",
+      "affinity_value": 0.17,
+      "affinity_unit": "uM",
+      "affinity_error": 0.051,
+      "paffinity": 6.77,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_ejm_48",
+      "smiles": "O=C(Nc1ccnc(NC(=O)C2CCCC2)c1)c1c(Cl)cccc1Cl",
+      "heavy_atoms": 25,
+      "affinity_type": "ki",
+      "affinity_value": 0.24,
+      "affinity_unit": "uM",
+      "affinity_error": 0.072,
+      "paffinity": 6.62,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_ejm_50",
+      "smiles": "O=C(CO)Nc1cc(NC(=O)c2c(Cl)cccc2Cl)ccn1",
+      "heavy_atoms": 22,
+      "affinity_type": "ki",
+      "affinity_value": 0.25,
+      "affinity_unit": "uM",
+      "affinity_error": 0.075,
+      "paffinity": 6.602,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    },
+    {
+      "id": "lig_ejm_43",
+      "smiles": "CC(C)C(=O)Nc1cc(NC(=O)c2c(Cl)cccc2Cl)ccn1",
+      "heavy_atoms": 23,
+      "affinity_type": "ki",
+      "affinity_value": 0.84,
+      "affinity_unit": "uM",
+      "affinity_error": 0.25,
+      "paffinity": 6.076,
+      "measurement_doi": "10.1016/j.ejmech.2013.03.070"
+    }
+  ]
+}
