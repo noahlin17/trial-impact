@@ -1,6 +1,6 @@
-"""Join the self-docking output (work/selfdock_raw.json) into the self-contained,
-committed results/selfdock.json that analyze.py and figure.py consume. Failed complexes
-are dropped and reported (nothing fabricated). Run in the trialsim env after selfdock.py.
+"""Join self-docking output into the self-contained committed result artifact.
+
+Run in the trialsim env after selfdock.py.
 """
 import json
 import os

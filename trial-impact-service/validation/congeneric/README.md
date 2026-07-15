@@ -49,7 +49,7 @@ flexible-receptor minimization, careful protonation/tautomer states, and entropy
 expensive sampling we scoped out. Reported honestly rather than tuned to a positive.
 
 Pairs with the pose-fidelity **positive** (`../pose_fidelity/`): the pipeline reproduces
-crystal *geometry* (6/7 < 2 Å) but cheap physics does not rank *affinity* even in-regime —
+crystal *geometry* (5/7 < 2 Å) but cheap physics does not rank *affinity* even in-regime —
 a sharp, defensible boundary.
 
 ## Reproduce
@@ -66,6 +66,12 @@ PYTHONPATH=. micromamba run -n trialsim python validation/congeneric/prep_poses.
 PYTHONPATH=. micromamba run -n mmgbsa   python validation/congeneric/score_mmgbsa.py tyk2
 micromamba run -n mmgbsa python validation/congeneric/build_results.py tyk2
 ```
+
+The cheap `make validate-congeneric` path is self-contained and reads the committed scalar
+results. Full regeneration still fetches the fixed-ID 4GIH receptor live from RCSB, while
+docked poses under `work/` are intermediate and gitignored. The Vina stage uses the canonical
+`conda-sim.lock.yml`, but the MM-GBSA environment has no tracked lock, so exact full-redock
+reproducibility is not guaranteed.
 
 Thrombin (`thrombin/ligands.json`) is committed but **not** run here: the Tyk2 result did
 not clear the bar, so per the pre-registration the replication run is not warranted (and

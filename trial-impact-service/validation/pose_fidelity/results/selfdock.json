@@ -2,34 +2,6 @@
   "n": 7,
   "rows": [
     {
-      "pdb_id": "2ZFF",
-      "het": "53U",
-      "ligand_name": "D-phenylalanyl-N-benzyl-L-prolinamide",
-      "note": "Thrombin (FEP-series reference structure)",
-      "resolution_A": 1.47,
-      "n_ref_heavy": 26,
-      "seeds": [
-        42,
-        43,
-        44
-      ],
-      "rmsd_per_seed": [
-        0.614,
-        0.619,
-        0.633
-      ],
-      "rmsd_top": 0.614,
-      "rmsd_best": 0.614,
-      "rmsd_median": 0.619,
-      "rmsd_seed_spread": 0.019,
-      "dg_per_seed": [
-        -8.335,
-        -8.341,
-        -8.32
-      ],
-      "success_2A": true
-    },
-    {
       "pdb_id": "3PP0",
       "het": "03Q",
       "ligand_name": "2-{2-[4-({5-chloro-6-[3-(trifluoromethyl)phenoxy]pyridin-3-yl}amino)-5H-pyrrolo[3,2-d]pyrimidin-5-yl]ethoxy}ethanol",
@@ -42,18 +14,18 @@
         44
       ],
       "rmsd_per_seed": [
-        0.615,
-        0.613,
-        0.629
+        0.603,
+        0.6,
+        0.615
       ],
-      "rmsd_top": 0.615,
-      "rmsd_best": 0.613,
-      "rmsd_median": 0.615,
-      "rmsd_seed_spread": 0.016,
+      "rmsd_top": 0.603,
+      "rmsd_best": 0.6,
+      "rmsd_median": 0.603,
+      "rmsd_seed_spread": 0.015,
       "dg_per_seed": [
-        -11.37,
-        -11.409,
-        -11.397
+        -11.355,
+        -11.274,
+        -11.355
       ],
       "success_2A": true
     },
@@ -86,6 +58,34 @@
       "success_2A": true
     },
     {
+      "pdb_id": "2ZFF",
+      "het": "53U",
+      "ligand_name": "D-phenylalanyl-N-benzyl-L-prolinamide",
+      "note": "Thrombin (FEP-series reference structure)",
+      "resolution_A": 1.47,
+      "n_ref_heavy": 26,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "rmsd_per_seed": [
+        0.622,
+        0.646,
+        0.647
+      ],
+      "rmsd_top": 0.622,
+      "rmsd_best": 0.622,
+      "rmsd_median": 0.646,
+      "rmsd_seed_spread": 0.025,
+      "dg_per_seed": [
+        -8.317,
+        -8.299,
+        -8.262
+      ],
+      "success_2A": true
+    },
+    {
       "pdb_id": "1UWH",
       "het": "BAX",
       "ligand_name": "4-{4-[({[4-CHLORO-3-(TRIFLUOROMETHYL)PHENYL]AMINO}CARBONYL)AMINO]PHENOXY}-N-METHYLPYRIDINE-2-CARBOXAMIDE",
@@ -98,18 +98,18 @@
         44
       ],
       "rmsd_per_seed": [
-        0.683,
-        0.697,
-        0.7
+        0.706,
+        0.706,
+        0.674
       ],
-      "rmsd_top": 0.683,
-      "rmsd_best": 0.683,
-      "rmsd_median": 0.697,
-      "rmsd_seed_spread": 0.017,
+      "rmsd_top": 0.706,
+      "rmsd_best": 0.674,
+      "rmsd_median": 0.706,
+      "rmsd_seed_spread": 0.032,
       "dg_per_seed": [
-        -11.903,
         -11.899,
-        -11.891
+        -11.859,
+        -11.88
       ],
       "success_2A": true
     },
@@ -126,18 +126,18 @@
         44
       ],
       "rmsd_per_seed": [
-        1.08,
-        1.076,
-        0.997
+        1.138,
+        1.04,
+        1.073
       ],
-      "rmsd_top": 1.08,
-      "rmsd_best": 0.997,
-      "rmsd_median": 1.076,
-      "rmsd_seed_spread": 0.083,
+      "rmsd_top": 1.138,
+      "rmsd_best": 1.04,
+      "rmsd_median": 1.073,
+      "rmsd_seed_spread": 0.098,
       "dg_per_seed": [
-        -12.673,
-        -12.649,
-        -12.693
+        -12.644,
+        -12.686,
+        -12.682
       ],
       "success_2A": true
     },
@@ -154,20 +154,20 @@
         44
       ],
       "rmsd_per_seed": [
-        1.459,
-        8.571,
-        7.911
+        5.869,
+        5.795,
+        1.765
       ],
-      "rmsd_top": 1.459,
-      "rmsd_best": 1.459,
-      "rmsd_median": 7.911,
-      "rmsd_seed_spread": 7.112,
+      "rmsd_top": 5.869,
+      "rmsd_best": 1.765,
+      "rmsd_median": 5.795,
+      "rmsd_seed_spread": 4.104,
       "dg_per_seed": [
-        -7.599,
-        -7.288,
-        -7.659
+        -7.36,
+        -7.549,
+        -7.666
       ],
-      "success_2A": true
+      "success_2A": false
     },
     {
       "pdb_id": "4GIH",

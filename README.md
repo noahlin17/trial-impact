@@ -34,13 +34,13 @@ pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a C
 - **A physics-based MM-GBSA rescore does not rescue it** — same ρ, still size-confounded ([`validation/`](trial-impact-service/validation/README.md), reproduce with `make validate`).
 
 The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md)
-redocked **6/7 native ligands within 2 Å (86%), median top-pose RMSD 0.68 Å**. That supports the
+redocked **5/7 native ligands within 2 Å (71%), median top-pose RMSD 0.71 Å**. That supports the
 geometric pose-reproduction claim only; it says nothing about affinity or binding strength. Together,
 the positive geometry control and negative affinity test are the honest boundary of the shipped claim.
 
 The second [pre-registered control](trial-impact-service/validation/PREREGISTRATION.md), [Experiment A
 (congeneric ranking)](trial-impact-service/validation/congeneric/README.md), is negative too: on the
-13-ligand Tyk2 series, cheap single-snapshot MM-GBSA gives ρ = −0.54 (95% CI [−0.86, +0.08]) versus
+13-ligand Tyk2 series, cheap single-snapshot MM-GBSA gives ρ = −0.54 (95% CI [−0.89, +0.07]) versus
 measured affinity, failing to beat the size baseline or raw Vina even in the within-target regime.
 The A+C thresholds were fixed before scores were computed: two honest affinity negatives, one positive
 geometry control, and no claim that pose fidelity rescues affinity.

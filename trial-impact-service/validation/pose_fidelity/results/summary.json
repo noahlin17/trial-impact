@@ -1,12 +1,12 @@
 {
   "n": 7,
-  "success_rate": 0.857,
-  "n_success": 6,
-  "median_rmsd_top": 0.683,
-  "rho_spread_rmsd": 0.714,
-  "mean_spread_correct": 1.211,
-  "mean_spread_incorrect": 0.039,
+  "success_rate": 0.714,
+  "n_success": 5,
+  "median_rmsd_top": 0.706,
+  "rho_spread_rmsd": 0.893,
+  "mean_spread_correct": 0.038,
+  "mean_spread_incorrect": 2.071,
   "target_rate": 0.6,
   "success_threshold_A": 2.0,
-  "verdict": "POSITIVE: redocking succeeds 86% (>= 60%); seed agreement does not cleanly separate correct from incorrect poses."
+  "verdict": "POSITIVE: redocking succeeds 71% (>= 60%); seed agreement does not cleanly separate correct from incorrect poses."
 }

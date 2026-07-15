@@ -5,8 +5,9 @@ docked pose lands to the deposited crystallographic pose.
 For each complex in ``complexes.json`` (run in the trialsim conda env, PYTHONPATH=service
 root):
 
-  1. download the crystal (RCSB), split protein (ATOM) receptor from the native ligand
-     (HETATM of the manifest's HET code),
+  1. load the archived crystal (or download it from RCSB when first populating the
+     archive), then split protein (ATOM) receptor from the native ligand (HETATM of
+     the manifest's HET code),
   2. build a REFERENCE ligand = crystal heavy-atom coordinates with bond orders assigned
      from the ligand's ideal SMILES (RCSB chemcomp), so RMSD is chemically correct,
   3. redock a FRESH RDKit conformer of that ligand into the receptor across the pipeline's
@@ -21,6 +22,7 @@ Optional argv restricts to given PDB IDs.
 """
 import json
 import os
+import shutil
 import sys
 import urllib.request
 
@@ -28,11 +30,20 @@ from app import simulation as sim
 
 HERE = os.path.dirname(__file__)
 WORK = os.path.join(HERE, "work")
+STRUCTURES = os.path.join(HERE, "structures")
+PREPARED_RECEPTORS = os.path.join(STRUCTURES, "receptors")
 RCSB = "https://data.rcsb.org/rest/v1/core"
 
 
 def _ligand_smiles(het: str) -> str:
-    """Ideal SMILES for a HET code from the RCSB chemical-component API."""
+    """Ideal SMILES from the archive, falling back to the RCSB component API."""
+    archive = os.path.join(STRUCTURES, "ligands.json")
+    if os.path.isfile(archive):
+        with open(archive) as fh:
+            refs = json.load(fh)
+        ref = refs.get(het.upper())
+        if ref and ref.get("smiles"):
+            return ref["smiles"]
     url = f"{RCSB}/chemcomp/{het.upper()}"
     with urllib.request.urlopen(url, timeout=60) as fh:  # noqa: S310 (pinned host)
         d = json.loads(fh.read().decode())
@@ -41,6 +52,14 @@ def _ligand_smiles(het: str) -> str:
     if not smi:
         raise RuntimeError(f"no SMILES for HET {het}")
     return smi
+
+
+def _structure(pdb_id: str, out_dir: str) -> tuple[str, str]:
+    """Load an archived PDB, falling back to the live RCSB download."""
+    archived = os.path.join(STRUCTURES, f"{pdb_id.upper()}.pdb")
+    if os.path.isfile(archived):
+        return archived, "pdb"
+    return sim._fetch_experimental_pdb(pdb_id, out_dir)
 
 
 def _split_receptor_and_ligand(pdb_path: str, het: str, rec_out: str) -> str:
@@ -125,14 +144,20 @@ def selfdock_one(pdb_id: str, het: str) -> dict:
 
     out_dir = os.path.join(WORK, pdb_id)
     os.makedirs(out_dir, exist_ok=True)
-    pdb_path, fmt = sim._fetch_experimental_pdb(pdb_id, out_dir)
+    pdb_path, fmt = _structure(pdb_id, out_dir)
 
     rec_pdb = os.path.join(out_dir, "receptor_atoms.pdb")
     lig_block = _split_receptor_and_ligand(pdb_path, het, rec_pdb)
     smiles = _ligand_smiles(het)
     ref = _reference_mol(lig_block, smiles)
 
-    receptor_pdbqt = sim.prepare_receptor_pdbqt(rec_pdb, out_dir)
+    archived_receptor = os.path.join(PREPARED_RECEPTORS, f"{pdb_id.upper()}.pdbqt")
+    if os.path.isfile(archived_receptor):
+        receptor_pdbqt = archived_receptor
+    else:
+        receptor_pdbqt = sim.prepare_receptor_pdbqt(rec_pdb, out_dir)
+        os.makedirs(PREPARED_RECEPTORS, exist_ok=True)
+        shutil.copyfile(receptor_pdbqt, archived_receptor)
     dock_mol = sim.embed_ligand(Chem.MolToSmiles(ref))  # fresh conformer -> honest redock
     ligand_pdbqt = sim.prepare_ligand_pdbqt(dock_mol, out_dir)
     box = _dock_box(lig_block)
@@ -140,7 +165,8 @@ def selfdock_one(pdb_id: str, het: str) -> dict:
     seeds = sim._derive_seeds(sim._VINA_REPLICATES)
     rmsds, top_dg = [], []
     for s in seeds:
-        v = Vina(sf_name="vina", cpu=os.cpu_count() or 1, seed=s)
+        # A single worker avoids OpenMP scheduling drift between repeated seeded runs.
+        v = Vina(sf_name="vina", cpu=1, seed=s)
         v.set_receptor(receptor_pdbqt)
         v.set_ligand_from_file(ligand_pdbqt)
         v.compute_vina_maps(center=box[0], box_size=box[1])

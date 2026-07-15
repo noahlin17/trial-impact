@@ -28,26 +28,29 @@ in-place heavy-atom RMSD to the deposited pose):
 
 | pdb | ligand | heavy | top-pose RMSD | < 2 Å |
 |---|---|---:|---:|:--:|
-| 2ZFF | 53U (thrombin) | 26 | 0.61 | Y |
-| 3PP0 | 03Q | 34 | 0.61 | Y |
+| 2ZFF | 53U (thrombin) | 26 | 0.62 | Y |
+| 3PP0 | 03Q | 34 | 0.60 | Y |
 | 1STP | BTN (biotin) | 16 | 0.62 | Y |
-| 1UWH | BAX (sorafenib) | 32 | 0.68 | Y |
-| 1IEP | STI (imatinib) | 37 | 1.08 | Y |
-| 1M17 | AQ4 (erlotinib) | 29 | 1.46 | Y |
+| 1UWH | BAX (sorafenib) | 32 | 0.71 | Y |
+| 1IEP | STI (imatinib) | 37 | 1.14 | Y |
+| 1M17 | AQ4 (erlotinib) | 29 | 5.87 | . |
 | 4GIH | 0X5 (Tyk2) | 23 | 7.17 | . |
 
-**POSITIVE on the geometry criterion — one of the two pre-registered C criteria met: 6/7
-within 2 Å (86% ≥ the 60% bar), median 0.68 Å** (the second criterion, seed agreement as a
-confidence signal, did *not* hold — see below). When routed to the correct pocket, the
+**POSITIVE on the geometry criterion — criterion 1 met: 5/7 within 2 Å (71% ≥ the
+60% bar), median 0.71 Å. Criterion 2, seed agreement as a usable confidence signal,
+was NOT met.** When routed to the correct pocket, the
 multi-seed protocol reproduces the crystallographic pose — which is exactly the
-*geometric-engagement* claim the product makes. 4GIH is the honest miss: Vina finds a rotated
-in-pocket mode that scores marginally better (the docked conformer still aligns to the crystal
-at ~1.3 Å, but is displaced in place).
+*geometric-engagement* claim the product makes. 4GIH and 1M17 are the honest misses:
+4GIH fails consistently, while 1M17 has a large seed spread and its top pose fails even though
+one alternate seed reaches 1.77 Å. 4GIH is a confidently converged wrong pose: its
+0.04 Å spread is inside the 0.02–0.10 Å range of the correct poses, yet its top pose
+is 7.17 Å wrong. No seed-spread threshold separates correct from incorrect. Vina finds
+a rotated in-pocket mode that scores marginally better (the docked conformer still aligns
+to the crystal at ~1.3 Å, but is displaced in place).
 
-**Seed agreement is NOT a clean correctness signal.** 4GIH fails *consistently* (tight
-seed spread, 0.04 Å) while 1M17 succeeds *despite* a large spread (7.1 Å). So a stable
-multi-seed pose is not by itself evidence of a correct pose — a caveat worth stating
-rather than the confidence metric we hoped for.
+The reported Spearman ρ = +0.89 and mean-spread gap (0.04 Å correct versus 2.07 Å
+incorrect) are driven entirely by the single high-spread 1M17 outlier. They do not
+constitute a usable seed-spread threshold or confidence signal.
 
 ## Interpretation
 
@@ -64,7 +67,18 @@ prospective docking test.
 make validate-posefidelity   # analyze.py + figure.py from committed results/selfdock.json
 ```
 
-Regenerating scores from scratch (downloads + docking) needs the trialsim conda env:
+The committed `complexes.json`, archived `structures/*.pdb`, `structures/ligands.json`, and
+prepared `structures/receptors/*.pdbqt` are self-contained inputs for full redocking. The
+prepared receptor snapshots avoid nondeterministic hydrogen placement during regeneration.
+The canonical simulation environment is pinned by `conda-sim.lock.yml`; when the archive is
+present, self-docking runs offline from those inputs rather than fetching RCSB structures or
+CCD definitions. Docked poses under `work/` remain intermediate and gitignored. The other
+validation experiments still use live structure and ligand retrieval, and their MM-GBSA
+environment is not represented by a tracked lock, so exact full-redock reproducibility is not
+guaranteed there.
+
+For first-time archive population or an explicit live fallback, score regeneration needs the
+trialsim conda env:
 
 ```bash
 PYTHONPATH=. micromamba run -n trialsim python validation/pose_fidelity/selfdock.py

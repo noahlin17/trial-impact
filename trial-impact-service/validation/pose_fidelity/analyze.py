@@ -47,8 +47,11 @@ def main() -> int:
               f"   {'Y' if r['rmsd_top'] < SUCCESS_A else '.'}")
 
     med = float(np.median(top))
-    # Does tight seed agreement flag correct poses? Positive rho(spread, rmsd) => yes.
-    # Observed result: seed agreement did not cleanly separate correct from incorrect poses.
+    # Criterion 2: does inter-seed agreement SEPARATE correct from incorrect poses, i.e.
+    # does a seed-spread threshold exist that classifies them (max correct spread < min
+    # incorrect spread)? A positive rho or a lower mean spread among correct poses is NOT
+    # sufficient — it can be driven by a single high-spread outlier while a confidently
+    # converged pose is still wrong. Separability is the usable-confidence-signal test.
     rho_spread = spearman(spread, top)
     correct = [s for s, r in zip(spread, top, strict=True) if r < SUCCESS_A]
     wrong = [s for s, r in zip(spread, top, strict=True) if r >= SUCCESS_A]
@@ -57,15 +60,14 @@ def main() -> int:
           f"   (target >= {TARGET_RATE:.0%})")
     print(f"median top-pose RMSD: {med:.2f} A")
     print(f"rho(seed spread, RMSD) = {rho_spread:+.2f}  "
-          "(positive => tight agreement flags correct poses)")
+          "(reported association; not the separability criterion)")
     if correct and wrong:
         print(f"mean seed spread: correct {np.mean(correct):.2f} A vs "
               f"incorrect {np.mean(wrong):.2f} A")
 
     hit_rate = rate >= TARGET_RATE
-    agreement_signal = (not math.isnan(rho_spread) and rho_spread > 0
-                        and bool(correct) and bool(wrong)
-                        and np.mean(correct) < np.mean(wrong))
+    agreement_signal = (bool(correct) and bool(wrong)
+                        and max(correct) < min(wrong))
     verdict = (
         f"POSITIVE: redocking succeeds {rate:.0%} (>= {TARGET_RATE:.0%}); "
         if hit_rate else

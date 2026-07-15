@@ -1,7 +1,8 @@
-"""Build the pose-fidelity (Option C) benchmark manifest: for a curated list of
-high-resolution protein-ligand co-crystals, resolve the co-crystallised drug-like
-ligand (HET code + name + formula weight) from the RCSB REST API and write a
-self-contained, committed ``complexes.json`` that the self-docking harness consumes.
+"""Build the pose-fidelity (Option C) benchmark manifest and archive its inputs: for a
+curated list of high-resolution protein-ligand co-crystals, resolve the co-crystallised
+drug-like ligand (HET code + name + formula weight) from the RCSB REST API and write a
+self-contained, committed ``complexes.json`` plus structure/ligand inputs that the
+self-docking harness consumes.
 
 Option C asks a pose question, not an affinity one: redock each native ligand into its
 own crystal receptor and measure how close the top pose lands to the deposited
@@ -19,6 +20,7 @@ import os
 import urllib.request
 
 HERE = os.path.dirname(__file__)
+STRUCTURES = os.path.join(HERE, "structures")
 RCSB = "https://data.rcsb.org/rest/v1/core"
 
 # Curated candidates: high-resolution co-crystals spanning this project's regime
@@ -43,6 +45,39 @@ MIN_FW = 200.0  # drug-like ligand formula-weight floor (Da)
 def _get_json(url: str) -> dict:
     with urllib.request.urlopen(url, timeout=60) as fh:  # noqa: S310 (pinned host)
         return json.loads(fh.read().decode())
+
+
+def _archive_inputs(rec: dict) -> None:
+    """Archive the exact structure and ligand definition used by self-docking."""
+    os.makedirs(STRUCTURES, exist_ok=True)
+    pdb = rec["pdb_id"]
+    path = os.path.join(STRUCTURES, f"{pdb}.pdb")
+    if not os.path.isfile(path):
+        with urllib.request.urlopen(
+            f"https://files.rcsb.org/download/{pdb}.pdb", timeout=60
+        ) as fh:  # noqa: S310 (pinned host)
+            with open(path, "wb") as out:
+                out.write(fh.read())
+    het = rec["ligand_het_code"].upper()
+    ccd = _get_json(f"{RCSB}/chemcomp/{het}")
+    desc = ccd.get("rcsb_chem_comp_descriptor", {})
+    smiles = desc.get("SMILES_stereo") or desc.get("SMILES")
+    if not smiles:
+        raise RuntimeError(f"no SMILES for HET {het}")
+    refs_path = os.path.join(STRUCTURES, "ligands.json")
+    refs = {}
+    if os.path.isfile(refs_path):
+        with open(refs_path) as fh:
+            refs = json.load(fh)
+    refs[het] = {
+        "pdb_id": pdb,
+        "smiles": smiles,
+        "source": "RCSB Chemical Component Dictionary",
+        "ccd_url": f"{RCSB}/chemcomp/{het}",
+    }
+    with open(refs_path, "w") as fh:
+        json.dump(refs, fh, indent=2, sort_keys=True)
+        fh.write("\n")
 
 
 def resolve(pdb_id: str) -> dict | None:
@@ -86,6 +121,7 @@ def main() -> int:
         rec = resolve(pdb)
         if rec is not None:
             rec["note"] = note
+            _archive_inputs(rec)
             complexes.append(rec)
     out = {
         "n": len(complexes),
