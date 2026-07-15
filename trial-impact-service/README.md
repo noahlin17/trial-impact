@@ -10,14 +10,14 @@ readout — alerts to Slack/email while surfacing everything on a dashboard.
 > **Not investment advice.** Output is an automated research signal for
 > informational purposes only. A disclaimer is attached to every assessment.
 
-> **Scope — preclinical / Phase 1 is the forward-looking tier.** The physics answers whether a
-> molecule *engages its target* — a fixed molecular property largely proven out by end of Phase 1 —
-> so Phase 1 is the only tier where the chemistry carries new information. A Phase 2/3 run is not a
-> tradeable signal but a **retrospective re-simulation**: the drug already cleared Phase 1 and
-> (often) has a public outcome, so re-running the fixed chemistry on it benchmarks the pipeline
-> against a known readout rather than predicting one — the open Phase 2/3 questions (efficacy,
-> statistics, safety at scale) are ones the pipeline does not model. See the root
-> [README](../README.md#trial-phase--the-preclinical--phase-1-scope) and
+> **Scope — a preclinical / discovery-stage engagement instrument.** The physics answers whether a
+> molecule *engages its target* — a molecular property established *preclinically*, before Phase 1,
+> so at any trial the docking result is **confirmatory, not new**. What a trial actually tests
+> (Phase 1: human safety/PK/dose; Phase 2/3: efficacy, statistics, safety at scale) is orthogonal to
+> what the pipeline computes. It runs on clinical events only because ClinicalTrials.gov is the event
+> feed; phase governs only *information timing* (Phase 1 outcome not yet public vs Phase 2/3 public →
+> a **retrospective known-readout re-simulation**), never what the chemistry can compute. See the root
+> [README](../README.md#trial-phase--a-preclinical--discovery-stage-instrument) and
 > [THESIS.md §3.3](../THESIS.md).
 
 ---
@@ -491,12 +491,12 @@ addressed; ○ = documented, future work.)
   was the majority path in production, not an edge case. The modifiers are now gated on
   `has_readout`, so no readout means no call. Both published runs are `met`, so their
   numbers are byte-identical — a regression test asserts exactly that.
-- **No phase weighting — by design** — the forward-looking scope is **preclinical / Phase 1
-  only** (binding is a molecular property established by end of Phase 1; Phase 2/3 test
-  efficacy and trial statistics the physics does not model), so there is a *single*
-  actionable tier and nothing to weight. A Phase 2/3 run is a **retrospective re-simulation**
-  against a known readout — a pipeline benchmark, not a tradeable signal. See
-  [the preclinical / Phase 1 scope](../README.md#trial-phase--the-preclinical--phase-1-scope).
+- **No phase weighting — by design** — the chemistry answers one phase-invariant,
+  **preclinical / discovery-stage** question (target engagement is established before the clinic;
+  Phase 2/3 test efficacy and statistics the physics does not model), so there is nothing to
+  weight. Phase governs only *information timing*: a Phase 2/3 run is a **retrospective known-readout
+  re-simulation** — a pipeline benchmark, not a tradeable signal. See
+  [the preclinical / discovery-stage scope](../README.md#trial-phase--a-preclinical--discovery-stage-instrument).
 - **Naive competitor read-through** ○ — competitors are assumed to move opposite the
   sponsor, one magnitude bucket softer. Real read-through depends on mechanism /
   target overlap and modality, not just "is a competitor."

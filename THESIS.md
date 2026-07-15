@@ -156,46 +156,43 @@ anything the docking produces. Open Targets exposes a genetic-association score 
 target–indication pair at no cost. Combining a target-validation axis with a molecule axis
 seems defensible; either alone does not.
 
-### 3.3 The chemistry is a preclinical / Phase 1 instrument by construction
+### 3.3 The chemistry is a preclinical / discovery-stage instrument by construction
 
-The system is built for one *forward-looking* tier — **preclinical / Phase 1** — and that follows
-directly from what it measures. The question this pipeline answers — *does the molecule engage its
-target at a tolerated exposure?* — is a molecular property that is fixed from the start and is largely
-resolved by the time a drug clears Phase 1. Nothing that happens in Phase 2 or Phase 3 makes the
-*binding* more interesting, so the tier where the chemistry carries genuinely new information is
-Phase 1. A Phase 2/3 event is not "educational" but **retrospective**: the drug already went through
-Phase 1, its binding is settled, and (often) its outcome is public — so running the chemistry on it
-is a *known-readout re-simulation* of the molecular hypothesis, a benchmark of the pipeline against a
-result that already exists, not a forward-looking tradeable signal:
+The right way to place this pipeline is to ask, for a given trial, **what is already known going in
+versus what the trial is actually testing** — and then see which side the chemistry sits on.
 
-- **Binding affinity is a property of the molecule and the structure, not of the trial.** ΔG does
-  not change between phases; only our knowledge of the downstream *clinical* consequences does.
-- **Engagement is effectively proven out by end of Phase 1.** Phase 1 (plus preclinical) is where
-  human PK, tolerated dose and — increasingly — direct target-occupancy readouts establish whether
-  free drug reaches and occupies the target. That is exactly the therapeutic-index question chemistry
-  and PK can speak to: can free drug concentration plausibly exceed Kd at a tolerated dose.
-- **What P2/P3 add is orthogonal to what we model.** Phase 2 tests whether engaging the target
-  helps patients (efficacy → a *target-validation* / disease-biology question); Phase 3 tests whether
-  that effect replicates at scale with adequate statistics and safety (trial-execution / statistical
-  questions). None of these is a binding question, so the docking output becomes progressively more
-  redundant as clinical data accumulates and the market prices it in.
+**Known *going into* Phase 1.** Target engagement / binding is a molecular property established
+*preclinically*: a molecule only reaches the clinic after in-vitro potency, selectivity, and often
+co-crystal or cell target-engagement data. Engagement is an **entry criterion**, and ΔG does not
+change between phases. So the docking result — *does the molecule engage its target?* — is
+**confirmatory of an already-established fact**, not information generated at the trial.
 
-So the incremental information from the physics is highest exactly when clinical uncertainty about
-engagement is highest — at preclinical / Phase 1 — and decays to near-zero by Phase 2/3, where the
-genetics/target-validation axis (§3.2) and the trial result itself carry the call. The one way
-later-phase data would *sharpen* the chemistry is indirect: measured human PK / plasma-protein
-binding can replace our generic PK and `fu` placeholders — but that improves the *inputs*, it does
-not make binding a more relevant question at that stage.
+**Being *tested* in Phase 1 (unknown going in).** Human safety / tolerability, human PK, and the
+tolerated dose — and, in some programmes, early human target-occupancy. These are exactly the
+quantities the pipeline does **not** compute: occupancy is unset (it needs a Kd the docking cannot
+supply, §3.4), and exposure comes from a *generic* Bateman model (fixed `ka`/`Vd`/`CL`, `F`=1), not a
+human-calibrated one. **Phase 2/3** then test efficacy (a target-validation / disease-biology
+question, §3.2) and replication at scale — also outside the physics.
 
-**Practical rule:** run and act on preclinical / Phase 1. A Phase 2/3 run is a *retrospective
-re-simulation* against a known readout — useful as a benchmark of the pipeline, not a tradeable
-signal.
+So the chemistry answers a question that is **most uncertain in discovery / lead optimisation, before
+the clinic**, and is largely settled by the time any trial exists. The system runs on clinical events
+only because ClinicalTrials.gov is the available **event feed** — an operational trigger, not a claim
+that a trial is where the physics is most informative. Phase therefore governs only *information
+timing*: a Phase 1 outcome is not yet public (an engagement-consistent readout *could* be un-priced —
+a timing argument, not a forecast of the trial's real unknowns), while a Phase 2/3 drug has a public
+outcome, making its run a **retrospective known-readout re-simulation** — a benchmark of the pipeline,
+not a trade.
 
-A single-tier scope means **there is no phase weighting anywhere in the model** —
-`market_model.assess` is phase-agnostic. Phase decides only *whether* an event is forward-looking
-(Phase 1) or a retrospective known-readout case (Phase 2/3); it never scales the call.
-Phase-dependent coefficients would only make sense across multiple tradeable tiers, and there is
-only one here.
+**This is a first pass, not a dead end.** Engagement is confirmatory today, but it is the **first
+validated primitive** — a reproducible pocket route and docked pose — that every genuinely predictive
+downstream piece consumes. The pieces that would actually address the *tested* unknowns (and so could
+generate edge) are set out in §4 (and the README's *What it would take to be edge-generating* table).
+
+Because the chemistry's claim is phase-invariant, **there is no phase weighting anywhere in the
+model** — `market_model.assess` is phase-agnostic. Phase decides only *whether* an event's outcome is
+still unpublished (Phase 1) or already public (Phase 2/3); it never scales the call. Phase-dependent
+coefficients would only make sense across multiple tradeable tiers, and there is only one question
+here.
 
 ### 3.4 There is no longer an absolute number to check against the literature
 
