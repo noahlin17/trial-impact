@@ -259,6 +259,16 @@ produce an encouraging and false result. Four problems seem material:
 
 ## 4. Where an edge would have to come from
 
+**North Star.** Intake a Phase 1 trial's design plus *all* public information — structure, target,
+indication, planned dose, and any published in-vitro, PK, or prior computational results — and
+estimate a quantity the trial is *testing but has not yet read out* (human PK, tolerability, human
+occupancy) *before* it is published. The estimate only counts if it is **net-new against everything
+already public**: recreating a disclosed in-vitro potency, a reported PK value, or a prior docking
+result is already priced and adds nothing, no matter how cheaply we reproduce it. This is not built
+today — the current output is confirmatory engagement — and the eventual output is a probabilistic
+prior, not a precise prediction; the two constraints below (§4.1 beating the implied probability, and
+the point-in-time backtest of §3.5) are what would turn such a prior into an actual edge.
+
 I do not think the edge is in the chemistry. If there is one, it is in producing a
 better-calibrated estimate of P(success) — and therefore of expected value — than the one
 implied by the market, and in trading the difference. The chemistry is one input to that
