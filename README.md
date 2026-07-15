@@ -41,11 +41,22 @@ auditable, self-falsifying validation of its own scoring.
 potency; or a validated market prediction — the market/stock layer further down is an **illustrative,
 un-backtested downstream demo**, not a result.
 
-The *forward-looking* scope is **preclinical / Phase 1** — the only tier where the chemistry carries
-new information (binding is a fixed molecular property largely resolved by then). A later-phase drug
-already cleared Phase 1, so running the chemistry on it is a **retrospective re-simulation of a
-molecule whose trial outcome is already public** — a known-readout check, not a tradeable signal, and
-not merely "educational" (see [Trial phase](#trial-phase--the-preclinical--phase-1-scope)).
+Scientifically, this is a **preclinical / discovery-stage engagement instrument**: target engagement
+is a molecular property established *before* the clinic (it is an entry criterion for Phase 1), so by
+the time a molecule has a trial the chemistry is **confirmatory, not predictive** of the trial's real
+unknowns. It is run on clinical events only because ClinicalTrials.gov is the available event feed —
+an operational choice, not a claim that a trial is where the physics is most informative. For a
+Phase 1 event the outcome is at least *not yet public*, so an engagement-consistent readout can be
+un-priced (a timing argument, not a forecast of human safety/PK/dose); for a later-phase drug the
+outcome is already public, so the run is a **retrospective known-readout re-simulation**, not a
+tradeable signal (see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument)).
+
+This is deliberately a **first pass**: engagement is not itself net-new predictive information, but it
+is the **first validated primitive** the rest of the pipeline is built on. A reproducible pocket
+route + docked pose is the input the genuinely predictive pieces need — calibrated affinity within a
+regime, structure-derived human PK, target-validation / genetics features, and a calibrated
+P(success) — each of which *would* add information the market has not already priced (see
+[Next steps](#next-steps)).
 
 > **Not investment advice.** Output is an automated research signal for informational
 > purposes only; a disclaimer is attached to each assessment.
@@ -269,14 +280,16 @@ end to end, and it is not a trade.
 
 | Trial | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call |
 |-------|---------------|-----------|-----------|---------------|-----|-----------|
-| Phase 1 — **forward-looking scope** | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
-| Phase 3 — *retrospective (known readout)* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
+| Phase 1 — **outcome not yet public** | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
+| Phase 3 — *public outcome (retrospective)* | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
 
-**Only the Phase 1 row is in the forward-looking scope** — the tier the system is built for, where
-the readout is not yet known. The Phase 3 CFTR × ivacaftor row is a **retrospective re-simulation**
-(ivacaftor already cleared Phase 1 and its outcome is public), included as a known-readout check of
-the pipeline, not a tradeable signal — see [Trial phase](#trial-phase--the-preclinical--phase-1-scope)
-for why binding stops being an open question after Phase 1.
+The two rows differ only in **information timing**, not in what the chemistry computes — engagement is
+confirmatory of a preclinical fact in both. The Phase 1 KRAS × sotorasib row is the case where the
+clinical outcome is *not yet public*, so an engagement-consistent readout could be un-priced; the
+Phase 3 CFTR × ivacaftor row already has a public outcome, so it is a **retrospective known-readout
+re-simulation**, a benchmark of the pipeline rather than a tradeable signal — see
+[Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) for why the chemistry is a
+preclinical/discovery-stage instrument regardless of the event's phase.
 
 The *scoring* layer reproduces deterministically from committed source — the engagement
 classification, Cmax, and both PoS deltas fall out of the mean ΔG and the resolved route by fixed
@@ -381,29 +394,44 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 Genuine per-drug pharmacology needs enrichment overrides (`fu`, `Vd`, `CL` per drug — the
 same mechanism as `endpoint_outcome`) or a structure→PK model.
 
-### Trial phase — the preclinical / Phase 1 scope
+### Trial phase — a preclinical / discovery-stage instrument
 
-The pipeline is scoped to **preclinical / Phase 1** by construction, because that is the only phase
-at which its one question carries new information. The pipeline answers *does the molecule engage its
-target at a tolerated exposure?* — and that is a preclinical / Phase 1 question:
+The pipeline answers *does the molecule engage its target at a plausible exposure?* — and that is a
+**preclinical / discovery-stage** question, not one a clinical trial is designed to answer. It is
+important to be precise about what a trial actually resolves:
 
-- Binding affinity is a fixed property of the molecule and structure: **ΔG does not change between
-  phases.** Target engagement is largely **established by the end of Phase 1**, through human PK,
-  tolerated dose and (increasingly) direct occupancy readouts.
-- Phase 2 and Phase 3 ask questions the physics does not touch: P2 is efficacy (does engaging the
-  target help patients — a target-validation / disease-biology question); P3 is whether that effect
-  replicates at scale with adequate statistics and safety. By then engagement is settled and priced,
-  so a docking number is **redundant** rather than informative.
+- **Target engagement is proven *before* Phase 1.** A molecule only reaches the clinic after
+  preclinical potency, selectivity, and often co-crystal / cell target-engagement data. Engagement is
+  an **entry criterion**, and ΔG is a fixed molecular property that does not change between phases —
+  so the docking result is **confirmatory of an already-established preclinical fact**, not new
+  information generated at the trial.
+- **What Phase 1 genuinely tests is orthogonal to the chemistry:** human safety / tolerability,
+  human PK, and the tolerated dose. The pipeline does **not** compute these — occupancy is unset, and
+  exposure comes from a *generic* PK model (fixed `ka`/`Vd`/`CL`, `F`=1), not a human-calibrated one.
+- **Phase 2 / 3** ask further questions the physics does not touch: P2 efficacy (a
+  target-validation / disease-biology question), P3 replication at scale with statistics and safety.
 
-So the physics carries the most incremental information exactly when clinical uncertainty about
-engagement is highest — preclinical / Phase 1 — which is why the system targets that tier. A Phase 2/3
-event is not a forward-looking signal but a **retrospective re-simulation**: the drug already cleared
-Phase 1 and (often) has a public outcome, so re-running the fixed chemistry on it is a known-readout
-check of the pipeline, not a trade. See [THESIS.md §3.3](THESIS.md).
+So the chemistry is most informative in **discovery / lead optimisation — before the clinic** — where
+engagement is genuinely uncertain. The system runs it on clinical events only because
+ClinicalTrials.gov is the available **event feed**; that is an operational trigger, not a claim that a
+trial is where the physics carries the most information. The phase of an event therefore matters only
+for *information timing*, not for what the chemistry can compute:
 
-Since the scope is a single tier, **the market model is phase-agnostic by design** — there is no
-phase weighting. Phase determines only *whether* an event is forward-looking (Phase 1) or a
-retrospective known-readout case (Phase 2/3); it never scales the call.
+- **Phase 1 event** — the clinical outcome is not yet public, so an engagement-consistent readout can
+  be un-priced. This is a **timing** argument (the market may not have integrated the public
+  structural evidence), **not** a forecast of the trial's real unknowns (human safety/PK/dose).
+- **Phase 2 / 3 event** — the drug already cleared Phase 1 and (often) has a public outcome, so
+  re-running the fixed chemistry is a **retrospective known-readout re-simulation**, a benchmark of
+  the pipeline, not a trade. See [THESIS.md §3.3](THESIS.md).
+
+Because the chemistry's claim is phase-invariant, **the market model is phase-agnostic by design** —
+there is no phase weighting. Phase determines only *whether* an event's outcome is still unpublished
+(Phase 1) or already public (Phase 2/3); it never scales the call.
+
+None of this makes the engagement result a dead end. It is the **first validated building block**: a
+reproducible pocket route and docked pose are the inputs every genuinely predictive downstream piece
+consumes ([Next steps](#next-steps)). Shipping the confirmatory primitive first — and validating it
+honestly — is what makes it possible to compute the net-new, not-yet-priced data later.
 
 **The practical upshot.** The *binding* half of the pipeline is defensible today for a
 **reversible, non-covalent small molecule against a small globular protein with an
@@ -420,6 +448,29 @@ order-of-magnitude scene-setting, not predictions. Target occupancy is no longer
 from docking, because it rested on a Kd the Vina score cannot support (issue #4); what the docking
 half now claims is only *geometric engagement* — the molecule docked into the resolved site with a
 reproducible pose — which is a claim the method can actually back.
+
+### What it would take to be edge-generating — compute the *unknowns*, not the *knowns*
+
+Edge can only come from computing something that is (a) genuinely uncertain and (b) not already in the
+price. Engagement fails both: it is **known going into Phase 1** (an entry criterion) and public, so
+no amount of re-deriving it is alpha. The only place net-new signal can live is the set of things a
+trial is actually **testing** — and each requires new chemistry or data the current build does not
+have. Ordered against the known-vs-tested split, and honest that any early edge would be thin:
+
+| What the trial actually tests (unknown going in) | What it would take to compute it | Chemistry-computable? | Edge realism |
+|---|---|---|---|
+| **Safety / tolerability, tolerated dose** (Phase 1 core) | Off-target / selectivity docking against a liability panel + ADMET/DMPK models (hERG, metabolic stability, reactive-metabolite risk for covalent warheads) | Partly — builds directly on the docked-pose primitive | Attrition here is large and under-modelled; plausibly the best chemistry-side lever |
+| **Does free drug reach & occupy the target at a tolerated dose** (therapeutic index) | Measured / predicted **human** PK (`Vd`, `CL`, `F`, `fu`) to replace the generic Bateman model, **plus** a calibrated affinity to turn exposure into real occupancy | Partly — needs a validated strength estimator first | Turns exposure into the TI question P1 probes; limited until PK is drug-specific |
+| **Durability / resistance** (emerges later, unknown early) | Re-dock against clinically-observed resistance mutants (e.g. gatekeeper mutations) | Yes — direct use of the pose primitive | Genuinely forward-looking and structure-computable; narrow applicability |
+| **Efficacy — does engaging the target help patients** (Phase 2, the biggest unknown) | Target-validation / human-genetics axis (Open Targets association, Mendelian randomisation) — **not** chemistry | No | Strongest documented predictor of P2/P3 success and plausibly under-priced; the real edge candidate |
+| **Whether any of the above is *tradeable*** | A **point-in-time labelled corpus** (as-of features + realised outcomes/returns), sponsor→ticker resolution, and a **calibrated P(success)** fit and backtested against genetics-only and base-rate baselines | N/A (infrastructure) | Prerequisite for *claiming* edge at all — see [THESIS §3.5, §4](THESIS.md) |
+
+The through-line: the docked pose is the **input** these consume, not the signal itself. A calibrated
+strength estimator (a within-regime FEP/ensemble result, per the exploration branch) would unlock the
+occupancy and selectivity rows; the genetics axis and a labelled corpus are what would let the market
+model make a claim beyond "it runs." Even assembled, the realistic first-pass edge is in
+**breadth and speed** (systematically scoring many events cheaply), not a single decisive number —
+and it stays unproven until the backtest in [THESIS §3.5](THESIS.md) is actually run.
 
 ---
 
@@ -587,8 +638,8 @@ a test — the estimate simply becomes less well-founded than its downstream use
 principle rather than a checklist: *no quantity may be consumed downstream as a stronger claim than
 the step that produced it can support.* Read that way, several of this project's clearest decisions
 are one invariant applied, and belong in the design from the outset rather than found afterward:
-the **preclinical / Phase 1 scope** (the physics answers a Phase 1 question, so it is not consumed
-as a Phase 2/3 efficacy claim — see [Trial phase](#trial-phase--the-preclinical--phase-1-scope));
+the **preclinical / discovery-stage scope** (the physics answers a molecular-engagement question, so
+it is not consumed as a Phase 2/3 efficacy claim — see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument));
 the **no-call gate** (a ΔG is an *input* to a probability, so a trial with no clinical readout
 yields no directional call — [THESIS §3.1](THESIS.md)); the **estimator/harness split** (Vina is
 one implementation, not "the model"); and the **drug-likeness flag** (a Ro5 oral-absorption
