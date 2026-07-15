@@ -261,74 +261,32 @@ pipeline is the part that is built.
 
 ## Results from two real pipeline runs
 
-Genuine outputs from the committed pipeline (see [`results/`](results/) for the raw JSON
-and the rendered dashboards — open the `.html` files in a browser). Docking runs across a
-**fixed seed set (42, 43, 44)** and reports **mean ± sd**, so the docking is deterministic
-*given the same resolved structure* — but the structure is fetched live and not pinned, so the
-ΔG is not point-in-time reproducible (see the caveat below and issue #10). (Regenerated with
-`regen_artifacts.py` against the pinned stack; `run_real.py` runs the same pipeline in a live
-Devin session.)
-
-**Read the engagement + exposure columns as the product, the ΔG as a diagnostic, and the model call
-as scaffolding.** Engagement + exposure are the pipeline's structured readout — the *modality* a
-pricing model would eventually consume — but as computed today they are **not net-new** (engagement
-is a confirmatory public fact; exposure is generic PK). The ΔG beside them is a docking-objective
-diagnostic, not an affinity and not comparable across rows (issue #4), and the `Model call` is the
-rules-based placeholder — it shows the pipeline runs end to end, not a trade.
+Genuine outputs from the committed pipeline (raw JSON + rendered dashboards in
+[`results/`](results/)). Docking runs a fixed seed set (42, 43, 44) and reports mean ± sd —
+deterministic *given the same resolved structure*, but the structure is fetched live and not pinned,
+so the ΔG is not point-in-time reproducible (issue #10; routing KRAS to 7VVB/fpocket gives −5.91 vs
+6OIM's −7.202).
 
 | Drug (status) | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call *(rules-based demo — not a prediction)* |
 |-------|---------------|-----------|-----------|---------------|-----|-----------|
 | **Approved** (Lumakras, 2021) | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | AMGN ↑ · REGN/NVS ↓ *(illustrative)* |
-| **Approved** (Kalydeco, 2012) | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | VRTX ↑ · CRSP/BLUE ↓ *(illustrative)* |
+| **Approved** (Kalydeco, 2012) | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 | clean | VRTX ↑ · CRSP/BLUE ↓ *(illustrative)* |
 
-**Both are *approved* drugs, chosen because the answer is already known — this is a backtest against
-ground truth, not a forecast.** A correct run is *expected* to recover a clean `experimental-site`
-engagement, so these rows carry **no tradeable signal**: re-deriving a public fact about an approved
-drug is a benchmark of the pipeline, not an edge.
+Both are **approved** drugs, chosen because the answer is known — a **backtest against ground truth,
+not a forecast**, carrying no tradeable signal. Read the columns as: engagement + exposure = the
+product (confirmatory, not net-new); ΔG = a docking-objective diagnostic, not an affinity and not
+comparable across rows (issue #4); `Model call` = the rules-based placeholder. **‡ Engagement is
+*geometry, not strength*** — the ligand docked into the experimentally-resolved site with a
+reproducible multi-seed pose (sd ≤ 0.75); no Kd or occupancy is surfaced. The ΔGs are cognate/holo
+(partly circular) and the covalent KRAS score is Vina's reversible function (a pocket-correct lower
+bound, [issue #2](#known-issues)); `code_patched: false` confirms the numbers came from
+`simulation.py` unpatched. Routing is class-based, not drug-based, so a net-new drug in either class
+routes itself the same way.
 
-The scoring layer is deterministic from committed source, **but the ΔG numbers carry no measurement
-provenance** — they are not point-in-time reproducible (structure resolved *live*, issue #10 —
-routing KRAS to 7VVB/fpocket gives −5.91 vs 6OIM's −7.202), and even a stable number is a
-docking-objective score (cognate, and a reversible lower bound for covalent KRAS), not an affinity.
-What *is* verifiable is integrity: `code_patched: false` confirms the number came from
-`simulation.py` unpatched (see below).
-
-**‡ The engagement column is *geometry, not strength*.** It records that the ligand docked into the
-*experimentally-resolved* binding site (a curated holo / covalent-tethered residue) with a
-reproducible multi-seed pose (ΔG sd ≤ 0.75) — deliberately **not** a binding-strength or affinity
-claim (why: [issue #4](#known-issues)). No absolute Kd or Kd-derived occupancy is surfaced (the
-uncalibrated exp(ΔG/RT) survives, clearly labelled, in `provenance.vina_pseudo_kd_nM` only), and the
-market model prices only a small, capped geometric corroboration of a positive readout — no ΔG/Kd
-magnitude, no occupancy. The `druglikeness_flag` is ≥2 Lipinski violations — a drug-likeness / oral-absorption
-heuristic, **not** a toxicity model — so it is surfaced as information only and is **not priced**
-into the call (issue #3, fixed). It fires on sotorasib, an approved drug; with the former −0.15
-"safety" penalty removed, the KRAS call is `strong` (PoS delta +0.50), while ivacaftor (one
-violation, unflagged) is unchanged.
-
-Inputs are drug-specific, not hardcoded: sotorasib's flags come from its computed descriptors
-(MW 560.6, logP 5.30) and an RDKit acrylamide match, while ivacaftor comes back clean, so the two
-produce different PoS deltas. **Routing is class-based, not drug-based** — sotorasib matches the
-*covalent-warhead + KRAS-G12C* predicate and ivacaftor the *reversible + curated-holo* one, so a
-net-new drug in either class routes itself the same way.
-
-> **† The ΔGs are pocket-resolved but cognate and reversible-scored — read them as such.**
-> Both runs now box the real pocket (KRAS switch-II Cys of 6OIM; ivacaftor's VX7 site in 6O2P),
-> which is the fix for the old blind-slab problem (the pre-routing CFTR box held only ~26% of the
-> receptor). But two caveats remain: (i) **cognate/holo docking is partly circular** — redocking a
-> drug into its own bound pocket inflates apparent accuracy; and (ii) **the covalent KRAS score is
-> still Vina's reversible function** — the warhead is geometrically tethered to Cys A:12 but no
-> covalent bond enthalpy is added, so it is a pocket-correct lower bound, not true reactive
-> scoring. See **[open issue #2](#known-issues)** and the covalent entry. The previous CFTR pin
-> `9MXL` actually contained **(R)-BPO-27, not ivacaftor**; `6O2P` is the real ivacaftor–CFTR
-> complex, so this also corrects the structure, not just the box.
-
-A **results-analysis view** (`GET /analysis`, exported to
-[`results/analysis_dashboard.html`](results/analysis_dashboard.html)) lets you
-inspect the whole corpus and learn from it: cross-run charts (docking ΔG *diagnostic* vs PoS
-delta, and geometric-engagement counts), a sortable comparison table, and a per-run
-drill-down with the 3D docked structure, the reconstructed PK/PD exposure curve (occupancy is
-shown only when a calibrated Kd exists — the docking estimator reports none), and a step-by-step
-**reasoning trace** of how each probability-of-success delta was built.
+The **analysis view** (`GET /analysis`,
+[`results/analysis_dashboard.html`](results/analysis_dashboard.html)) inspects the whole corpus:
+cross-run charts (ΔG diagnostic vs PoS delta, engagement counts), a sortable table, and a per-run
+drill-down with the 3D pose, PK/PD exposure curve, and a reasoning trace for each PoS delta.
 
 ---
 
