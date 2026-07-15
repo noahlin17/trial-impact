@@ -178,9 +178,9 @@ So the chemistry answers a question that is **most uncertain in discovery / lead
 the clinic**, and is largely settled by the time any trial exists. The system runs on clinical events
 only because ClinicalTrials.gov is the available **event feed** — an operational trigger, not a claim
 that a trial is where the physics is most informative. Phase therefore governs only *information
-timing*: a Phase 1 outcome is not yet public (an engagement-consistent readout *could* be un-priced —
-a timing argument, not a forecast of the trial's real unknowns), while a Phase 2/3 drug has a public
-outcome, making its run a **retrospective known-readout re-simulation** — a benchmark of the pipeline,
+timing*: a Phase 1 trial's *outcome* is not yet public while a Phase 2/3 drug's is — but engagement
+itself is public in both, so the chemistry surfaces **nothing un-priced** at either. A Phase 2/3 run
+is simply an explicit **retrospective known-readout re-simulation** — a benchmark of the pipeline,
 not a trade.
 
 **This is a first pass, not a dead end.** Engagement is confirmatory today, but it is the **first
