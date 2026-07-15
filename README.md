@@ -302,7 +302,7 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 |---|---|---|
 | **Small molecules** (MW ≲ 900, drug-like, PubChem-resolvable) | ✅ | The pipeline is built for these. Both published runs are here. Resolved via PubChem → isomeric SMILES → RDKit ETKDG 3D embed → PDBQT. |
 | **Peptides & macrocycles** | ◑ | RDKit will embed them, but Vina's scoring function is parameterized on drug-like ligands and its rigid-ligand sampling degrades badly past ~10 rotatable bonds. Numbers would come back; they would not mean much. Needs macrocycle-aware sampling. |
-| **Biologics** — antibodies, proteins, ADCs, oligos/siRNA, cell & gene therapy | ○ | **Cannot be docked at all.** There is no SMILES, and binding is a protein–protein interface, not a ligand in a pocket. This excludes a large fraction of the oncology pipeline. Needs a separate affinity path (PPI scoring / co-folding) or a metadata-only route that skips the physics and scores the readout alone. |
+| **Biologics** — antibodies, proteins, ADCs, oligos/siRNA, cell & gene therapy | ○ | **Cannot be docked** — no SMILES, and binding is a protein–protein interface, not a ligand in a pocket. Excludes a large fraction of the oncology pipeline; needs a separate affinity path (PPI scoring / co-folding). |
 | **PROTACs & molecular glues** | ○ | Require a *ternary* complex (target + ligase + linker). Fundamentally a different modeling problem, not a harder docking run. |
 
 ### Target / receptor
@@ -321,7 +321,7 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 | Interaction | | Where it stands |
 |---|---|---|
 | **Reversible non-covalent binding** — H-bonds, hydrophobic contact, vdW, electrostatics | ✅ | Exactly what Vina's empirical function scores. This is the only interaction class the ΔG is actually valid for. Ivacaftor is the clean case. |
-| **Covalent inhibitors** | ◑ | **Tethered to the right pocket, still scored reversibly.** An RDKit SMARTS match catches acrylamide/acrylate, halo-acetamide, vinyl sulfone, boronic acid/ester and epoxide warheads. When the warhead is a tetherable Michael acceptor **and** the target is a curated covalent class (KRAS G12C, EGFR, BTK), the ligand is Meeko-tethered to the geometrically-detected reactive cysteine and docked in a residue-centered box (KRAS/sotorasib is this case). Vina still scores non-covalent interactions — no bond-formation enthalpy — so the ΔG is a pocket-correct **lower bound**, not true reactive scoring; full reactive/flexible-residue docking needs AutoDock-GPU (not on conda channels). Non-tetherable warheads and non-curated targets fall back to reversible docking with a warning. The flag is still not consumed by the market model. |
+| **Covalent inhibitors** | ◑ | **Tethered to the right pocket, still scored reversibly.** An RDKit SMARTS match catches acrylamide, halo-acetamide, vinyl sulfone, boronic acid/ester and epoxide warheads; when the warhead is a tetherable Michael acceptor **and** the target is a curated covalent class (KRAS G12C, EGFR, BTK), the ligand is Meeko-tethered to the reactive cysteine and docked in a residue-centered box (KRAS/sotorasib). Vina still scores non-covalently — no bond-formation enthalpy — so the ΔG is a pocket-correct **lower bound**, not true reactive scoring (that needs AutoDock-GPU, off conda channels). Non-tetherable warheads / non-curated targets fall back to reversible docking with a warning. |
 | **Allosteric & cryptic pockets (curated)** | ◑ | A blind box cannot find a cryptic pocket closed in the apo structure — which is exactly why covalent classes pin an *open* drug-bound holo (KRAS's switch-II pocket in 6OIM). Works where the class/structure is curated; an uncurated cryptic pocket still degrades. |
 | **Metal coordination** (zinc proteases, metalloenzymes) | ○ | Vina handles metal centers poorly without specific parameterization. A zinc-binding drug's affinity would be badly underestimated. |
 | **Halogen bonding, explicit bridging waters** | ○ | Not modeled. The receptor is stripped of waters before docking. |
@@ -333,7 +333,7 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 | **One-compartment Bateman model, closed form** | ◑ | `ka`/`Vd`/`CL` are fixed physiological placeholders and `Kp` is order-of-magnitude, so exposure is **directional, not drug-specific** — it will tell you a 960 mg dose achieves high exposure, not what sotorasib's real Cmax is. No bioavailability term either (`F` = 1), which flatters oral exposure. |
 | **Target occupancy** | ○ | **No longer reported by the docking estimator.** Occupancy is `C_free/(C_free + Kd)`, which depends entirely on a Kd the Vina score cannot support (issue #4). The free-drug (`fu`) machinery and its curated table remain in `run_pkpd` for any estimator that *does* supply a real Kd, but the docking path leaves occupancy `None`. Exposure (Cmax, AUC) is Kd-independent and is retained. |
 | **Single dose, exposure only** | ○ | No steady-state accumulation; Cmax is the peak of a single-dose curve and AUC is AUC(0–48h), not AUC(0–∞). Most of these drugs are dosed chronically. |
-| **Kd from an empirical docking score** | ○ | **Removed as a headline.** `Kd = exp(ΔG/RT)` treated Vina's empirical score as a rigorous free energy (and at 310.15 K where its calibration assumes 298.15 K). An 8-anchor calibration showed the raw score does not rank affinity at all (issue #4), so the docking estimator no longer surfaces a Kd; the uncalibrated value survives only as a clearly-labelled `provenance.vina_pseudo_kd_nM`, never priced. |
+| **Kd from an empirical docking score** | ○ | **Removed as a headline.** `Kd = exp(ΔG/RT)` treated Vina's empirical score as a rigorous free energy; the 8-anchor calibration showed the raw score does not rank affinity (issue #4), so no Kd is surfaced — the uncalibrated value survives only as a labelled `provenance.vina_pseudo_kd_nM`, never priced. |
 
 Genuine per-drug pharmacology needs enrichment overrides (`fu`, `Vd`, `CL` per drug — the
 same mechanism as `endpoint_outcome`) or a structure→PK model.
@@ -371,14 +371,12 @@ surviving claim is *geometric engagement*.
 
 ### What it would take to be edge-generating — compute the *unknowns*, not the *knowns*
 
-Edge can only come from computing something that is (a) genuinely uncertain and (b) **not already
-public** — which explicitly includes any in-vitro measurement, reported PK, or computational result
-disclosed with the drug or trial. Recreating those is not signal even if the market has not obviously
-"priced" them. Engagement fails this on every count: it is **known going into Phase 1** (an entry
-criterion), public, and routinely accompanied by published potency and structures — so re-deriving it
-is not alpha. The only place net-new signal can live is the set of things a trial is actually
-**testing** and has *not yet published* — and each requires new chemistry or data the current build
-does not have. Ordered against the known-vs-tested split, and honest that any early edge would be thin:
+Edge can only come from computing something (a) genuinely uncertain and (b) **not already public** —
+which includes any in-vitro measurement, reported PK, or computational result disclosed with the
+drug/trial; recreating those is not signal. Engagement fails this: it is known going into Phase 1,
+public, and routinely published alongside potency and structures. Net-new signal can only live in
+what a trial is actually **testing** and has not yet published — each needing new chemistry or data
+the current build lacks (honest that any early edge would be thin):
 
 | What the trial actually tests (unknown going in) | What it would take to compute it | Chemistry-computable? | Edge realism |
 |---|---|---|---|
@@ -389,11 +387,10 @@ does not have. Ordered against the known-vs-tested split, and honest that any ea
 | **Whether any of the above is *tradeable*** | A **point-in-time labelled corpus** (as-of features + realised outcomes/returns), sponsor→ticker resolution, and a **calibrated P(success)** fit and backtested against genetics-only and base-rate baselines | N/A (infrastructure) | Prerequisite for *claiming* edge at all — see [THESIS §3.5, §4](THESIS.md) |
 
 The through-line: the docked pose is the **input** these consume, not the signal itself. A calibrated
-strength estimator (a within-regime FEP/ensemble result, per the exploration branch) would unlock the
-occupancy and selectivity rows; the genetics axis and a labelled corpus are what would let the market
-model make a claim beyond "it runs." Even assembled, the realistic first-pass edge is in
-**breadth and speed** (systematically scoring many events cheaply), not a single decisive number —
-and it stays unproven until the backtest in [THESIS §3.5](THESIS.md) is actually run.
+strength estimator would unlock the occupancy/selectivity rows; the genetics axis + a labelled corpus
+are what would let the market model claim anything beyond "it runs." Even assembled, the realistic
+first-pass edge is **breadth and speed**, not one decisive number — unproven until the backtest
+([THESIS §3.5](THESIS.md)) runs.
 
 **"Unpublished" is not "un-priced."** A tempting theory is that the first unlock is a quantity that
 *could* be computed but has not been published. That is the right hunting ground but the wrong
@@ -406,19 +403,10 @@ the point-in-time backtest answers it. (Full argument: [THESIS §4](THESIS.md).)
 
 ## Catching a bug: when the result was too clean
 
-On the first real run, the stored result matched the example values embedded in my
-own prompt. I pulled the raw Devin session
-transcript and found the cause: the transcript includes the full prompt text (which
-itself contains an example `SIM_RESULT_JSON` for formatting), and my extractor was
-matching that example *before* it ever reached Devin's actual output further down
-the transcript.
-
-Fix: skip prompt-echo messages and take the last decodable result marker in the
-transcript, plus a regression test that reproduces the exact scenario. The real
-result — sotorasib's ΔG, which falls straight out of
-its actual molecular weight and logP — then flowed through correctly. (The prompt's
-example result is now a set of typed placeholders that *cannot* parse as JSON, so an
-echoed example can never be mistaken for a result in the first place.)
+On the first real run, the stored result matched the example values embedded in my own prompt: the
+extractor was matching the prompt's example `SIM_RESULT_JSON` *before* Devin's actual output further
+down the transcript. Fix: skip prompt-echo messages, take the last decodable result marker, add a
+regression test, and make the prompt's example un-parseable so it can never be mistaken for a result.
 
 This is the habit behind the validation section above, and behind the `code_patched`
 field in the result contract: a plausible number is not a correct number until it's
@@ -465,59 +453,39 @@ split, pocket-aware routing, covalent tethering, free-drug PK/PD, multi-seed ΔG
 the conda-lock sim env — are **done**; they are logged under
 [Addressed issues](#known-issues) rather than repeated here.)*
 
-**1 · Add the axis the physics cannot see**
-Drugs mostly fail on **target validation**, not chemistry. Pull the **Open Targets**
-genetic-association score for the target–indication pair — genetically-supported targets succeed
-at roughly twice the rate, making it the strongest known public predictor of clinical success,
-and a stronger one than anything docking produces. Add clinical precedent and trial-design
-quality (endpoint, powering, biomarker enrichment). Then build the **retrospective panel of
-known winners and losers** and make the chemistry clear it — but note the anchor experiment
-(issue #4) shows the current docking layer contributes only *geometric engagement*, not an
-affinity/strength signal, so the panel is where a rescoring estimator (gnina/MM-GBSA) would have
-to prove it adds incremental IC over the genetics-plus-base-rate baseline.
+**1 · Add the axis the physics cannot see.** Drugs mostly fail on **target validation**, not
+chemistry. Pull the **Open Targets** genetic-association score (genetically-supported targets succeed
+~2× as often — the strongest known public predictor, stronger than anything docking produces), plus
+clinical precedent and trial-design quality. Then build the retrospective winners/losers panel — the
+place a rescoring estimator (gnina/MM-GBSA) would have to prove it adds IC over a
+genetics-plus-base-rate baseline, since docking contributes only *geometric engagement* (issue #4).
 
-**2 · Build the corpus — point-in-time, with honest labels**
-Accumulate `(trial design, physics, genetics, outcome, realized move)` per trial, backfilled over
-history (the physics is computable retroactively, which is the only reason a backtest is
-feasible). Two rules make or break it: **filter structures by deposition date** (docking a
-co-crystal published *after* the trial registered is look-ahead bias), and **reconstruct outcomes
-from press releases / 8-Ks, not just CT.gov** (negative trials are systematically under-reported,
-so a registry-only corpus is skewed toward winners). Keep terminated and withdrawn trials in.
-Close the label loop with an **LLM classifier** over results sections and press releases, instead
-of `watchlist.json` enrichment.
+**2 · Build the corpus — point-in-time, honest labels.** Accumulate `(trial design, physics,
+genetics, outcome, realized move)` per trial, backfilled over history. Two rules make or break it:
+**filter structures by deposition date** (a co-crystal published *after* registration is look-ahead
+bias) and **reconstruct outcomes from press releases / 8-Ks, not just CT.gov** (negative trials are
+under-reported, so a registry-only corpus skews toward winners). Keep terminated/withdrawn trials in;
+close the label loop with an **LLM classifier**, not `watchlist.json`.
 
-**3 · Fit a calibrated P(success) — and respect the small-n trap**
-The goal is a **better-calibrated probability than the market's**, with the chemistry as one
-feature among many. The intuition "more features, more data" contains the trap: **the binding
-constraint is labels, not features.** Filter to *(small molecule, known target, resolvable
-structure, listed sponsor, material to market cap, honest outcome)* and you have **hundreds to
-low thousands** of clean examples — so expect to support **10–30 features**, with regularized
-logistic regression or gradient boosting beating anything deep. Piling on every RDKit descriptor
-produces a beautiful backtest and no alpha.
-- **Time-series CV, never random k-fold** — random folds leak the future, and drug development is
-  non-stationary.
-- **Test the cheap baseline first:** historical PoS by phase × indication, plus the Open Targets
-  genetic score, is a strong and nearly-free prior. **The chemistry must prove incremental IC over
-  it — it may not**, and that is worth knowing *before* building more physics.
-- Pre-register hypotheses; test 100 feature sets and one will "work."
-- **KPI is calibration, not accuracy** — Brier / log-loss and a calibration curve *against the
-  market's implied PoS*. The question is never "were we right?" but *"were we systematically
-  right where the market was wrong, by enough to pay the spread?"*
+**3 · Fit a calibrated P(success) — respect the small-n trap.** The goal is a **better-calibrated
+probability than the market's**, chemistry as one feature among many. The binding constraint is
+**labels, not features**: a clean filter leaves hundreds-to-low-thousands of examples, so support
+10–30 features (regularized logistic / gradient boosting, not deep nets).
+- **Time-series CV, never random k-fold** — folds leak the future; drug development is non-stationary.
+- **Test the cheap baseline first** (PoS by phase × indication + Open Targets); **the chemistry must
+  prove incremental IC over it — it may not**, worth knowing before building more physics.
+- Pre-register hypotheses. **KPI is calibration, not accuracy** — Brier / log-loss and a curve
+  *against the market's implied PoS*: not "were we right?" but *"right where the market was wrong, by
+  enough to pay the spread?"*
 
-**4 · Then price it — and remember the edge is breadth**
-Recover the market's **implied** probability — from options around the catalyst, or by decomposing
-market cap against a risk-adjusted NPV — because the edge is `our P(success) − implied P(success)`,
-not the level of our own call. Trade the divergence in **options** (a binary catalyst makes the
-stock bimodal; convex payoffs pay you for being right about the *probability*, not the sign), and
-size by the edge.
-
-By `IR ≈ IC × √breadth`, a modest edge applied 200–400× a year beats a brilliant one applied 15×.
-So **do not try to out-analyze a specialist on a marquee Phase 3** — the edge is a **coverage
-arbitrage** in the neglected tail of uncovered SMID-cap names. That requires real
-**sponsor→ticker entity resolution** (issue #7): breadth is the whole thesis, and a six-entry
-`tickers.json` is exactly what breadth is not. Model **slippage honestly** — SMID biotech options
-are illiquid and IV crush around a binary event is brutal; an edge that cannot be harvested at
-size is not a business.
+**4 · Then price it — the edge is breadth.** Recover the market's **implied** probability (options
+around the catalyst, or market cap vs risk-adjusted NPV) — the edge is `our P − implied P`, not the
+level of our call — and trade the divergence in convex **options**. By `IR ≈ IC × √breadth`, a modest
+edge applied 200–400×/yr beats a brilliant one applied 15×, so the edge is **coverage arbitrage** in
+the neglected SMID-cap tail, not out-analyzing a specialist on a marquee Phase 3. That needs real
+**sponsor→ticker entity resolution** (issue #7) — a six-entry `tickers.json` is not breadth — and
+**honest slippage** (illiquid options, brutal IV crush; an edge unharvestable at size is not a
+business).
 
 **Harden & ship**
 Retries/timeouts on `blocked` or hung sessions; CI (GitHub Actions: ruff + pytest) plus a nightly
@@ -534,89 +502,48 @@ simplifications are catalogued separately under
 the full detail and proposed fix for every row below. The domain of validity is set out in
 [Chemistry & biophysical scope](#chemistry--biophysical-scope).
 
-Most of these were found by auditing the code after the runs had been published. Several share a
-structure worth noting: in each case a locally reasonable choice is treated as a stronger claim
-further down the pipeline. A relative score is converted into an absolute Kd (#4).
-A computationally tractable search box is described as covering the receptor (#2). (Two more of
-this species have since been fixed: a total concentration reported as target engagement was #1,
-corrected by the free-drug correction; and a drug-likeness heuristic priced as a toxicity penalty
-was #3, now surfaced as information only.) None of these raise an error or fail
-a test — the estimate simply becomes less well-founded than its downstream use implies.
+Most were found by auditing the code after the runs were published, and several share one structure:
+a locally reasonable choice consumed downstream as a stronger claim than it can support — a relative
+score read as an absolute Kd (#4), a tractable search box described as covering the receptor (#2), a
+total concentration reported as engagement (#1, fixed), a drug-likeness heuristic priced as toxicity
+(#3, fixed). None raise an error; the estimate simply becomes less well-founded than its use implies.
 
-**The design invariant.** These are all the same species of defect, and naming it makes it a
-principle rather than a checklist: *no quantity may be consumed downstream as a stronger claim than
-the step that produced it can support.* Read that way, several of this project's clearest decisions
-are one invariant applied, and belong in the design from the outset rather than found afterward:
-the **preclinical / discovery-stage scope** (the physics answers a molecular-engagement question, so
-it is not consumed as a Phase 2/3 efficacy claim — see [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument));
-the **no-call gate** (a ΔG is an *input* to a probability, so a trial with no clinical readout
-yields no directional call — [THESIS §3.1](THESIS.md)); the **estimator/harness split** (Vina is
-one implementation, not "the model"); and the **drug-likeness flag** (a Ro5 oral-absorption
-heuristic, so it is information, never a priced safety event — #3). #4 (relative score read as
-absolute Kd) was the last open violation of this invariant; it is now **resolved by re-scoping the
-docking claim** rather than by calibrating the number — see the anchor experiment below.
+**The design invariant.** Naming that species makes it a principle: *no quantity may be consumed
+downstream as a stronger claim than the step that produced it can support.* Several of the project's
+clearest decisions are that one invariant applied — the **preclinical / discovery-stage scope** (not
+consumed as a Phase 2/3 efficacy claim, [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument)),
+the **no-call gate** (a ΔG is an input to a probability, so no readout → no directional call,
+[THESIS §3.1](THESIS.md)), the **estimator/harness split** (Vina is one implementation, not "the
+model"), and the **drug-likeness flag** (information, never a priced safety event). #4 was the last
+open violation; it is resolved by **re-scoping the docking claim**, not by calibrating the number.
 
-**Issue #4, and why docking is now only a geometric claim.** #4 began as "ΔG is documented as
-*relative* but consumed as *absolute* Kd." The plan was to keep Vina's *ranking* and demote only
-its *magnitude* to a calibrated relative band. To validate that, 8 potent approved reversible
-binders with clean ChEMBL Ki/Kd (kinase hinge binders across ABL1/EGFR/VEGFR2 + FXa/rivaroxaban,
-pKd 7.4–10.1) were docked **through this exact pipeline**. The premise is a *ranking* claim, so the
-test is **Spearman ρ** (rank correlation) throughout — and the result **falsified it across diverse
-ligands**:
+**Issue #4 — why docking is now only a geometric claim.** #4 began as "ΔG documented as *relative* but
+consumed as *absolute* Kd." The plan was to keep Vina's *ranking* and demote only its magnitude — but
+docking the 8 anchors (pKd 7.4–10.1) through this exact pipeline falsified even the ranking (headline:
+Spearman ρ(−ΔG, pKd) = −0.24, ρ(−ΔG, size) = +0.45, LE ≈ −0.02). Two faults were separated: (a)
+`Kd = exp(ΔG/RT)` is invalid for a relative score, but `exp()` is monotonic so fixing it cannot inject
+affinity information; (b) the **scoring layer itself** is the primary cause (vdW-dominated,
+uncalibrated across pockets), so no downstream transform recovers absent information — a cross-target
+"strength band" would be size-in-disguise, and **is not shipped**. The resolution demotes docking to
+what it can defend:
+- raw ΔG kept only as a labelled **docking-objective diagnostic** (not an affinity, not cross-comparable);
+- **no Kd, no Kd-derived occupancy** (both `None`); the uncalibrated value survives only in
+  `provenance.vina_pseudo_kd_nM` with a "NOT an affinity" note;
+- docking reported as a geometric **`binding_engagement`** class (`experimental-site` … `no-structure` /
+  `failed`), with multi-seed sd as reproducibility, not affinity uncertainty;
+- the **market model** drops the affinity/occupancy terms, keeping only a capped **+0.05** geometric
+  corroboration of a *positive* readout (never rescues a miss; no-call gate holds with no readout);
+- estimator IDs bump (`vina-docking-pkpd@2→@3`, `ligand-efficiency-baseline@1→@2`).
 
-- `ρ(−ΔG, measured pKd) = −0.24` — no usable affinity signal (if anything, the wrong sign);
-- `ρ(−ΔG, heavy-atom count) = +0.45` — the score tracks **ligand size / contact area**, not affinity;
-- `ρ(ligand-efficiency, pKd) ≈ −0.02` — size-normalizing the score does **not** rescue it.
-  (nilotinib docks *strongest* at −13.6 yet is one of the *weakest* anchors at 14.5 nM — because it
-  is large, not because it binds tightly.)
-
-Two independent faults were separated in the process: (a) the post-SIM transform `Kd = exp(ΔG/RT)`
-is invalid for a relative score, but `exp()` is *monotonic* and so preserves whatever ranking ΔG
-carries — fixing it cannot inject affinity information; (b) the **docking/scoring layer itself**
-is the primary cause — Vina's score is dominated by vdW contact, is not calibrated across
-different pockets, and its resolution is coarser than our anchor set's ~2.7-log affinity spread.
-No downstream transform can recover affinity information that is absent from the score. A
-cross-target "relative binding-strength band" built on this score would therefore be
-**size-in-disguise**, not affinity — the same overclaim in new clothes — so **it is not shipped.**
-
-The resolution demotes the docking claim to what the method can defend:
-- the raw ΔG is retained only as a clearly-labelled **docking-objective diagnostic** (not an affinity, and not comparable across molecules/targets);
-- **no absolute Kd** and **no Kd-derived occupancy** are surfaced by the docking estimator (both are
-  `None`); the uncalibrated `exp(ΔG/RT)` value is kept only in `provenance.vina_pseudo_kd_nM` with
-  an explicit "NOT an affinity (issue #4)" note;
-- docking is reported as a **geometric `binding_engagement` classification** — `experimental-site`
-  (docked into an experimentally-resolved site with a reproducible multi-seed pose, sd ≤ 0.75) /
-  `experimental-site-noisy` / `predicted-pocket` (fpocket) / `no-site` (blind) / `no-structure`
-  (structure-free baseline) / `failed`;
-- multi-seed sd is used as **reproducibility/quality** evidence, not affinity uncertainty;
-- the **market model** removes the docking-derived affinity and occupancy pricing terms entirely.
-  It now applies only a small, capped (**+0.05**) geometric corroboration for an `experimental-site`
-  engagement, and only to a *positive* clinical readout — docking can never rescue a missed
-  endpoint, and the no-call gate still holds when there is no readout;
-- the estimator IDs bump so old and new results stay comparable in the corpus:
-  `vina-docking-pkpd@2 → @3`, `ligand-efficiency-baseline@1 → @2`.
-
-**Future scoring — how the *strength* signal could come back (documented, not built).** The
-limitation is fundamental to all fast docking scoring functions (Glide/GOLD/AutoDock4 share it), so
-swapping the docking *engine* would not fix it — the fix is a different *class* of scorer layered on
-the reusable Vina pose/routing/pocket/covalent/provenance infra:
-- **gnina CNN rescoring** (open source, ~drop-in on Vina/smina poses) — best accuracy-per-effort;
-  the natural first `gnina-rescore@1` estimator to run head-to-head against `vina-docking-pkpd`.
-  Needs a GPU (the only released binary is CUDA-only), so it is not runnable in this CPU sandbox;
-- **MM-GBSA** (OpenMM implicit-solvent single-point) — **built and tested here, and it did not help.**
-  A CPU-only single-snapshot MM-GBSA (ff14SB / GAFF-2.11 / OBC2, ligand minimized in a rigid
-  receptor) was run on the same 8 anchors ([`trial-impact-service/validation/`](trial-impact-service/validation/README.md)):
-  Spearman ρ(MM-GBSA, pKd) = **−0.24** (95% CI [−0.93, +0.62]), **no better than Vina** (−0.24) and
-  still size-tracking (ρ ≈ +0.4). So the cheap MM-GBSA is **not shipped as a strength estimator** —
-  same discipline as #4. This is a clean, reproducible negative result, not a shipped feature;
-- **FEP/TI** — gold standard for *relative* affinity but only within a congeneric series on one
-  target, and too expensive per pair for a broad event-driven pipeline.
-No fake/unimplemented estimator is added now; the `Estimator` interface exists so a real one slots
-in when built. The MM-GBSA head-to-head is committed as a reproducible experiment (`make validate`),
-not as a production scorer.
-
-#3 (drug-likeness read as toxicity) was the same species of defect and is now fixed: the flag is
-renamed `druglikeness_flag` and priced at zero.
+**How a *strength* signal could come back (documented, not built).** The limitation is fundamental to
+all fast docking scorers (Glide/GOLD/AutoDock4 alike), so swapping the *engine* would not fix it — the
+fix is a different *class* of scorer on the reusable pose/routing/covalent infra: **gnina CNN
+rescoring** (drop-in on Vina poses, best accuracy-per-effort, but CUDA-only so not runnable in this CPU
+sandbox); **MM-GBSA** — built and tested here and it **did not help** (ρ = −0.24, 95% CI [−0.93, +0.62],
+no better than Vina, still size-tracking; committed as a reproducible experiment via `make validate`,
+[`validation/`](trial-impact-service/validation/README.md), not shipped); and **FEP/TI** (gold standard
+but only within a congeneric series, too expensive per pair for a broad pipeline). The `Estimator`
+interface exists so a real one slots in when built.
 
 **Status:** ○ open · ◑ mitigated, not fixed · ✅ fixed
 
@@ -638,9 +565,8 @@ requirement for a real forecast or a place where the current build overreaches i
 
 ### Addressed — the work done so far (high-level log)
 
-Each row is a defect that was found (mostly by auditing the code after the runs were published) and
-resolved; the common thread is the design invariant above — *a quantity was being consumed as a
-stronger claim than the step that produced it could support.*
+Each row is a defect found (mostly by auditing the code post-publication) and resolved — the common
+thread is the design invariant above.
 
 | # | Was | Resolution | PR | |
 |---|---|---|---|---|
