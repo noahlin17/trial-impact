@@ -267,11 +267,15 @@ and the rendered dashboards — open the `.html` files in a browser). Docking ru
 Devin session.)
 
 **Read the engagement + exposure columns as the product and the model call as scaffolding.** The
-**geometric engagement** classification and exposure (Cmax/AUC) are the net-new data modality a
-pricing model would eventually consume; the docking ΔG beside them is a *docking-objective
-diagnostic*, not an affinity and not comparable across the two rows (issue #4). The `Model call`
-column is the transparent rules-based placeholder described above; it shows that the pipeline runs
-end to end, and it is not a trade.
+**geometric engagement** classification and exposure (Cmax/AUC) are the pipeline's structured readout
+— the *modality* a pricing model would eventually consume — but as computed today they are **not
+net-new**: engagement is a confirmatory *public* preclinical fact (an entry criterion, issue #4) and
+the exposure comes from a generic PK model, so neither is an un-priced signal. What would make this
+modality net-new is the future work in [What it would take to be edge-generating](#what-it-would-take-to-be-edge-generating--compute-the-unknowns-not-the-knowns)
+(calibrated affinity, human PK, occupancy), not these confirmatory outputs. The docking ΔG beside
+them is a *docking-objective diagnostic*, not an affinity and not comparable across the two rows
+(issue #4). The `Model call` column is the transparent rules-based placeholder described above; it
+shows that the pipeline runs end to end, and it is not a trade.
 
 | Drug (status) | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call |
 |-------|---------------|-----------|-----------|---------------|-----|-----------|
