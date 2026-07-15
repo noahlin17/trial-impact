@@ -60,6 +60,19 @@ regime, structure-derived human PK, target-validation / genetics features, and a
 P(success) — each of which *would* add information the market has not already priced (see
 [Next steps](#next-steps)).
 
+> **North Star.** Take a Phase 1 trial's design plus *all* public information — structure, target,
+> indication, planned dose, and any **published in-vitro, PK, or prior computational results** — and
+> produce a model estimate of a quantity the trial is *testing but has not yet read out* (human PK,
+> tolerability / MTD, human target occupancy). The estimate is useful only if it is **net-new against
+> everything already public**: recreating a disclosed in-vitro potency, a reported PK parameter, or a
+> prior docking result is by definition already priced and adds nothing. Two honest bounds: **(1)** the
+> output is a *probabilistic prior with error bars*, and edge requires it to beat the market's implied
+> probability on a point-in-time backtest — the estimate alone is not a trade; **(2)** the idea
+> generalises to later phases only in *form* — Phase 2/3 test efficacy / disease biology the chemistry
+> does not model, so those need a different input (genetics / target-validation), not more docking.
+> **None of this is built today** — the current output is confirmatory geometric engagement; the North
+> Star is the direction the roadmap is for.
+
 > **Not investment advice.** Output is an automated research signal for informational
 > purposes only; a disclaimer is attached to each assessment.
 
@@ -467,11 +480,14 @@ reproducible pose — which is a claim the method can actually back.
 
 ### What it would take to be edge-generating — compute the *unknowns*, not the *knowns*
 
-Edge can only come from computing something that is (a) genuinely uncertain and (b) not already in the
-price. Engagement fails both: it is **known going into Phase 1** (an entry criterion) and public, so
-no amount of re-deriving it is alpha. The only place net-new signal can live is the set of things a
-trial is actually **testing** — and each requires new chemistry or data the current build does not
-have. Ordered against the known-vs-tested split, and honest that any early edge would be thin:
+Edge can only come from computing something that is (a) genuinely uncertain and (b) **not already
+public** — which explicitly includes any in-vitro measurement, reported PK, or computational result
+disclosed with the drug or trial. Recreating those is not signal even if the market has not obviously
+"priced" them. Engagement fails this on every count: it is **known going into Phase 1** (an entry
+criterion), public, and routinely accompanied by published potency and structures — so re-deriving it
+is not alpha. The only place net-new signal can live is the set of things a trial is actually
+**testing** and has *not yet published* — and each requires new chemistry or data the current build
+does not have. Ordered against the known-vs-tested split, and honest that any early edge would be thin:
 
 | What the trial actually tests (unknown going in) | What it would take to compute it | Chemistry-computable? | Edge realism |
 |---|---|---|---|
