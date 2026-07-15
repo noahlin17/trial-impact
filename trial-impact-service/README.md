@@ -319,7 +319,7 @@ addressed; ○ = documented, future work.)
 - **A physics rescorer (MM-GBSA) was tested and also failed — so no strength estimator ships** ✅ —
   the natural next move was to rescore the docked poses with single-snapshot MM-GBSA (OpenMM /
   ff14SB / GAFF-2.11 / OBC2 implicit solvent, ligand minimized in a rigid receptor), which adds the
-  electrostatics + desolvation terms Vina omits. Validated on the **same 8 anchors** (see
+  electrostatics + desolvation terms Vina omits. Evaluated on the **same 8 anchors** (see
   [`validation/`](validation/README.md)): MM-GBSA does **not** beat Vina and does **not** rank
   measured affinity — Spearman ρ(MM-GBSA, pKd) = **−0.24** (95% CI [−0.93, +0.62]) vs ρ(Vina) =
   −0.24, and both still track ligand size (ρ ≈ +0.4). Applying the same discipline used on Vina, the

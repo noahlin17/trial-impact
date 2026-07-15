@@ -134,7 +134,7 @@ the flag (renamed from `tox_flag`) is surfaced as informational provenance only 
 ## † How to read the two ΔGs (pocket-resolved, but cognate and reversible-scored)
 
 Both runs now box the **real pocket**, which is the fix for the old blind-slab problem. But
-neither ΔG is a validated absolute affinity, for two reasons:
+neither ΔG is an absolute affinity, for two reasons:
 
 - **Cognate/holo docking is partly circular.** Redocking a drug into its own bound pocket
   (the switch-II site of 6OIM for sotorasib, the VX7 site of 6O2P for ivacaftor) inflates

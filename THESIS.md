@@ -225,7 +225,7 @@ predictive system there is no readout to fall back on, so recovering a real *str
 (gnina CNN rescoring / MM-GBSA / FEP — §future work) becomes blocking.
 
 The obvious next candidate, a single-snapshot **MM-GBSA rescore** of the docked poses (which adds
-the electrostatics and desolvation terms Vina omits), was subsequently built CPU-only and validated
+the electrostatics and desolvation terms Vina omits), was subsequently built CPU-only and evaluated
 on the same eight anchors (`trial-impact-service/validation/`). It **also failed**: Spearman
 ρ(MM-GBSA, pKd) = −0.24 (95% CI [−0.93, +0.62]), no better than Vina's −0.24, and it still tracks
 ligand size (ρ ≈ +0.4). Applying the same discipline used on Vina, the cheap MM-GBSA is *not*
