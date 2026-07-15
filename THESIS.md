@@ -18,11 +18,12 @@ evidence, from first principles, or simply guessing, I have tried to say so.
 
 **Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
 The one falsifiable scientific claim this project actually tests — *does the docking score rank
-binding strength?* — was tested on 8 approved drugs with measured ChEMBL affinities and **rejected**:
-Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size, ρ ≈ +0.45), and a CPU MM-GBSA rescore did
-not improve on it (ρ = −0.24, still size-tracking). So the pipeline ships only a *geometric
-engagement* claim, and the negative result — reproducible via `make validate` — is the substantive
-finding.
+binding strength?* — was tested on 8 approved drugs with measured ChEMBL affinities and found **not to
+hold**: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size, ρ ≈ +0.45), and a CPU MM-GBSA
+rescore did not improve on it (ρ = −0.24, still size-tracking). At n = 8 the confidence intervals are
+wide and span zero, so this is **directional, not a powered refutation** — but it points the same way
+as long-standing docking literature, so the pipeline ships only a *geometric engagement* claim. The
+negative result — reproducible via `make validate` — is the substantive finding.
 
 ---
 
@@ -34,11 +35,10 @@ say much about whether the molecule should have been expected to work.
 
 The idea here is to produce a second input for the same event: an estimate of whether the
 drug engages its target, computed from the protein structure and the ligand chemistry
-rather than from the sponsor's description of the result. The output is a continuous
-quantity (a docking ΔG *score* plus a geometric target-engagement classification, and
-PK/PD-derived exposure) rather than a categorical one — note that the ΔG is *not* turned into
-an absolute Kd or occupancy, because it cannot support that claim (§3.4, issue #4). This has
-three consequences:
+rather than from the sponsor's description of the result. The output is a
+geometric target-engagement classification plus a docking ΔG *diagnostic* and PK/PD-derived
+exposure — note that the ΔG is *not* turned into an absolute Kd or occupancy, because it cannot
+support that claim (§3.4, issue #4). This has three consequences:
 
 - it can be scored against realized outcomes, so its value can be measured rather than
   argued;
@@ -61,7 +61,8 @@ A signal's value tends to decay with the cost of reproducing it. The cost here i
 AutoDock Vina is free and has been available since 2010; RDKit, the PDB, AlphaFold DB,
 PubChem and Open Targets are all free; and the pipeline in this repository was assembled in
 days with agent assistance. If a ΔG for a given trial is cheaply computable by anyone, it is
-reasonable to assume it is already reflected in the price, or will be shortly.
+reasonable to assume it is largely in the price already — though "cheap to compute" is not the same
+as "priced in," a distinction §4 returns to.
 
 So I do not think the docking is where an edge would come from. Candidates that seem more
 durable to me, in rough order of how much I believe them:
@@ -216,10 +217,11 @@ the build deliberately stopped making.
 
 The reason the claim was dropped, rather than recalibrated, is worth stating: 8 potent approved
 reversible binders with clean ChEMBL Ki/Kd were docked through this exact pipeline, and the result
-**falsified the premise that Vina ranks affinity at all** across diverse ligands. The premise is a
+showed **no evidence that Vina ranks affinity** across diverse ligands. The premise is a
 *ranking* claim, so the test is **Spearman ρ** (rank correlation): `ρ(−ΔG, measured pKd) = −0.24`,
 while `ρ(−ΔG, heavy-atom count) = +0.45` (the score tracks ligand size, not Kd), and
-ligand-efficiency normalization did not rescue it (`ρ ≈ −0.02`). `exp()` is monotonic, so the invalid
+ligand-efficiency normalization did not rescue it (`ρ ≈ −0.02`). At n = 8 the CIs span zero, so this
+is directional rather than definitive, but it is enough to withhold a strength claim. `exp()` is monotonic, so the invalid
 transform was not the root cause; the docking/scoring layer itself cannot supply affinity
 information. The free-drug (`fu`) occupancy machinery remains in the pipeline for any future
 estimator that produces a real Kd, but the docking path leaves occupancy `None`.
