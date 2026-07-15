@@ -278,6 +278,19 @@ That reframing also disposes of the commoditization problem in §2. It does not 
 whether a ΔG is cheap to compute. It matters whether the resulting probability estimate is
 better than the one already in the price.
 
+It also disciplines a tempting but flawed theory of the first unlock: *"the edge is a quantity that
+could be computed by intense simulation or a computational chemist but has not been published."* That
+is the right hunting ground and the wrong stopping condition. **Unpublished is not un-priced.** The
+sponsor running the trial employs computational chemists and runs FEP / MD / PBPK / ADMET internally
+and simply does not publish it, so the unpublished quantity is usually *already known to the party
+that sets the price* and leaks into it through their actions (dose choice, trial design, guidance).
+Computability guarantees neither materiality to the readout nor a mispriced consensus. And depth
+compounds the problem: a deep sim of a heavily-followed drug is the worst case, because coverage is
+maximal and the sponsor knows everything. The plausible edge is the inverse — a cheap, calibrated
+estimate applied at **breadth** across many under-covered events (§4.2), where no informed party has
+done the work — and whether any specific quantity is un-priced is an empirical question the
+point-in-time backtest (§3.5) settles, not one that can be reasoned into existence.
+
 ### 4.1 The position
 
 > edge = our P(success) − the market's implied P(success)
