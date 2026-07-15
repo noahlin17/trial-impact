@@ -10,8 +10,11 @@ and the chemistry, not from the sponsor's description of the result. A closed-fo
 tissue exposure (Cmax/AUC).
 
 What makes this more than "a pipeline that runs" is the validation below: the tempting claim — that a
-docking score measures *how strongly* a drug binds — was tested against measured affinities and
-**falsified**, twice, so the shipped claim is the narrower one the method can actually support.
+docking score measures *how strongly* a drug binds — was tested against measured affinities and **did
+not hold** (nor did a physics-based rescore), so the shipped claim is the narrower one the method can
+actually support. The test is small (n = 8) and **directional, not definitive** — but it points the
+same way as two decades of docking literature, and the point is that the project tested its own
+premise and shipped the narrower claim rather than the flattering one.
 
 ## Headline result — a docking score is not binding strength (and a physics rescore doesn't fix it)
 
@@ -29,6 +32,12 @@ pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a C
 - **The raw Vina score does not rank cross-target affinity** — it tracks ligand **size** (the biggest
   molecules score "best" while being weaker binders).
 - **A physics-based MM-GBSA rescore does not rescue it** — same ρ, still size-confounded ([`validation/`](trial-impact-service/validation/README.md), reproduce with `make validate`).
+
+**Read this as directional, not decisive.** At n = 8 the 95% CIs are wide and span zero (Vina ρ
+[−0.83, +0.62]), so this does not *prove* Vina is uninformative — it shows **no evidence** of affinity
+ranking on this set, exactly as the long-known size confound predicts. A powered refutation would need
+a far larger, structurally diverse anchor set; what is defensible today is the negative *direction*
+and the discipline of not shipping a strength claim the data cannot support.
 
 So the pipeline makes only the claim the method can back — **geometric target engagement** (did the
 molecule dock into the experimentally-resolved site with a reproducible multi-seed pose) — and
@@ -153,26 +162,17 @@ something — a coverage argument, not an insight one. (The illustrative IR arit
 
 ### What this repository does and does not establish
 
-It establishes that the pipeline runs, that its outputs are **reproducible from source**, and
-that its failure modes are visible rather than silent. That is a precondition for testing the
-thesis. It is not evidence for it.
+It establishes that the pipeline runs, that its outputs are **reproducible from source**, and that
+its failure modes are visible rather than silent — a precondition for testing the thesis, not
+evidence for it. Both the chemistry and market model are placeholders: docking is now pocket-routed
+(covalent tether → co-crystal → fpocket → blind, per `docking_box.mode`) but reports only *geometric
+engagement* (the 8-anchor calibration killed the affinity reading, headline above), the PK model is
+generic, and the market model is uncalibrated and rules-based. The current numbers are not tradeable.
 
-Both the chemistry and the market model are placeholders, though the docking box is no longer
-blind: it is now routed to the actual pocket — a covalent warhead against a curated covalent class
-is tethered to its reactive cysteine, a reversible drug is boxed on a curated or auto-discovered
-co-crystal ligand, and only an un-routable target falls back to fpocket then a blind centroid box
-(the tier is recorded in `docking_box.mode`). The PK model is still generic (single-dose,
-one-compartment, no bioavailability term) and the market model is uncalibrated and rules-based.
-The docking ΔG is **no longer** turned into an absolute Kd or a Kd-derived occupancy: the 8-anchor
-calibration (headline result above; full detail in [issue #4](#known-issues)) showed the raw Vina
-score does not rank measured affinity — it tracks ligand size — so docking is reported only as
-*geometric engagement*. The current numbers are not tradeable.
-
-The assumption most likely to be fatal is not "can we compute the chemistry," which works, but
-"does the chemistry carry information the market does not already have," which is untested. A
-baseline of phase × indication base rates plus a free genetic-association score is probably a
-reasonably strong prior on its own, and the physics has to beat it. That experiment is cheap and
-should be run before any further work on the physics.
+The assumption most likely to be fatal is not "can we compute the chemistry," which works, but "does
+the chemistry carry information the market does not already have," which is untested. A baseline of
+phase × indication base rates plus a free genetic-association score is probably a strong prior on its
+own, and the physics must beat it — a cheap experiment that should run before any further physics.
 
 ### The wider view
 
@@ -277,10 +277,10 @@ them is a *docking-objective diagnostic*, not an affinity and not comparable acr
 (issue #4). The `Model call` column is the transparent rules-based placeholder described above; it
 shows that the pipeline runs end to end, and it is not a trade.
 
-| Drug (status) | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call |
+| Drug (status) | Target × Drug | Structure (route) | Engagement ‡ | ΔG (diagnostic, kcal/mol) | Flags | Model call *(rules-based demo — not a prediction)* |
 |-------|---------------|-----------|-----------|---------------|-----|-----------|
-| **Approved** (Lumakras, 2021) | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | ▲ AMGN strong · ▼ REGN/NVS moderate |
-| **Approved** (Kalydeco, 2012) | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | ▲ VRTX strong · ▼ CRSP/BLUE |
+| **Approved** (Lumakras, 2021) | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | AMGN ↑ · REGN/NVS ↓ *(illustrative)* |
+| **Approved** (Kalydeco, 2012) | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 † | clean | VRTX ↑ · CRSP/BLUE ↓ *(illustrative)* |
 
 **Both are *approved* drugs, chosen precisely because the answer is already known — this is a
 backtest of the pipeline against ground truth, not a forecast.** Each has a resolved co-crystal and a
@@ -292,18 +292,13 @@ confirmatory preclinical fact here, and re-deriving a public fact about an appro
 would only shift a *live* run's information timing, never what the chemistry computes, is in
 [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument).)
 
-The *scoring* layer reproduces deterministically from committed source — the engagement
-classification, Cmax, and both PoS deltas fall out of the mean ΔG and the resolved route by fixed
-arithmetic — **but the ΔG numbers themselves carry no real provenance as measurements; read them as
-illustrative pipeline outputs, not quantities that mean something.** Two reasons: (1) the mean ΔG
-depends on whichever structure the router resolves from **live** PDBe/RCSB at run time (not pinned
-point-in-time, issue #10), so it is *not* point-in-time reproducible — a different resolving
-structure returns a materially different number (observed: KRAS to 7VVB/fpocket −5.91 instead of
-6OIM/covalent-tethered −7.202); and (2) even a stable number is not an affinity — it is Vina's
-docking-objective score, cognate (self-pocket) for both rows and only a reversible lower bound for
-covalent KRAS. What *is* verifiable is integrity, not meaning: `code_patched: false` confirms the
-number came from `simulation.py` as committed, not from a session that patched it around a broken
-upstream API — that field exists because it caught exactly that case (see below).
+The *scoring* layer is deterministic from committed source (engagement class, Cmax, and both PoS
+deltas fall out of the mean ΔG and route by fixed arithmetic), **but the ΔG numbers carry no
+provenance as measurements — read them as illustrative outputs.** They are not point-in-time
+reproducible (the structure is resolved *live*, issue #10 — routing KRAS to 7VVB/fpocket gives −5.91
+vs 6OIM's −7.202), and even a stable number is a docking-objective score, cognate here and only a
+reversible lower bound for covalent KRAS — not an affinity. What *is* verifiable is integrity:
+`code_patched: false` confirms the number came from `simulation.py` unpatched (see below).
 
 **‡ The engagement column is *geometry, not strength*.** It records that the ligand docked into the
 *experimentally-resolved* binding site (a curated holo / covalent-tethered residue) with a
@@ -317,14 +312,11 @@ into the call (issue #3, fixed). It fires on sotorasib, an approved drug; with t
 "safety" penalty removed, the KRAS call is `strong` (PoS delta +0.50), while ivacaftor (one
 violation, unflagged) is unchanged.
 
-The inputs are drug-specific rather than hardcoded: sotorasib's flags derive from its computed
-descriptors (MW 560.6, logP 5.30) and an RDKit substructure match on its acrylamide warhead,
-while ivacaftor (one violation, reversible) comes back clean, so the two readouts produce
-different PoS deltas. **The routing is class-based, not drug-based** — sotorasib matches the
-*covalent-warhead + KRAS-G12C class* predicate and ivacaftor the *reversible + curated-holo*
-predicate, so a net-new drug in either category routes itself the same way. The inputs are real;
-the interpretation placed on two of them in the market model is not well founded, and is
-documented as such.
+Inputs are drug-specific, not hardcoded: sotorasib's flags come from its computed descriptors
+(MW 560.6, logP 5.30) and an RDKit acrylamide match, while ivacaftor comes back clean, so the two
+produce different PoS deltas. **Routing is class-based, not drug-based** — sotorasib matches the
+*covalent-warhead + KRAS-G12C* predicate and ivacaftor the *reversible + curated-holo* one, so a
+net-new drug in either class routes itself the same way.
 
 > **† The ΔGs are pocket-resolved but cognate and reversible-scored — read them as such.**
 > Both runs now box the real pocket (KRAS switch-II Cys of 6OIM; ivacaftor's VX7 site in 6O2P),
@@ -451,21 +443,15 @@ error bars* whose edge is unproven until the backtest runs. The broader open que
 stage lets public inputs extrapolate an un-priced quantity; earlier-is-better is the guess, not a
 finding.
 
-**The practical upshot.** The *binding* half of the pipeline is defensible today for a
-**reversible, non-covalent small molecule against a small globular protein with an
-experimental structure** — and, with the pocket-aware routing, also for **covalent small
-molecules against a curated covalent class** (as a reversible-scored lower bound) and any drug
-with a discoverable co-crystal. That is the honest boundary. Everything without a co-crystal or a
-curated class still degrades to fpocket/blind (and says so), and biologics remain out of scope.
-Both published runs now sit inside the routed universe — sotorasib via the covalent-tethered
-tier, CFTR via a curated holo — rather than partly outside it as before.
-
-The *pharmacology* half is weaker still, and I would not defend it as more than
-directional: with generic PK constants and no bioavailability term the exposure numbers remain
-order-of-magnitude scene-setting, not predictions. Target occupancy is no longer reported at all
-from docking, because it rested on a Kd the Vina score cannot support (issue #4); what the docking
-half now claims is only *geometric engagement* — the molecule docked into the resolved site with a
-reproducible pose — which is a claim the method can actually back.
+**The practical upshot.** The *binding* half is defensible today for a **reversible small molecule
+against a small globular protein with an experimental structure**, and — via pocket-aware routing —
+for **covalent small molecules against a curated covalent class** (a reversible-scored lower bound)
+or any drug with a discoverable co-crystal; both published runs sit inside this routed universe.
+Everything else degrades to fpocket/blind (and says so), and biologics are out of scope. The
+*pharmacology* half is weaker — generic PK constants, no bioavailability term, so exposure is
+order-of-magnitude scene-setting, not a prediction — and occupancy is no longer reported at all,
+since it rested on a Kd the score cannot support (issue #4). The surviving claim is *geometric
+engagement*, which the method can back.
 
 ### What it would take to be edge-generating — compute the *unknowns*, not the *knowns*
 
@@ -539,28 +525,14 @@ upstream API. See the service README.
 
 ---
 
-## Why there is nothing to "check against literature" here
+## Nothing to "check against literature" per run — by design
 
-An earlier version of this README compared the two runs' docking-derived Kd against published
-binding data and tried to reason about the gap. **That check is now moot, by design:** the pipeline
-no longer emits any absolute Kd, affinity, or occupancy (issue #4). The only per-run outputs are a
-*geometric engagement* classification, a *docking-objective diagnostic* ΔG (explicitly not an
-affinity), and exposure — none of which is a number you can hold up against a literature Kd/IC50.
-There is simply no absolute quantity left to validate against the literature, so per-run
-literature comparison is not a meaningful test and is not claimed.
-
-Validating the piece that *does* make a claim was done separately and honestly, not on these two
-demo runs:
-
-- **Affinity ranking — falsified.** An 8-anchor cross-target calibration through this exact pipeline
-  showed raw Vina does not rank measured affinity (it tracks ligand size), and a CPU MM-GBSA rescore
-  failed the same way ([Known issues #4](#known-issues), `trial-impact-service/validation/`). So no
-  strength estimator is shipped — the surviving claim is geometric engagement, not affinity.
-
-The general fact that AutoDock Vina has no representation of covalent bond formation (so it
-understates covalent inhibitors) is a documented property of the scoring function, not a result
-these two runs demonstrate. No numbers, prompts, or pipeline behaviour were adjusted to make any of
-the above come out a particular way.
+The pipeline emits no absolute Kd, affinity, or occupancy (issue #4), so there is no per-run number to
+hold against a literature Kd/IC50 — the outputs are a geometric-engagement class, a labelled
+docking-objective diagnostic ΔG, and exposure. The one claim that *can* be checked — *does the score
+rank affinity?* — was tested separately and honestly on the 8-anchor set and did not hold (headline
+above; [Known issues #4](#known-issues)). No numbers, prompts, or behaviour were tuned to make any
+result come out a particular way.
 
 ---
 
