@@ -299,6 +299,16 @@ estimate applied at **breadth** across many under-covered events (§4.2), where 
 done the work — and whether any specific quantity is un-priced is an empirical question the
 point-in-time backtest (§3.5) settles, not one that can be reasoned into existence.
 
+This cuts less deeply than it first appears. Chemistry is almost certainly priced to *some* degree
+already — sophisticated players use it explicitly, and it is baked in implicitly through the
+sponsor's own dose and design choices. The claim is not that chemistry is unused; it is that AI has
+lowered the cost of running *more* of it, on *more* names, to the point where applying it more fully
+— where the ROI of an expert, a wet-lab assay, or a full FEP / MD campaign did not previously
+justify the cost per trial — is plausibly an edge *right now*, simply from using more relevant
+chemistry at all. That edge is explicitly not a long-term moat: as the cost keeps falling it
+commoditises, and the durable position is the labeled point-in-time dataset and a *combination* of
+factors, not the chemistry in isolation (§2 durability table; §5.1).
+
 ### 4.1 The position
 
 > edge = our P(success) − the market's implied P(success)
@@ -338,6 +348,15 @@ The implication is that a weak but genuine edge applied to many decisions can be
 than a strong edge applied to few. That is the argument for why a commoditized input might
 still be useful: it does not need to be a good signal, it needs to be a slightly informative
 one that can be produced at scale. Scale is what the agent sandbox provides.
+
+The converse is an equally valid strategy: a small number of very high-conviction positions,
+sized heavily, where the edge per name is large rather than broad. That route is legitimate but
+demanding — the conviction has to be genuinely earned, because even a correct read on the
+chemistry leaves irreducible risk. Trial design, dose selection, execution, and ordinary clinical
+and lab variability introduce failure modes the molecule axis does not touch (§3.2), so the gap
+between "the molecule should work" and "this trial will read out positive" never closes to zero.
+Breadth and conviction are two ways to convert the same estimate into return; which one applies is
+a function of how sure the estimate actually is.
 
 It also suggests where to look. Sell-side and specialist coverage concentrates on a relatively
 small number of high-profile catalysts, and the implied probabilities on those are likely to be
