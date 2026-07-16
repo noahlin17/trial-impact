@@ -10,14 +10,17 @@ the molecule makes a **reproducible, geometrically sound engagement** — comput
 and the chemistry, not from the sponsor's description of the result. A closed-form PK/PD solve adds
 tissue exposure (Cmax/AUC).
 
-Its central premise was pre-registered and tested rather than assumed. Binding strength is governed by
-the free energy of binding (ΔG) — the finding is *not* that this doesn't matter, it's that a **cheap**
-docking/rescoring score is a poor stand-in for it. Checked against measured affinities two ways,
-cross-target and within-target, the fast single-snapshot physics we ran **failed to recover ΔG** even
-where the setup favors it. That's a verdict on the *cheap estimator*, not on affinity: so the pipeline
-ships only what this method can stand behind today — **geometry, not affinity** — while more expensive
-physics (ensemble MM-GBSA, FEP) remains **untested here, not disproven**. The validation below maps
-exactly where that line sits.
+Its central premise was pre-registered and tested rather than assumed, and it split cleanly. The
+**low-lift** methods here proved **sufficient to reproduce binding geometry** — redock a native ligand
+and the pose comes back (5/7 within 2 Å): a real, if early, result to build directly on. They were
+**not** sufficient to get *binding strength* on the cheap: affinity is governed by the free energy of
+binding (ΔG), and a fast single-snapshot docking/rescore is a poor stand-in for it — checked against
+measured affinities two ways, cross-target and within-target, it **failed to recover ΔG** even where
+the setup favors it. That is a verdict on the *low-lift estimator*, not on affinity itself — more
+expensive physics (ensemble MM-GBSA, FEP) is **untested here, not disproven**. So the pipeline ships
+only what it can stand behind today, **geometry, not affinity**, and treats the geometry win as the
+**foundation to build on**: real impact needs it pushed prospectively (novel ligands, blind/cross-docking)
+and paired with affinity methods that clear the bar.
 
 ## Headline result — a docking score is not binding strength (and a physics rescore doesn't fix it)
 
