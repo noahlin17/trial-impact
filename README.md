@@ -16,13 +16,14 @@ and the pose comes back (5/7 within 2 Å): a real, if early, result to build dir
 **not** sufficient to get *binding strength* on the cheap: affinity is governed by the free energy of
 binding (ΔG), and a fast single-snapshot docking/rescore is a poor stand-in for it — checked against
 measured affinities two ways, cross-target and within-target, it **failed to recover ΔG** even where
-the setup favors it. That is a verdict on the *low-lift estimator*, not on affinity itself — more
-expensive physics (ensemble MM-GBSA, FEP) is **untested here, not disproven**. So the pipeline ships
-only what it can stand behind today, **geometry, not affinity**, and treats the geometry win as the
-**foundation to build on**: real impact needs it pushed prospectively (novel ligands, blind/cross-docking)
-and paired with affinity methods that clear the bar.
+the setup favors it. That is a verdict on the *low-lift estimator*, not on affinity itself:
+recovering ΔG cleanly likely needs materially more compute — full-GPU ensemble MM-GBSA or FEP — but
+that is a **hypothesis, not a result**, and untested here. So the pipeline ships only what it can stand
+behind today, **geometry, not affinity**, and treats the geometry win as the **foundation to build
+on**: real impact needs it pushed prospectively (novel ligands, blind/cross-docking) and paired with
+heavier affinity methods that would have to earn the claim on the same pre-registered terms.
 
-## Headline result — a docking score is not binding strength (and a physics rescore doesn't fix it)
+## Headline results — the low-lift pipeline reproduces binding *geometry*, but does not recover binding *strength* on the cheap
 
 I tested the affinity premise on **8 approved drugs with real, measured affinities** (ChEMBL Ki/Kd,
 pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a CPU MM-GBSA:

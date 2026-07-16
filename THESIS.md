@@ -17,9 +17,9 @@ literature and standard results, not from direct experience. Where I am reasonin
 evidence, from first principles, or simply guessing, I have tried to say so.
 
 **Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
-The central falsifiable claim this project tests — *does the docking score rank binding strength?* —
-was tested from two angles: an 8-drug cross-target panel and a 13-ligand within-target Tyk2 series.
-Both were negative. The cross-target panel is the *expected* regime failure — raw docking scores are
+The central falsifiable claim this project tests — *does a **low-lift** docking score rank binding
+strength?* — was tested from two angles: an 8-drug cross-target panel and a 13-ligand within-target
+Tyk2 series. Both were negative: the cheap score did not recover measured affinity. The cross-target panel is the *expected* regime failure — raw docking scores are
 not calibrated across different receptors, and a narrow affinity range against a wide size range lets
 size dominate almost by construction: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size,
 ρ ≈ +0.45), and a CPU MM-GBSA rescore did not improve on it (ρ = −0.24, still size-tracking); at n = 8
@@ -34,8 +34,11 @@ pre-registered criteria: inter-seed agreement does *not* separate correct from i
 seed spread is a reproducibility diagnostic, not a validated confidence signal. The A+C thresholds were
 fixed in the [pre-registration](trial-impact-service/validation/PREREGISTRATION.md) before scores were
 computed. Together, the two ranking negatives — one cross-target (expected), one in-regime (the
-discriminating one) — and a geometry control that passes only its redock-success criterion define the
-boundary; pose fidelity does not rescue affinity.
+discriminating one) — and a geometry result that clears its redock-success criterion define the
+boundary: the low-lift methods are **sufficient to reproduce geometry** (a real first step to build
+on) but **not to recover ΔG cheaply**. That is a verdict on the cheap estimator, not on affinity —
+recovering ΔG plausibly needs materially more compute (full-GPU ensemble MM-GBSA or FEP), which is a
+**hypothesis, not a result**, and untested here. Pose fidelity does not rescue affinity.
 
 ---
 
