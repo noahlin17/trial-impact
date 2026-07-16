@@ -1,0 +1,41 @@
+{
+  "target": "tyk2",
+  "structure_pdb_id": "4GIH",
+  "n": 13,
+  "predictors": {
+    "heavy-atoms (size baseline)": {
+      "rho": 0.292,
+      "ci95": [
+        -0.3,
+        0.73
+      ],
+      "kendall_tau": 0.226
+    },
+    "Vina ligand efficiency": {
+      "rho": -0.291,
+      "ci95": [
+        -0.68,
+        0.33
+      ],
+      "kendall_tau": -0.154
+    },
+    "Vina (-dG)": {
+      "rho": 0.077,
+      "ci95": [
+        -0.54,
+        0.68
+      ],
+      "kendall_tau": 0.051
+    },
+    "MM-GBSA (-dG)": {
+      "rho": -0.538,
+      "ci95": [
+        -0.89,
+        0.07
+      ],
+      "kendall_tau": -0.385
+    }
+  },
+  "positive": false,
+  "verdict": "NEGATIVE for tyk2: cheap single-snapshot MM-GBSA does not clear the pre-registered bar (rho -0.54 < 0.5; 95% CI includes 0; does not beat size + Vina). Honest evidence that the cheap protocol is insufficient even in the favorable regime."
+}

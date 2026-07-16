@@ -535,7 +535,7 @@ def kd_from_dg(dg_kcal_mol: float) -> float:
 
     This identity only yields a real Kd if ``dg`` is a calibrated binding free energy.
     A Vina score is not: it ranks by size/contact area, not affinity (issue #4 — an
-    8-anchor calibration found r(−ΔG, affinity)≈−0.4 but r(−ΔG, heavy-atoms)≈+0.6). So
+    8-anchor calibration found Spearman ρ(−ΔG, pKd) = −0.24 but ρ(−ΔG, heavy-atoms) = +0.45). So
     the result of this function is a *transparency* value kept in provenance and
     labelled uncalibrated; it is never surfaced as a headline Kd or priced by the
     market model.

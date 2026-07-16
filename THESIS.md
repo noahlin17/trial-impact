@@ -17,13 +17,25 @@ literature and standard results, not from direct experience. Where I am reasonin
 evidence, from first principles, or simply guessing, I have tried to say so.
 
 **Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
-The one falsifiable scientific claim this project actually tests — *does the docking score rank
-binding strength?* — was tested on 8 approved drugs with measured ChEMBL affinities and found **not to
-hold**: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size, ρ ≈ +0.45), and a CPU MM-GBSA
-rescore did not improve on it (ρ = −0.24, still size-tracking). At n = 8 the confidence intervals are
-wide and span zero, so this is **directional, not a powered refutation** — but it points the same way
-as long-standing docking literature, so the pipeline ships only a *geometric engagement* claim. The
-negative result — reproducible via `make validate` — is the substantive finding.
+The central falsifiable claim this project tests — *does the docking score rank binding strength?* —
+was tested from two angles: an 8-drug cross-target panel and a 13-ligand within-target Tyk2 series.
+Both were negative. The cross-target panel is the *expected* regime failure — raw docking scores are
+not calibrated across different receptors, and a narrow affinity range against a wide size range lets
+size dominate almost by construction: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size,
+ρ ≈ +0.45), and a CPU MM-GBSA rescore did not improve on it (ρ = −0.24, still size-tracking); at n = 8
+the confidence intervals are wide and span zero, so this is **directional, not a powered refutation**.
+The discriminating test holds target and scaffold fixed — the regime where structure-based scoring is
+*supposed* to work — and it fails there too: in the Tyk2 series, cheap single-snapshot MM-GBSA gave
+ρ = −0.54 (95% CI [−0.89, +0.07]) versus measured affinity, failing to beat size or raw Vina; n = 13
+is still small and its CI spans zero. The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md)
+redocked **5/7 native ligands within 2 Å (71%), median top-pose RMSD 0.71 Å** — positive evidence for
+pose geometry only (not affinity or binding strength), and it clears only the **first** of its two
+pre-registered criteria: inter-seed agreement does *not* separate correct from incorrect poses, so the
+seed spread is a reproducibility diagnostic, not a validated confidence signal. The A+C thresholds were
+fixed in the [pre-registration](trial-impact-service/validation/PREREGISTRATION.md) before scores were
+computed. Together, the two ranking negatives — one cross-target (expected), one in-regime (the
+discriminating one) — and a geometry control that passes only its redock-success criterion define the
+boundary; pose fidelity does not rescue affinity.
 
 ---
 
@@ -217,7 +229,7 @@ the build deliberately stopped making.
 
 The reason the claim was dropped, rather than recalibrated, is worth stating: 8 potent approved
 reversible binders with clean ChEMBL Ki/Kd were docked through this exact pipeline, and the result
-showed **no evidence that Vina ranks affinity** across diverse ligands. The premise is a
+showed **no evidence that Vina ranks affinity** across these anchors (mostly ATP-competitive kinase hinge binders plus one soluble-enzyme inhibitor) — reproducing, on our own scale, the size-confounding that fast docking scorers have shown since the mid-2000s, not a new finding. The premise is a
 *ranking* claim, so the test is **Spearman ρ** (rank correlation): `ρ(−ΔG, measured pKd) = −0.24`,
 while `ρ(−ΔG, heavy-atom count) = +0.45` (the score tracks ligand size, not Kd), and
 ligand-efficiency normalization did not rescue it (`ρ ≈ −0.02`). At n = 8 the CIs span zero, so this
@@ -299,6 +311,16 @@ estimate applied at **breadth** across many under-covered events (§4.2), where 
 done the work — and whether any specific quantity is un-priced is an empirical question the
 point-in-time backtest (§3.5) settles, not one that can be reasoned into existence.
 
+This cuts less deeply than it first appears. Chemistry is almost certainly priced to *some* degree
+already — sophisticated players use it explicitly, and it is baked in implicitly through the
+sponsor's own dose and design choices. The claim is not that chemistry is unused; it is that AI has
+lowered the cost of running *more* of it, on *more* names, to the point where applying it more fully
+— where the ROI of an expert, a wet-lab assay, or a full FEP / MD campaign did not previously
+justify the cost per trial — is plausibly an edge *right now*, simply from using more relevant
+chemistry at all. That edge is explicitly not a long-term moat: as the cost keeps falling it
+commoditises, and the durable position is the labeled point-in-time dataset and a *combination* of
+factors, not the chemistry in isolation (§2 durability table; §5.1).
+
 ### 4.1 The position
 
 > edge = our P(success) − the market's implied P(success)
@@ -338,6 +360,23 @@ The implication is that a weak but genuine edge applied to many decisions can be
 than a strong edge applied to few. That is the argument for why a commoditized input might
 still be useful: it does not need to be a good signal, it needs to be a slightly informative
 one that can be produced at scale. Scale is what the agent sandbox provides.
+
+Two caveats keep this from reading as a free lunch. The law assumes **independent** decisions,
+and biotech catalysts are not: outcomes cluster by mechanism, indication and macro regime, so
+correlated bets push *effective* breadth well below the raw event count. And a signal is never
+expressed frictionlessly — the fuller form `IR ≈ IC · √BR · TC` carries a transfer coefficient
+`TC < 1` for position limits, sizing error and illiquidity, which in small-cap options (§4.3) is
+well under 1. Both pull the achievable IR below the table's arithmetic; the table shows the
+*shape* of the breadth argument, not a reachable number.
+
+The converse is an equally valid strategy: a small number of very high-conviction positions,
+sized heavily, where the edge per name is large rather than broad. That route is legitimate but
+demanding — the conviction has to be genuinely earned, because even a correct read on the
+chemistry leaves irreducible risk. Trial design, dose selection, execution, and ordinary clinical
+and lab variability introduce failure modes the molecule axis does not touch (§3.2), so the gap
+between "the molecule should work" and "this trial will read out positive" never closes to zero.
+Breadth and conviction are two ways to convert the same estimate into return; which one applies is
+a function of how sure the estimate actually is.
 
 It also suggests where to look. Sell-side and specialist coverage concentrates on a relatively
 small number of high-profile catalysts, and the implied probabilities on those are likely to be
@@ -398,8 +437,8 @@ demonstration is honest about what it does; the scaling claim is not yet support
 ## 5. The broader thesis: AI is changing the outcome distribution, and pricing has not adjusted
 
 **This section is a thesis, not a finding.** It reflects my own view, formed from following the
-recent wave of AI-for-biology and life-sciences companies as an investor. It is a position I hold
-with some conviction and no proof. None of what follows is established from data I have gathered,
+recent wave of AI-for-biology and life-sciences companies — as a generalist reasoning from public
+evidence, not a seasoned biotech specialist. It is a position I hold with some conviction and no proof. None of what follows is established from data I have gathered,
 and §5.2 sets out where I think it is most likely to be wrong. I state it as a hypothesis because
 that is what it is, and because the value of writing it down is that it can then be tested.
 
@@ -420,7 +459,7 @@ The observations behind it — again, observations rather than measurements:
   like strategic anxiety than financial optimisation.
 - **Data exclusivity is a depreciating moat.** Synthetic data generation and increasingly capable
   multimodal models will erode the value of proprietary clinical datasets on a horizon I would
-  guess at 6–24 months. Companies valued primarily on data exclusivity face structural multiple
+  guess at 12–24 months. Companies valued primarily on data exclusivity face structural multiple
   compression.
 - **The binding constraint has shifted from selection to speed.** The question is less "which
   drug works" than "how quickly can this move from discovery to commercialisation." Phase

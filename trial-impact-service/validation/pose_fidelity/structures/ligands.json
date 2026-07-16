@@ -1,0 +1,44 @@
+{
+  "03Q": {
+    "ccd_url": "https://data.rcsb.org/rest/v1/core/chemcomp/03Q",
+    "pdb_id": "3PP0",
+    "smiles": "c1cc(cc(c1)Oc2c(cc(cn2)Nc3c4c(ccn4CCOCCO)ncn3)Cl)C(F)(F)F",
+    "source": "RCSB Chemical Component Dictionary"
+  },
+  "0X5": {
+    "ccd_url": "https://data.rcsb.org/rest/v1/core/chemcomp/0X5",
+    "pdb_id": "4GIH",
+    "smiles": "c1cc(c(c(c1)Cl)C(=O)Nc2ccnc(c2)NC(=O)C3CC3)Cl",
+    "source": "RCSB Chemical Component Dictionary"
+  },
+  "53U": {
+    "ccd_url": "https://data.rcsb.org/rest/v1/core/chemcomp/53U",
+    "pdb_id": "2ZFF",
+    "smiles": "c1ccc(cc1)C[C@H](C(=O)N2CCC[C@H]2C(=O)NCc3ccccc3)N",
+    "source": "RCSB Chemical Component Dictionary"
+  },
+  "AQ4": {
+    "ccd_url": "https://data.rcsb.org/rest/v1/core/chemcomp/AQ4",
+    "pdb_id": "1M17",
+    "smiles": "COCCOc1cc2c(cc1OCCOC)ncnc2Nc3cccc(c3)C#C",
+    "source": "RCSB Chemical Component Dictionary"
+  },
+  "BAX": {
+    "ccd_url": "https://data.rcsb.org/rest/v1/core/chemcomp/BAX",
+    "pdb_id": "1UWH",
+    "smiles": "CNC(=O)c1cc(ccn1)Oc2ccc(cc2)NC(=O)Nc3ccc(c(c3)C(F)(F)F)Cl",
+    "source": "RCSB Chemical Component Dictionary"
+  },
+  "BTN": {
+    "ccd_url": "https://data.rcsb.org/rest/v1/core/chemcomp/BTN",
+    "pdb_id": "1STP",
+    "smiles": "C1[C@H]2[C@@H]([C@@H](S1)CCCCC(=O)O)NC(=O)N2",
+    "source": "RCSB Chemical Component Dictionary"
+  },
+  "STI": {
+    "ccd_url": "https://data.rcsb.org/rest/v1/core/chemcomp/STI",
+    "pdb_id": "1IEP",
+    "smiles": "Cc1ccc(cc1Nc2nccc(n2)c3cccnc3)NC(=O)c4ccc(cc4)CN5CCN(CC5)C",
+    "source": "RCSB Chemical Component Dictionary"
+  }
+}

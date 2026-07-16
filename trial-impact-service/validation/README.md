@@ -36,10 +36,10 @@ the tightest binder — lands mid-pack. MM-GBSA does **not** beat Vina, and neit
 Fast docking scores are dominated by van-der-Waals contact area (≈ size); a
 single-pose, rigid-receptor, no-entropy MM-GBSA is still dominated by the same
 size-scaling interaction energy. On a set whose affinity range (~2.7 log units) is
-smaller than its size range, size drowns out the affinity signal. Recovering affinity
-would need either a **congeneric, same-target series** (where ranking is more valid) or
-far more expensive sampling (**explicit-solvent MM-GBSA ensembles / FEP**) — documented
-future work, not shipped here.
+smaller than its size range, size drowns out the affinity signal. The
+[congeneric same-target test](congeneric/README.md) has now also been run: cheap
+single-snapshot MM-GBSA on 13 Tyk2 ligands was negative (ρ = −0.54, 95% CI [−0.89, +0.07]).
+More expensive sampling (**explicit-solvent MM-GBSA ensembles / FEP**) remains untested.
 
 Consequently the pipeline makes **no absolute-affinity or binding-strength claim**. The
 docked pose is used only as a *geometric engagement* signal (does the ligand dock into
@@ -68,3 +68,10 @@ micromamba run -n mmgbsa python validation/build_scores.py
 ```
 
 `validation/work/` (receptor PDBs, PDBQT, docked poses) is intermediate and gitignored.
+
+The cheap `make validate` path is self-contained and reads the committed scalar
+`results/scores.json`. Full regeneration fetches target/ligand information and receptor
+structures live through UniProt, PubChem, and RCSB routing; the selected structures and
+docked poses under `work/` are not archived as tracked inputs. The Vina stage uses the
+canonical `conda-sim.lock.yml`, but the MM-GBSA environment has no tracked lock, so exact
+full-redock reproducibility is not guaranteed.

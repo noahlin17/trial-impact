@@ -33,6 +33,27 @@ pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a C
   molecules score "best" while being weaker binders).
 - **A physics-based MM-GBSA rescore does not rescue it** — same ρ, still size-confounded ([`validation/`](trial-impact-service/validation/README.md), reproduce with `make validate`).
 
+The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md)
+redocked **5/7 native ligands within 2 Å (71%), median top-pose RMSD 0.71 Å**. This clears the first of
+its two pre-registered criteria (redock success ≥ 60%) but **not the second**: inter-seed agreement does
+*not* separate correct from incorrect poses (4GIH is a confidently-converged *wrong* pose — 0.04 Å seed
+spread, yet 7.17 Å off), so the multi-seed spread is a reproducibility diagnostic, **not** a validated
+confidence signal. It supports the geometric pose-reproduction claim only; it says nothing about affinity
+or binding strength.
+
+**The discriminating affinity test is the within-target one.** The 8-anchor panel above is the *expected*
+regime failure: raw docking scores are not calibrated across different receptors, and here a narrow
+affinity range (pKd 7.4–10.1) sits against a wide size range, so size dominates almost by construction —
+useful confirmation of the long-known confound, but not a demanding test. The sharper test holds target,
+scaffold, and pocket fixed — the regime where structure-based scoring is *supposed* to work. That is the
+second [pre-registered control](trial-impact-service/validation/PREREGISTRATION.md), [Experiment A
+(congeneric ranking)](trial-impact-service/validation/congeneric/README.md), and it is **negative too**:
+on the 13-ligand Tyk2 series, cheap single-snapshot MM-GBSA gives ρ = −0.54 (95% CI [−0.89, +0.07])
+versus measured affinity, failing to beat the size baseline or raw Vina even within-target. The A+C
+thresholds were fixed before scores were computed: **two affinity negatives — one cross-target (expected),
+one in-regime (the meaningful one)** — and a geometry control that passes only its redock-success
+criterion, with no claim that pose fidelity rescues affinity.
+
 **Read this as directional, not decisive.** At n = 8 the 95% CIs are wide and span zero (Vina ρ
 [−0.83, +0.62]), so this does not *prove* Vina is uninformative — it shows **no evidence** of affinity
 ranking on this set, exactly as the long-known size confound predicts. A powered refutation would need
@@ -65,18 +86,14 @@ why Phase 1 is the *hypothesised* tier to build toward, and what net-new data an
 require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) and
 [What it would take to be edge-generating](#what-it-would-take-to-be-edge-generating--improve-on-the-markets-estimate-dont-re-derive-the-knowns).
 
-> **North Star.** Take a Phase 1 trial's design plus *all* public information — structure, target,
-> indication, planned dose, and any **published in-vitro, PK, or prior computational results** — and
-> produce a model estimate of a quantity the trial is *testing but has not yet read out* (human PK,
-> tolerability / MTD, human target occupancy). The estimate is useful only if it is **net-new against
-> everything already public**: recreating a disclosed in-vitro potency, a reported PK parameter, or a
-> prior docking result is by definition already priced and adds nothing. Two honest bounds: **(1)** the
-> output is a *probabilistic prior with error bars*, and edge requires it to beat the market's implied
-> probability on a point-in-time backtest — the estimate alone is not a trade; **(2)** the idea
-> generalises to later phases only in *form* — Phase 2/3 test efficacy / disease biology the chemistry
-> does not model, so those need a different input (genetics / target-validation), not more docking.
-> **None of this is built today** — the current output is confirmatory geometric engagement; the North
-> Star is the direction the roadmap is for.
+> **North Star.** Take a Phase 1 trial's design plus *all* public information and produce a model
+> estimate of a quantity the trial is *testing but has not yet read out* (human PK, tolerability / MTD,
+> human target occupancy). It is useful only if it improves on the market's *own* estimate — the bar is
+> *price, not publication*, since re-deriving a disclosed value the market already weights correctly adds
+> nothing. **None of this is built today**; the current output is confirmatory geometric engagement. The
+> full statement — why the output is a probabilistic prior that still needs a point-in-time backtest, and
+> why it generalises to later phases only in *form* (Phase 2/3 test disease biology the chemistry does not
+> model) — is in [THESIS §4](THESIS.md).
 
 > **Not investment advice.** Output is an automated research signal for informational
 > purposes only; a disclaimer is attached to each assessment.
@@ -89,8 +106,9 @@ require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stag
 
 A trial event is routed to the right structure and pocket, docked, and classified as *geometric
 engagement*; a PK/PD solve adds exposure. Each estimator runs head-to-head against a size-only
-baseline it must beat — and the validation experiment (bottom-left) is what tests, and falsifies,
-the affinity premise. The market layer is an illustrative downstream demo.
+baseline it must beat — and the validation suite (with the bottom-left panel showing the cross-target
+test) tests the affinity premise across two ranking regimes and finds no evidence of affinity ranking,
+with a complementary pose-geometry control. The market layer is an illustrative downstream demo.
 
 ---
 
@@ -101,8 +119,8 @@ app — no re-dock. Both surfaces report the honest claim only: a **geometric en
 classification as the readout, with the docking ΔG kept as a **QC/diagnostic labelled "not an
 affinity"** — never an absolute affinity or occupancy.
 
-**`/status`** — one row per trial: the geometric engagement classification, a docking ΔG diagnostic
-(not an affinity, not comparable across molecules), and the (illustrative) price calls.
+**`/status`** — one row per trial: the geometric engagement classification, the docking ΔG
+diagnostic, and the (illustrative) price calls.
 
 ![Status dashboard](docs/dashboard-status.png)
 
@@ -501,8 +519,9 @@ open violation; it is resolved by **re-scoping the docking claim**, not by calib
 
 **Issue #4 — why docking is now only a geometric claim.** #4 began as "ΔG documented as *relative* but
 consumed as *absolute* Kd." The plan was to keep Vina's *ranking* and demote only its magnitude — but
-docking the 8 anchors (pKd 7.4–10.1) through this exact pipeline falsified even the ranking (headline:
-Spearman ρ(−ΔG, pKd) = −0.24, ρ(−ΔG, size) = +0.45, LE ≈ −0.02). Two faults were separated: (a)
+docking the 8 anchors (pKd 7.4–10.1) through this exact pipeline found no evidence of affinity
+ranking (headline: Spearman ρ(−ΔG, pKd) = −0.24, ρ(−ΔG, size) = +0.45, LE ≈ −0.02). Two faults were
+separated: (a)
 `Kd = exp(ΔG/RT)` is invalid for a relative score, but `exp()` is monotonic so fixing it cannot inject
 affinity information; (b) the **scoring layer itself** is the primary cause (vdW-dominated,
 uncalibrated across pockets), so no downstream transform recovers absent information — a cross-target

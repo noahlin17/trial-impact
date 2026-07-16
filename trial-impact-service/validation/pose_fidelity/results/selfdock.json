@@ -1,0 +1,201 @@
+{
+  "n": 7,
+  "rows": [
+    {
+      "pdb_id": "3PP0",
+      "het": "03Q",
+      "ligand_name": "2-{2-[4-({5-chloro-6-[3-(trifluoromethyl)phenoxy]pyridin-3-yl}amino)-5H-pyrrolo[3,2-d]pyrimidin-5-yl]ethoxy}ethanol",
+      "note": "HER2/EGFR-family + inhibitor",
+      "resolution_A": 2.25,
+      "n_ref_heavy": 34,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "rmsd_per_seed": [
+        0.603,
+        0.6,
+        0.615
+      ],
+      "rmsd_top": 0.603,
+      "rmsd_best": 0.6,
+      "rmsd_median": 0.603,
+      "rmsd_seed_spread": 0.015,
+      "dg_per_seed": [
+        -11.355,
+        -11.274,
+        -11.355
+      ],
+      "success_2A": true
+    },
+    {
+      "pdb_id": "1STP",
+      "het": "BTN",
+      "ligand_name": "BIOTIN",
+      "note": "Streptavidin + biotin (well-defined control)",
+      "resolution_A": 2.6,
+      "n_ref_heavy": 16,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "rmsd_per_seed": [
+        0.618,
+        0.599,
+        0.601
+      ],
+      "rmsd_top": 0.618,
+      "rmsd_best": 0.599,
+      "rmsd_median": 0.601,
+      "rmsd_seed_spread": 0.019,
+      "dg_per_seed": [
+        -7.436,
+        -7.496,
+        -7.491
+      ],
+      "success_2A": true
+    },
+    {
+      "pdb_id": "2ZFF",
+      "het": "53U",
+      "ligand_name": "D-phenylalanyl-N-benzyl-L-prolinamide",
+      "note": "Thrombin (FEP-series reference structure)",
+      "resolution_A": 1.47,
+      "n_ref_heavy": 26,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "rmsd_per_seed": [
+        0.622,
+        0.646,
+        0.647
+      ],
+      "rmsd_top": 0.622,
+      "rmsd_best": 0.622,
+      "rmsd_median": 0.646,
+      "rmsd_seed_spread": 0.025,
+      "dg_per_seed": [
+        -8.317,
+        -8.299,
+        -8.262
+      ],
+      "success_2A": true
+    },
+    {
+      "pdb_id": "1UWH",
+      "het": "BAX",
+      "ligand_name": "4-{4-[({[4-CHLORO-3-(TRIFLUOROMETHYL)PHENYL]AMINO}CARBONYL)AMINO]PHENOXY}-N-METHYLPYRIDINE-2-CARBOXAMIDE",
+      "note": "BRAF + inhibitor",
+      "resolution_A": 2.95,
+      "n_ref_heavy": 32,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "rmsd_per_seed": [
+        0.706,
+        0.706,
+        0.674
+      ],
+      "rmsd_top": 0.706,
+      "rmsd_best": 0.674,
+      "rmsd_median": 0.706,
+      "rmsd_seed_spread": 0.032,
+      "dg_per_seed": [
+        -11.899,
+        -11.859,
+        -11.88
+      ],
+      "success_2A": true
+    },
+    {
+      "pdb_id": "1IEP",
+      "het": "STI",
+      "ligand_name": "4-(4-METHYL-PIPERAZIN-1-YLMETHYL)-N-[4-METHYL-3-(4-PYRIDIN-3-YL-PYRIMIDIN-2-YLAMINO)-PHENYL]-BENZAMIDE",
+      "note": "ABL1 + imatinib",
+      "resolution_A": 2.1,
+      "n_ref_heavy": 37,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "rmsd_per_seed": [
+        1.138,
+        1.04,
+        1.073
+      ],
+      "rmsd_top": 1.138,
+      "rmsd_best": 1.04,
+      "rmsd_median": 1.073,
+      "rmsd_seed_spread": 0.098,
+      "dg_per_seed": [
+        -12.644,
+        -12.686,
+        -12.682
+      ],
+      "success_2A": true
+    },
+    {
+      "pdb_id": "1M17",
+      "het": "AQ4",
+      "ligand_name": "[6,7-BIS(2-METHOXY-ETHOXY)QUINAZOLINE-4-YL]-(3-ETHYNYLPHENYL)AMINE",
+      "note": "EGFR + erlotinib",
+      "resolution_A": 2.6,
+      "n_ref_heavy": 29,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "rmsd_per_seed": [
+        5.869,
+        5.795,
+        1.765
+      ],
+      "rmsd_top": 5.869,
+      "rmsd_best": 1.765,
+      "rmsd_median": 5.795,
+      "rmsd_seed_spread": 4.104,
+      "dg_per_seed": [
+        -7.36,
+        -7.549,
+        -7.666
+      ],
+      "success_2A": false
+    },
+    {
+      "pdb_id": "4GIH",
+      "het": "0X5",
+      "ligand_name": "2,6-dichloro-N-{2-[(cyclopropylcarbonyl)amino]pyridin-4-yl}benzamide",
+      "note": "TYK2 (FEP-series reference structure)",
+      "resolution_A": 2.0,
+      "n_ref_heavy": 23,
+      "seeds": [
+        42,
+        43,
+        44
+      ],
+      "rmsd_per_seed": [
+        7.169,
+        7.187,
+        7.208
+      ],
+      "rmsd_top": 7.169,
+      "rmsd_best": 7.169,
+      "rmsd_median": 7.187,
+      "rmsd_seed_spread": 0.039,
+      "dg_per_seed": [
+        -7.875,
+        -7.906,
+        -7.866
+      ],
+      "success_2A": false
+    }
+  ]
+}
