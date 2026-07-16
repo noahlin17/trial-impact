@@ -1,4 +1,4 @@
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   GLU L   1C     15.710  16.961  18.787  0.00  0.00    +0.000 NA
@@ -961,7 +961,7 @@ ATOM    957  H   GLU H 146       7.106 -17.841  23.395  0.00  0.00    +0.000 HD
 ATOM    958  H   THR H 147       7.836 -18.234  17.729  0.00  0.00    +0.000 HD
 ATOM    959  H   THR H 147       4.460 -19.871  16.236  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CA  LEU L   6      -1.441  13.827  14.542  0.00  0.00    +0.000 C 
@@ -1173,12 +1173,12 @@ ATOM    206  H   TYR L  14J      4.375   6.892  29.773  0.00  0.00    +0.000 HD
 ATOM    207  H   ILE L  14K      2.378   5.969  38.864  0.00  0.00    +0.000 HD
 ATOM    208  H   ILE L  14K      3.708   6.951  41.283  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CB  LEU L   6      -1.491  12.340  13.883  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   ILE H  16       5.060  -8.354  17.881  0.00  0.00    +0.000 NA
@@ -1342,47 +1342,47 @@ ATOM    158  H   VAL H  31      11.191   2.615  13.804  0.00  0.00    +0.000 HD
 ATOM    159  H   MET H  32      11.522   1.624   9.547  0.00  0.00    +0.000 HD
 ATOM    160  H   LEU H  33      13.817  -1.922  10.611  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CA  VAL H  17       2.284 -10.585  21.041  0.00  0.00    +0.000 C 
 ATOM      2  CB  VAL H  17       2.856 -11.762  21.801  0.00  0.00    +0.000 C 
 ATOM      3  CG2 VAL H  17       4.083 -12.367  21.228  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CB  VAL H  17       2.864 -11.735  21.893  0.00  0.00    +0.000 C 
 ATOM      2  CG1 VAL H  17       3.773 -11.280  22.917  0.00  0.00    +0.000 C 
 ATOM      3  CG2 VAL H  17       1.736 -12.631  22.362  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CG1 VAL H  17       1.835 -12.843  22.156  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CA  SER H  20      -3.157  -4.149  18.741  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CB  SER H  20      -4.101  -3.131  19.512  0.00  0.00    +0.000 C 
 ATOM      2  OG  SER H  20      -3.799  -2.065  19.826  0.00  0.00    +0.000 OA
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CA  SER H  27       4.558   6.212  16.509  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CB  SER H  27       4.747   4.652  16.708  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CA  LEU H  33      15.381  -1.819   9.118  0.00  0.00    +0.000 C 
@@ -1477,12 +1477,12 @@ ATOM     89  H   GLU H  39      14.424  -7.529   3.193  0.00  0.00    +0.000 HD
 ATOM     90  H   GLU H  39      16.665 -11.039   6.475  0.00  0.00    +0.000 HD
 ATOM     91  H   LEU H  40      11.411  -8.502   6.281  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CD2 LEU H  33      18.424  -1.525   9.434  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CA  LEU H  40      12.303  -7.120   7.677  0.00  0.00    +0.000 C 
@@ -1816,12 +1816,12 @@ ATOM    328  H   LEU H  64      22.499  -1.971   3.872  0.00  0.00    +0.000 HD
 ATOM    329  H   LEU H  65      18.150  -1.633   4.561  0.00  0.00    +0.000 HD
 ATOM    330  H   VAL H  66      17.126   2.682   5.009  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CB  LEU H  40      11.005  -7.514   8.536  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   GLY H 150       0.878 -15.170  13.641  0.00  0.00    +0.000 NA
@@ -1890,7 +1890,7 @@ ATOM     63  H   GLN H 156      -0.323  -4.835  13.699  0.00  0.00    +0.000 HD
 ATOM     64  H   GLN H 156      -1.859  -5.133  14.377  0.00  0.00    +0.000 HD
 ATOM     65  H   VAL H 157       0.333  -2.803  18.464  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CA  VAL H 157       1.507  -1.647  19.783  0.00  0.00    +0.000 C 
@@ -2842,7 +2842,7 @@ ATOM    946  H   GLN H 244      36.626  10.724  16.751  0.00  0.00    +0.000 HD
 ATOM    947  H   PHE H 245      29.980  12.389  15.904  0.00  0.00    +0.000 HD
 ATOM    948  H   GLY H 246      28.865  14.048  14.958  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CB  VAL H 157       0.745  -0.297  19.726  0.00  0.00    +0.000 C 
@@ -2852,7 +2852,7 @@ ATOM      4  CG1 VAL H 157       1.427   0.915  19.779  0.00  0.00    +0.000 C
 ATOM      5  CG2 VAL H 157       0.958   0.388  18.404  0.00  0.00    +0.000 C 
 ATOM      6  CG2 VAL H 157      -0.672  -0.354  19.384  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/2ZFF/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   GLY I  54       9.370 -13.687   0.935  0.00  0.00    +0.000 NA

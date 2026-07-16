@@ -1,4 +1,4 @@
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/4GIH/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   THR A 890     -15.616 -14.358   2.346  0.00  0.00    +0.000 NA
@@ -2082,7 +2082,7 @@ ATOM   2078  H   SER A1101      -2.558   2.821 -33.290  0.00  0.00    +0.000 HD
 ATOM   2079  H   SER A1101      -3.445   5.097 -35.620  0.00  0.00    +0.000 HD
 ATOM   2080  H   GLN A1102      -4.230   4.731 -32.596  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/4GIH/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CA  GLN A1102      -5.063   6.671 -32.548  0.00  0.00    +0.000 C 
@@ -2844,12 +2844,12 @@ ATOM    756  H   ARG A1177     -32.729  -3.645 -32.866  0.00  0.00    +0.000 HD
 ATOM    757  H   ARG A1177     -36.000  -2.758 -32.136  0.00  0.00    +0.000 HD
 ATOM    758  H   ARG A1177     -35.592  -1.672 -30.886  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/4GIH/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CB  GLN A1102      -6.409   6.239 -33.173  0.00  0.00    +0.000 C 
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/4GIH/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  CG  GLN A1102      -6.208   6.258 -34.826  0.00  0.00    +0.000 C 

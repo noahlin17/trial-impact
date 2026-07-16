@@ -1,4 +1,4 @@
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/1UWH/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   ASP A 447      94.736  49.824  64.007  0.00  0.00    +0.000 NA
@@ -1474,7 +1474,7 @@ ATOM   1470  H   THR A 598      66.882  53.873  65.618  0.00  0.00    +0.000 HD
 ATOM   1471  H   THR A 598      67.796  53.447  67.062  0.00  0.00    +0.000 HD
 ATOM   1472  H   VAL A 599      69.609  57.205  66.732  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/1UWH/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   LEU A 612      63.539  60.536  67.891  0.00  0.00    +0.000 NA
@@ -2561,7 +2561,7 @@ ATOM   1081  H   LEU A 720      73.299  23.777  89.023  0.00  0.00    +0.000 HD
 ATOM   1082  H   LYS A 722      71.814  20.388  88.914  0.00  0.00    +0.000 HD
 ATOM   1083  H   LYS A 722      69.584  20.920  90.456  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/1UWH/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   ASP B 447      94.783  50.618  67.663  0.00  0.00    +0.000 NA
@@ -4036,7 +4036,7 @@ ATOM   1469  H   THR B 598     106.833  24.128  67.304  0.00  0.00    +0.000 HD
 ATOM   1470  H   THR B 598     106.105  25.098  65.886  0.00  0.00    +0.000 HD
 ATOM   1471  H   VAL B 599     109.221  27.720  66.118  0.00  0.00    +0.000 HD
 TER 
-REMARK  Name = /home/ubuntu/repos/trial-impact/trial-impact-service/validation/pose_fidelity/work/1UWH/receptor_clean.pdb
+REMARK  Name = receptor_clean.pdb
 REMARK                            x       y       z     vdW  Elec       q    Type
 REMARK                         _______ _______ _______ _____ _____    ______ ____
 ATOM      1  N   LEU B 612     113.318  22.134  64.377  0.00  0.00    +0.000 NA
