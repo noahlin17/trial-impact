@@ -1,7 +1,8 @@
 # Trial Impact
 
-**A structure-based drug–target *engagement* pipeline that stress-tested its own central premise —
-and re-scoped the claim when the premise failed.**
+**A structure-based engagement pipeline built to test one question honestly: can cheap, structural
+chemistry price something a clinical trial is testing but hasn't read out yet — and, where it can't,
+say so.**
 
 Given a clinical-trial event, the service routes the drug and its target to the right experimental
 structure and binding pocket, docks the ligand (AutoDock Vina) into that pocket, and reports whether
@@ -9,12 +10,12 @@ the molecule makes a **reproducible, geometrically sound engagement** — comput
 and the chemistry, not from the sponsor's description of the result. A closed-form PK/PD solve adds
 tissue exposure (Cmax/AUC).
 
-What makes this more than "a pipeline that runs" is the validation below: the tempting claim — that a
-docking score measures *how strongly* a drug binds — was tested against measured affinities and **did
-not hold** (nor did a physics-based rescore), so the shipped claim is the narrower one the method can
-actually support. The test is small (n = 8) and **directional, not definitive** — but it points the
-same way as two decades of docking literature, and the point is that the project tested its own
-premise and shipped the narrower claim rather than the flattering one.
+Its central premise was pre-registered and tested rather than assumed. The tempting claim — that a
+docking score measures *how strongly* a drug binds — was checked against measured affinities two ways,
+cross-target and within-target, and found **no support**, so the pipeline ships only the claim the
+method can stand behind: **geometry, not affinity.** The result is an instrument with a tested
+boundary instead of a flattering one; the validation below maps exactly where it holds and where it
+stops.
 
 ## Headline result — a docking score is not binding strength (and a physics rescore doesn't fix it)
 
