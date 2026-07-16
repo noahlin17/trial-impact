@@ -10,12 +10,14 @@ the molecule makes a **reproducible, geometrically sound engagement** — comput
 and the chemistry, not from the sponsor's description of the result. A closed-form PK/PD solve adds
 tissue exposure (Cmax/AUC).
 
-Its central premise was pre-registered and tested rather than assumed. The tempting claim — that a
-docking score measures *how strongly* a drug binds — was checked against measured affinities two ways,
-cross-target and within-target, and found **no support**, so the pipeline ships only the claim the
-method can stand behind: **geometry, not affinity.** The result is an instrument with a tested
-boundary instead of a flattering one; the validation below maps exactly where it holds and where it
-stops.
+Its central premise was pre-registered and tested rather than assumed. Binding strength is governed by
+the free energy of binding (ΔG) — the finding is *not* that this doesn't matter, it's that a **cheap**
+docking/rescoring score is a poor stand-in for it. Checked against measured affinities two ways,
+cross-target and within-target, the fast single-snapshot physics we ran **failed to recover ΔG** even
+where the setup favors it. That's a verdict on the *cheap estimator*, not on affinity: so the pipeline
+ships only what this method can stand behind today — **geometry, not affinity** — while more expensive
+physics (ensemble MM-GBSA, FEP) remains **untested here, not disproven**. The validation below maps
+exactly where that line sits.
 
 ## Headline result — a docking score is not binding strength (and a physics rescore doesn't fix it)
 
