@@ -159,8 +159,8 @@ efficacy rather than to safety or pharmacokinetics. Lack of efficacy is frequent
 statement about the target rather than about the molecule: a compound can bind well, engage
 its target, and still fail because modulating that target does not alter the disease.
 
-Docking does not address that question. It addresses whether the molecule binds — and my
-assumption is that the market is not usually wrong about *that*. So a pre-readout model built
+Docking does not address that question. It speaks, at most, to whether the molecule engages the
+target — and my assumption is that the market is not usually wrong about *that*. So a pre-readout model built
 on binding affinity alone would be answering the less decisive half of the question.
 
 The literature I am aware of (e.g. Nelson et al., *Nature Genetics*, 2015, and subsequent
@@ -200,7 +200,7 @@ is simply an explicit **retrospective known-readout re-simulation** — a benchm
 not a trade.
 
 **This is a first pass, not a dead end.** Engagement is confirmatory today, but it is the **first
-validated primitive** — a reproducible pocket route and docked pose — that every genuinely predictive
+tested primitive** — a reproducible pocket route and docked pose — that every genuinely predictive
 downstream piece consumes. The pieces that would actually address the *tested* unknowns (and so could
 generate edge) are set out in §4 (and the README's *What it would take to be edge-generating* table).
 Phase 1 is the *hypothesised* tier to build toward — a guess to test, not a result — because it is
@@ -237,8 +237,8 @@ showed **no evidence that Vina ranks affinity** across these anchors (mostly ATP
 while `ρ(−ΔG, heavy-atom count) = +0.45` (the score tracks ligand size, not Kd), and
 ligand-efficiency normalization did not rescue it (`ρ ≈ −0.02`). At n = 8 the CIs span zero, so this
 is directional rather than definitive, but it is enough to withhold a strength claim. `exp()` is monotonic, so the invalid
-transform was not the root cause; the docking/scoring layer itself cannot supply affinity
-information. The free-drug (`fu`) occupancy machinery remains in the pipeline for any future
+transform was not the root cause; the current docking/scoring layer did not provide evidence of
+usable affinity information in this small panel. The free-drug (`fu`) occupancy machinery remains in the pipeline for any future
 estimator that produces a real Kd, but the docking path leaves occupancy `None`.
 
 This is the clearest reason to treat the chemistry and the market model here as placeholders.

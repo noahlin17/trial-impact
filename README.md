@@ -40,7 +40,8 @@ pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a C
   molecules score "best" while being weaker binders).
 - **A physics-based MM-GBSA rescore does not rescue it** — same ρ, still size-confounded ([`validation/`](trial-impact-service/validation/README.md), reproduce with `make validate`).
 
-The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md)
+The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md) — native-ligand
+**self-docking** into the native holo pocket, so a geometry/tool-reproduction control, not a prospective test —
 redocked **5/7 native ligands within 2 Å (71%), median top-pose RMSD 0.71 Å**. This clears the first of
 its two pre-registered criteria (redock success ≥ 60%) but **not the second**: inter-seed agreement does
 *not* separate correct from incorrect poses (4GIH is a confidently-converged *wrong* pose — 0.04 Å seed
@@ -86,7 +87,7 @@ public preclinical information, the pipeline as-is surfaces **nothing un-priced*
 is an explicit **retrospective known-readout re-simulation**.
 
 This is deliberately a **first pass**: engagement is not itself net-new information, but it is the
-**first validated primitive** — a reproducible pocket route + docked pose — that the genuinely
+**first tested primitive** — a reproducible pocket route + docked pose — that the genuinely
 predictive pieces build on (calibrated affinity, structure-derived human PK, target-validation /
 genetics, a calibrated P(success)). Why an event's *phase* is only an information-timing distinction,
 why Phase 1 is the *hypothesised* tier to build toward, and what net-new data an edge would actually
@@ -363,7 +364,7 @@ known-readout benchmark). The *hypothesised* payoff is to build toward Phase 1 �
 least public data, and what it validates is chemistry-grounded (human PK, tolerability, occupancy),
 so those quantities *might* be estimable from structure before the readout, unlike the disease
 biology Phase 2/3 tests. That is a hypothesis, not a result — the reproducible pose is the first
-validated primitive the predictive pieces consume ([Next steps](#next-steps)), and the rest is
+tested primitive the predictive pieces consume ([Next steps](#next-steps)), and the rest is
 unbuilt.
 
 **The practical upshot.** The *binding* half is defensible today for a reversible small molecule
