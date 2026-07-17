@@ -174,7 +174,8 @@ not necessarily to carry the argument.
 ### Why a weak signal might still be usable
 
 By Grinold's fundamental law, `IR ≈ IC × √breadth`: a weak but genuine signal applied to many
-decisions can be worth more than a strong one applied to few. A single input does not need to
+decisions can be worth more than a strong one applied to few — though correlated catalysts and real
+transaction costs pull the achievable number well below the arithmetic ([THESIS §4.2](THESIS.md)). A single input does not need to
 be a *great* signal on its own but **good enough** to meaningfully increase returns over a large enough sample size. 
 
 It also says where to look: specialist coverage often concentrates on a few high-profile
