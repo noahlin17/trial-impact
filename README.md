@@ -83,6 +83,7 @@ criterion.
 ***Can* claim** ✅ reproducible pocket routing (covalent-tether → co-crystal → fpocket → blind tiers, 
 recorded in `docking_box.mode`); directional PK/PD exposure; and an auditable, self-falsifying validation 
 of its own scoring.
+
 ***Cannot* claim** ❌ absolute affinity / Kd; target occupancy; that docking ranks cross-target
 potency; or a validated market prediction (the market/stock layer further down is an **illustrative,
 un-backtested downstream demo**, not a result). 
