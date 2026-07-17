@@ -288,8 +288,8 @@ produce an encouraging and false result. Four problems seem material:
 
 **North Star.** Intake a Phase 1 trial's design plus *all* public information — structure, target,
 indication, planned dose, and any published in-vitro, PK, or prior computational results — and
-estimate a quantity the trial is *testing but has not yet read out* (human PK, tolerability, human
-occupancy) *before* it is published. The estimate only counts if it makes our probability **more
+estimate a quantity the trial is *testing but has not yet read out* (human PK, tolerability, MTD,
+human occupancy) *before* it is published. The estimate only counts if it makes our probability **more
 accurate than the one already in the price**: recreating a disclosed in-vitro potency, a reported PK
 value, or a prior docking result adds nothing (those are public and, as a rule, already priced), so
 the bar is *price, not publication* — the harder and more valuable case is resolving genuine
