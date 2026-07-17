@@ -16,7 +16,7 @@ and the pose comes back (5/7 within 2 Å) — a real, if early, result to build 
 binding (ΔG)**. We never expected the raw AutoDock Vina score to *be* ΔG (literature is clear it's a
 fast, size-correlated heuristic, not a free-energy method). The bet we actually tested was that a **MM-GBSA rescore on top of the Vina pose** could recover binding strength. Checked against measured
 affinities two ways (cross-target and within-target), it **failed to recover ΔG** even where the setup
-favors it (inconsistency / system dependence warned about in MM-GBSA literature). That is a verdict on the
+favors it (consistent with the inconsistency / system-dependence the MM-GBSA literature warns about). That is a verdict on the
 *low-lift estimator*, not on affinity itself:
 recovering ΔG cleanly *likely* needs materially more compute (such as relative free-energy perturbation —
 the within-target series we used (Tyk2) is in fact a standard FEP benchmark), but that hypothesis 
