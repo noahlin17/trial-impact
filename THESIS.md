@@ -86,6 +86,13 @@ days with agent assistance. If a ΔG for a given trial is cheaply computable by 
 reasonable to assume it is largely in the price already — though "cheap to compute" is not the same
 as "priced in," a distinction §4 returns to.
 
+There is a second, sharper reason. By the time a molecule reaches Phase 1 its sponsor has not merely
+*computed* its binding but *measured* it — co-crystal structures, biophysical affinities, animal PK and
+tox — so a single-snapshot docking score is redundant to private data that is strictly better, not just
+cheaper. Conditioning on "reached Phase 1" also pre-selects molecules that all look good on binding,
+which compresses the between-candidate variance in any chemistry feature toward zero; the outcome
+variance that remains lives in target validity and human translation, not in whether the ligand binds.
+
 So I do not think the docking is where an edge would come from. Candidates that seem more
 durable to me, in rough order of how much I believe them:
 

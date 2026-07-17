@@ -160,6 +160,10 @@ That cost argument also cuts against the project. A signal's value tends to deca
 of reproducing it, and the cost here is low: Vina is free and has been available since 2010, RDKit, the PDB, 
 AlphaFold DB, PubChem and Open Targets are all free; the pipeline was built by orchestrating a coding agent. 
 If a ΔG is cheaply computable by anyone, it is reasonable to assume it is largely in the price already.
+It is also not only a matter of cost: by Phase 1 the sponsor already holds *measured* chemistry (crystal
+structures, binding assays, animal PK/tox) that beats any docking score, and the molecules that reach this
+stage are pre-selected to look good on binding — so chemistry carries little discriminating signal here
+regardless of how cheap it is.
 
 So the edge, if there is one, is not purely chemistry. It would be in producing a **better-calibrated estimate 
 of P(success)** than the one implied by the market, and trading the difference. 
