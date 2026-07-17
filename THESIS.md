@@ -19,7 +19,11 @@ evidence, from first principles, or simply guessing, I have tried to say so.
 **Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
 The central falsifiable claim this project tests — *does a **low-lift** docking score rank binding
 strength?* — was tested from two angles: an 8-drug cross-target panel and a 13-ligand within-target
-Tyk2 series. Both were negative: the cheap score did not recover measured affinity. The cross-target panel is the *expected* regime failure — raw docking scores are
+Tyk2 series. Both were negative: the cheap score did not recover measured affinity. Raw Vina being a
+crude, size-correlated heuristic was the *expected* prior, not the surprise — a fast docking objective
+is not a free-energy method; the bet actually under test was that a **cheap single-snapshot MM-GBSA
+rescore** on top of the Vina pose could recover binding strength, and that is the hypothesis that failed.
+The cross-target panel is the *expected* regime failure — raw docking scores are
 not calibrated across different receptors, and a narrow affinity range against a wide size range lets
 size dominate almost by construction: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size,
 ρ ≈ +0.45), and a CPU MM-GBSA rescore did not improve on it (ρ = −0.24, still size-tracking); at n = 8
@@ -37,8 +41,11 @@ computed. Together, the two ranking negatives — one cross-target (expected), o
 discriminating one) — and a geometry result that clears its redock-success criterion define the
 boundary: the low-lift methods are **sufficient to reproduce geometry** (a real first step to build
 on) but **not to recover ΔG cheaply**. That is a verdict on the cheap estimator, not on affinity —
-recovering ΔG plausibly needs materially more compute (full-GPU ensemble MM-GBSA or FEP), which is a
-**hypothesis, not a result**, and untested here. Pose fidelity does not rescue affinity.
+recovering ΔG plausibly needs a materially heavier, *different-class* method: relative FEP is the
+literature-supported candidate for a congeneric series like this Tyk2 set (itself a standard FEP
+benchmark), whereas simply spending more compute on the same class (ensemble/multi-snapshot MM-GBSA) is
+not a reliable fix. Either way that is a **hypothesis, not a result**, and untested here. Pose fidelity
+does not rescue affinity.
 
 ---
 

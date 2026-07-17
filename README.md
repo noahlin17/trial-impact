@@ -13,11 +13,14 @@ Its central premise was pre-registered and tested rather than assumed, and it sp
 **low-lift** methods here proved **sufficient to reproduce binding geometry**: redock a native ligand
 and the pose comes back (5/7 within 2 Å) — a real, if early, result to build directly on. They were
 **not** sufficient to get *binding strength* on the cheap: affinity is governed by the free energy of
-binding (ΔG), and a fast single-snapshot docking/rescore is a poor stand-in for it. Checked against
-measured affinities two ways (cross-target and within-target), it **failed to recover ΔG** even where
-the setup favors it. That is a verdict on the *low-lift estimator*, not on affinity itself:
+binding (ΔG). We never expected the raw AutoDock Vina score to *be* ΔG — the literature is clear it's a
+fast, size-correlated heuristic, not a free-energy method; the bet we actually tested was that a **cheap
+MM-GBSA rescore on top of the Vina pose** could recover binding strength. Checked against measured
+affinities two ways (cross-target and within-target), it **failed to recover ΔG** even where the setup
+favors it — a shortfall itself consistent with the MM-GBSA literature. That is a verdict on the
+*low-lift estimator*, not on affinity itself:
 recovering ΔG cleanly *likely* needs materially more compute (such as relative free-energy perturbation —
-the within-target series we used (Tyk2) is in fact a standard FEP benchmark) but that hypothesis 
+the within-target series we used (Tyk2) is in fact a standard FEP benchmark), but that hypothesis 
 is untested here. The geometry win is the foundation to build on. Real impact needs it pushed 
 prospectively (novel ligands, blind/cross-docking) and paired with heavier affinity methods that 
 would have to earn the claim on the same pre-registered terms.
@@ -84,10 +87,12 @@ clinical events only because ClinicalTrials.gov is the available event feed. Bec
 public preclinical information, the pipeline as-is surfaces **nothing un-priced** — a later-phase run
 is an explicit **retrospective known-readout re-simulation**.
 
-This is deliberately a **first pass**: engagement is not itself net-new information, but it is the
-**first tested primitive** — a reproducible pocket route + docked pose — that the genuinely
-predictive pieces build on (calibrated affinity, structure-derived human PK, target-validation /
-genetics, a calibrated P(success)). Why an event's *phase* is only an information-timing distinction,
+This is deliberately a **first pass**: for a molecule already in Phase 1, the docking is *expected* to
+pass — engagement is a proven entry criterion, so "does it bind" is essentially a given and carries no
+un-priced information. So docking earns its place not as a signal but as the **first tested primitive** —
+a reproducible pocket route + docked pose — that the genuinely predictive pieces build on (calibrated
+affinity, structure-derived human PK, target-validation / genetics, a calibrated P(success)), and as the
+honest tool-validation control (the pose-fidelity test above). Why an event's *phase* is only an information-timing distinction,
 why Phase 1 is the *hypothesised* tier to build toward, and what net-new data an edge would actually
 require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) and
 [What it would take to be edge-generating](#what-it-would-take-to-be-edge-generating--improve-on-the-markets-estimate-dont-re-derive-the-knowns).
