@@ -397,6 +397,10 @@ than a strong edge applied to few. That is the argument for why a commoditized i
 still be useful: it does not need to be a good signal, it needs to be a slightly informative
 one that can be produced at scale. Scale is what the agent sandbox provides.
 
+Breadth is necessary twice over: a single binary readout cannot score a probability, so calibration
+(§4.4) is only measurable across many events — breadth is what lets you *detect* skill at all, not
+merely amplify it once found.
+
 Two caveats keep this from reading as a free lunch. The law assumes **independent** decisions,
 and biotech catalysts are not: outcomes cluster by mechanism, indication and macro regime, so
 correlated bets push *effective* breadth well below the raw event count. And a signal is never

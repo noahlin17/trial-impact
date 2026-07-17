@@ -190,6 +190,8 @@ By Grinold's fundamental law, `IR ≈ IC × √breadth`: a weak but genuine sign
 decisions can be worth more than a strong one applied to few — though correlated catalysts and real
 transaction costs pull the achievable number well below the arithmetic ([THESIS §4.2](THESIS.md)). A single input does not need to
 be a *great* signal on its own but **good enough** to meaningfully increase returns over a large enough sample size. 
+And because a single binary outcome can't score a probability, breadth is also what makes the edge
+*measurable* in the first place, not just larger.
 
 It also says where to look: specialist coverage often concentrates on a few high-profile
 catalysts, so the **less-covered tail** is where a systematic estimate is most likely to add
