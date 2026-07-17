@@ -273,6 +273,18 @@ The **analysis view** (`GET /analysis`,
 cross-run charts (ΔG diagnostic vs PoS delta, engagement counts), a sortable table, and a per-run
 drill-down with the 3D pose, PK/PD exposure curve, and a reasoning trace for each PoS delta.
 
+Raw artifacts: [`sim_kras_sotorasib.json`](results/sim_kras_sotorasib.json) and
+[`sim_cftr_ivacaftor.json`](results/sim_cftr_ivacaftor.json), plus the
+[`KRAS`](results/dashboard_kras_6OIM.html) and [`CFTR`](results/dashboard_cftr_6O2P.html) status
+dashboards. Regenerate with the pinned stack:
+
+```bash
+cd trial-impact-service
+conda-lock install --name trialsim conda-sim.lock.yml
+python regen_artifacts.py
+# or a live Devin session: python run_real.py --watch
+```
+
 ---
 
 ## Chemistry & biophysical scope

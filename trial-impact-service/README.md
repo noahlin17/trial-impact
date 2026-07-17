@@ -58,7 +58,7 @@ structure (UniProt → experimental PDB or mmCIF, else AlphaFold), fetch the lig
 binding free energy ΔG reported as mean ± sd (the scalar only — the pose is *not* returned; see
 Limitations), then solve the PK/PD model in **closed form**
 (Bateman) for tissue exposure (Cmax/AUC). The ΔG is reported as a geometric target-engagement
-classification, **not** a calibrated affinity — no absolute Kd or occupancy (issue #4). That needs a full sandbox that
+classification, **not** a calibrated affinity — no absolute Kd or occupancy. That needs a full sandbox that
 can build a heavy native scientific
 stack (the canonical conda-lock `trialsim` env — see Simulation environment), pull structures, and iterate on failures — exactly what a Devin session is.
 One session per event keeps runs isolated, independently retryable, and observable
@@ -82,8 +82,8 @@ result contract, reproducibility, corpus — is model-agnostic. Two ship today:
 
 | Estimator id | What it is |
 |---|---|
-| `vina-docking-pkpd@3` | The real structure-based docking + PK/PD pipeline (the default). Bumped `@1→@2` when pocket-aware routing changed the ΔG numbers, then `@2→@3` when issue #4 changed the result semantics (no Kd, no Kd-derived occupancy, a geometric `binding_engagement` classification). |
-| `ligand-efficiency-baseline@2` | A deliberately naive, **structure-free control**: ΔG ≈ 0.3 kcal/mol × heavy-atom count, run through the same PK/PD model. Not a physical model — a floor the docking must beat to justify its cost. Reported at low confidence and flagged in `warnings`; `binding_engagement` is `no-structure`. Bumped `@1→@2` with the #4 semantics change. |
+| `vina-docking-pkpd@3` | The real structure-based docking + PK/PD pipeline (the default). Bumped `@1→@2` when pocket-aware routing changed the ΔG numbers, then `@2→@3` when result semantics changed (no Kd, no Kd-derived occupancy, a geometric `binding_engagement` classification). |
+| `ligand-efficiency-baseline@2` | A deliberately naive, **structure-free control**: ΔG ≈ 0.3 kcal/mol × heavy-atom count, run through the same PK/PD model. Not a physical model — a floor the docking must beat to justify its cost. Reported at low confidence and flagged in `warnings`; `binding_engagement` is `no-structure`. Bumped `@1→@2` with the semantics change. |
 
 The **comparison is the product**, not any single model's number: `/analysis` shows an
 estimator head-to-head for any trial scored by more than one estimator (and
@@ -144,7 +144,7 @@ compare_estimators.py  # race one trial through 2+ estimators head-to-head (real
 demo_e2e.py         # offline walkthrough of the whole pipeline (fakes Devin; no API key)
 poll_watch.py       # poll in-flight sessions until they settle
 verify_docking_box.py  # measures what fraction of the receptor the docking box contains
-                       # — reproduces the coverage figures behind open issue #2
+                       # — reproduces the coverage figures behind the blind-box fallback
 wsgi.py             # gunicorn / dev-server entrypoint
 tests/test_app.py   # end-to-end flow with in-memory fakes (offline)
 ```
@@ -278,18 +278,18 @@ addressed; ○ = documented, future work.)
 - **Small molecules only** ○ — the docking path models small-molecule drugs;
   biologics/antibodies can't be docked and are out of scope.
 - **Docking is fast & approximate** ○ — AutoDock Vina is an empirical scoring
-  function, not a rigorous binding free-energy method. FEP / MM-GBSA are more
-  accurate but far heavier; ΔG here is a *relative* signal, not a measured affinity.
-- **Free-drug occupancy machinery landed (issue #1), now dormant for docking (issue #4)** ◑ —
+  function, not a rigorous binding free-energy method; ΔG here is retained as a
+  diagnostic, not a measured affinity. See [`validation/README.md`](validation/README.md)
+  for the calibration result.
+- **Free-drug occupancy machinery is now dormant for docking** ◑ —
   `_pkpd_series` can evaluate `occ = C_free / (C_free + Kd)` with `C_free = fu · C` (only
   **unbound** drug engages a target), and `resolve_fu(drug, fu_hint)` resolves `fu` from an
   explicit hint > a small curated plasma-protein-binding table > unknown (`fu = 1.0` with a
-  warning). But occupancy requires a Kd, and issue #4's 8-anchor calibration showed the Vina
-  score cannot supply one — so **the docking estimator now reports `target_occupancy_pct = None`**
-  and never enters the occupancy branch. The machinery is kept intact for any future estimator
-  that produces a calibrated Kd; a legacy artifact that *does* carry a stored Kd still
-  reconstructs its occupancy curve. Exposure (Cmax, AUC) is Kd-independent and is retained. This
-  is why the market model below has **no occupancy term** any more.
+  warning). But the docking estimator does not emit a calibrated Kd, so it now reports
+  **`target_occupancy_pct = None`** and never enters the occupancy branch. The machinery is kept
+  intact for any future estimator that produces a calibrated Kd; a legacy artifact that *does*
+  carry a stored Kd still reconstructs its occupancy curve. Exposure (Cmax, AUC) is Kd-independent
+  and is retained. This is why the market model below has **no occupancy term** any more.
 - **`druglikeness_flag` is a drug-likeness heuristic, and is no longer priced** ✅ —
   It is `≥2 Lipinski Rule-of-5 violations`
   (`mw>500, logp>5, hbd>5, hba>10`). Ro5 predicts **oral absorption and permeability**; it
@@ -301,31 +301,13 @@ addressed; ○ = documented, future work.)
   not priced* and contributes `0.0` to the delta). A real safety signal would need a
   structural-alert model (PAINS / Brenk) or a tox QSAR — deliberately **not** faked here.
 - **ΔG was consumed as an absolute Kd — resolved by re-scoping docking to geometric engagement** ✅ —
-  The code used to convert the Vina score to an absolute
-  `Kd = exp(ΔG/RT)` and branch on hard thresholds (`Kd ≤ 100 nM`, `ΔG ≤ −9.0`). An 8-anchor
-  calibration through this exact pipeline showed the raw score does **not** rank measured affinity
-  (Spearman `ρ(−ΔG, pKd) = −0.24`) and instead tracks ligand size (`ρ(−ΔG, heavy-atoms) = +0.45`);
-  ligand-efficiency normalization did not rescue it, and `exp()` being monotonic means no
-  post-transform can recover affinity the score lacks. **Fix (implemented):** the docking
-  estimator no longer emits an absolute Kd or a Kd-derived occupancy (both `None`); the ΔG is kept
-  as a clearly-labelled relative *score* and the uncalibrated `exp(ΔG/RT)` value survives only in
-  `provenance.vina_pseudo_kd_nM` with a "NOT an affinity" note. `classify_engagement` maps the run
-  to a geometric `binding_engagement` (`experimental-site` / `experimental-site-noisy` /
-  `predicted-pocket` / `no-site` / `no-structure` / `failed`), gated on a reproducible multi-seed
-  pose (sd ≤ 0.75). A cross-target relative binding *band* is deliberately **not** shipped (it
-  would be size-in-disguise). Recovering a real strength signal needs a different scorer class
-  (gnina CNN rescoring / MM-GBSA / FEP) — added as a new estimator, not faked now.
-- **A physics rescorer (MM-GBSA) was tested and also failed — so no strength estimator ships** ✅ —
-  the natural next move was to rescore the docked poses with single-snapshot MM-GBSA (OpenMM /
-  ff14SB / GAFF-2.11 / OBC2 implicit solvent, ligand minimized in a rigid receptor), which adds the
-  electrostatics + desolvation terms Vina omits. Evaluated on the **same 8 anchors** (see
-  [`validation/`](validation/README.md)): MM-GBSA does **not** beat Vina and does **not** rank
-  measured affinity — Spearman ρ(MM-GBSA, pKd) = **−0.24** (95% CI [−0.93, +0.62]) vs ρ(Vina) =
-  −0.24, and both still track ligand size (ρ ≈ +0.4). Applying the same discipline used on Vina, the
-  cheap MM-GBSA is **not shipped as a binding-strength estimator** (that would repeat issue #4's
-  overclaim). The honest conclusion: cross-target affinity ranking needs either a congeneric
-  same-target series or far more expensive sampling (explicit-solvent MM-GBSA ensembles / FEP) —
-  documented, not forced. Regenerate with `make validate`.
+  The docking estimator no longer emits an absolute Kd or Kd-derived occupancy (both `None`); it
+  keeps the score as clearly-labelled provenance and classifies reproducible geometric engagement.
+  See [`validation/README.md`](validation/README.md) for the calibration result.
+- **A physics rescorer (MM-GBSA) is not shipped as a strength estimator** ✅ —
+  single-snapshot MM-GBSA remains a validation path rather than a production estimator. See
+  [`validation/README.md`](validation/README.md) for the calibration result; regenerate with
+  `make validate`.
 - **Generic PK constants** ○ — `ka`, `Vd`, `CL` are fixed physiological placeholders
   and `Kp` is order-of-magnitude, not drug-specific. There is also **no bioavailability
   term** (`F` is implicitly 1), which flatters oral exposure, and `cmax_ng_ml` is a
@@ -450,7 +432,7 @@ addressed; ○ = documented, future work.)
   seed set** (`_derive_seeds` → 42, 43, 44; the *set* is fixed, so runs stay bit-reproducible),
   and `dock_replicates` → `summarize_dg` returns mean ΔG, sample sd and n. The result carries
   `binding_affinity_kcal_mol` (mean), `binding_affinity_sd_kcal_mol` and `replicates`; **no
-  absolute Kd is derived** from the mean ΔG any more (issue #4); the sd feeds `_dg_noise_penalty`
+  absolute Kd is derived** from the mean ΔG any more; the sd feeds `_dg_noise_penalty`
   (0.5·sd, capped at 0.2) into `confidence` **and** gates the `binding_engagement` classification
   (an experimentally-resolved site with sd ≤ 0.75 is a *reproducible* `experimental-site`), so
   docking noise propagates into the PoS delta and the engagement label instead of being hidden. The observed spread here is small (0.010 / 0.052 kcal/mol).
@@ -466,7 +448,7 @@ addressed; ○ = documented, future work.)
   that breakdown, so they can never disagree. But the weights (0.5 / 0.2 / 0.15…)
   and thresholds are magic numbers. The real fix is **backtesting** against
   historical biotech readouts and actual next-day price moves to fit them.
-- **Docking is priced only as a capped geometric corroborator (issue #4)** ✅ — the market model
+- **Docking is priced only as a capped geometric corroborator** ✅ — the market model
   no longer has an affinity-strength term or an occupancy term. Because the Vina score cannot
   rank affinity, `pos_breakdown` prices only a small, capped **+0.05** bonus when
   `binding_engagement == "experimental-site"` (the ligand docked into an experimentally-resolved
@@ -477,7 +459,7 @@ addressed; ○ = documented, future work.)
 - **Missed-trial asymmetry** ✅ — fixed. Modifiers are now applied by meaning
   (efficacy corroboration only strengthens a win) rather than mirrored by the readout
   sign, which previously let the drug-likeness flag reduce the downside of a *failed*
-  trial. The met-trial path is unchanged. (The flag itself is now unpriced — issue #3 —
+  trial. The met-trial path is unchanged. (The flag itself is now unpriced —
   so it can no longer move any call regardless of sign.)
 - **Spurious alerts on `unknown` outcomes** ✅ — fixed, and this one was live on the
   *common* path. Every term in `pos_breakdown` is a modifier on a clinical readout, but
@@ -485,7 +467,7 @@ addressed; ○ = documented, future work.)
   plus a (then-priced) drug-likeness flag scored `-0.15 × 0.95 = -0.1425`, which clears
   the `0.10` market-moving threshold and emits a **"down" call on a trial that has reported
   nothing** — a directional signal derived purely from the drug's Lipinski violations.
-  (That flag is now unpriced entirely — issue #3 — so this path is doubly closed.)
+  (That flag is now unpriced entirely, so this path is doubly closed.)
   And `unknown` is the *default* for every trial the watchlist has not enriched, so this
   was the majority path in production, not an edge case. The modifiers are now gated on
   `has_readout`, so no readout means no call. Both published runs are `met`, so their
