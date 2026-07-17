@@ -20,7 +20,7 @@ free-energy method).
 > already exists, and because engagement is public preclinical information, the docking geometry surfaces 
 > **nothing un-priced**. The chemistry is **confirmatory, not predictive** of the trial's real unknowns. 
 > The genuinely predictive axes a full P(success) would combine are largely independent of docking
-> (target-validation / genetics, structure-derived PK), or like calibrated affinity, would start from a fetched
+> (target-validation / genetics, structure-derived PK), or — like calibrated affinity — would start from a fetched
 > experimental complex rather than our Vina run.
 
 The core hypothesis we tested was whether a **MM-GBSA rescore on top of the Vina pose** could recover 
@@ -89,11 +89,13 @@ un-backtested downstream demo**, not a result).
 
 > **North Star.** Take a Phase 1 trial's design plus public information and produce a model
 > estimate of a quantity the trial is *testing but has not yet read out* (human PK, tolerability / MTD,
-> human target occupancy, etc.). It is useful only if it improves on the market's *own* estimate — the bar
-> is *price, not publication*, since re-deriving a disclosed value the market already weights correctly adds
-> nothing. **None of this is built today**. The full statement — why the output is a probabilistic prior
-> that still needs a point-in-time backtest, and why it generalises to later phases only in *form*
-> (Phase 2/3 test disease biology the chemistry does not model) — is in [THESIS §4](THESIS.md).
+> human target occupancy, etc.) to derive a P(success) more accurately than the market's own estimate.
+> More detail below and in [THESIS §4](THESIS.md).
+
+> *None of this is built today*: the statement above is the goal, not a result. The bar is deliberately
+> price, not publication. Re-deriving a value the market already weights correctly adds nothing, so the only
+> useful output is one that beats the market's own implied estimate, which still requires a point-in-time
+> backtest this project has not run.
 
 ---
 
@@ -115,7 +117,7 @@ Served locally from the two committed result artifacts (`results/sim_*.json`) in
 app — no re-dock. Both dashboards surface engagement, not affinity (ΔG as a labelled diagnostic).
 
 **`/status`** — one row per trial: the geometric engagement classification, the docking ΔG
-diagnostic, and the (illustrative) price calls.
+(diagnostic), and the (illustrative) price calls.
 
 ![Status dashboard](docs/dashboard-status.png)
 
@@ -135,74 +137,57 @@ engagement-count and PoS, not Kd/occupancy; occupancy is shown only when a calib
 > *could* eventually feed. The tested core of the project is the biophysics (in)validation.
 
 The goal is **predictive intelligence in the window between a trial's design becoming public and
-its readout** — using computational chemistry (and, over time, the other structure-derived axes
-below) to estimate a quantity the trial is *testing but has not yet reported*, before the outcome
-is known. That estimate is scored against the realized outcome, entered into a probability model as
-one feature among several, and accumulated into a dataset. Reacting to a readout *after* it prints
-is a possible secondary use — the label is public within minutes and priced quickly, and says
-little about whether the molecule *should* have been expected to work — but it is not the aim; the
-value is in the estimate formed *ahead* of the event.
+its readout**, using computational chemistry (and, over time, the other derived axes below) to estimate 
+a quantity the trial is *testing but has not yet reported*, before the outcome is known. That estimate 
+is entered into a probability model as one feature among several to predict the implied P(success), 
+used to estimate Δ price.
 
 The reason to attempt it now is cost. Structure-based chemistry per trial has historically
 required a computational chemist. An agent sandbox does it per event, in minutes, for roughly
-the cost of the API calls. Worth being precise about what AI cheapened here, mostly the building and 
-running of the pipeline. An agent, not a specialist, wired the toolchain and validation harness together
-— which lowers the marginal cost of applying chemistry at breadth without making any single calculation 
-more accurate. On the science, AI structure prediction (AlphaFold) eases the geometry rung, but the 
-affinity rung we stalled on is not yet solved by it — ML scorers/potentials (gnina, ANI/MACE) are a 
-plausible lighter-lift alternative to FEP, but untested here (the same "hypothesis, not a result" bucket).
+the cost of the API calls. 
+
+> Worth being precise about what AI cheapened here, mostly the building and running of the pipeline.
+> An agent, not a specialist, wired the toolchain and validation harness together (which lowers the marginal
+> cost of applying chemistry at breadth). On the science, AI structure prediction (AlphaFold) eases the
+> geometry rung, but the affinity rung we stalled on is not yet solved by it. ML scorers/potentials (gnina,
+> ANI/MACE) are a plausible lighter-lift alternative to FEP, but untested here, so reside in the same
+> "hypothesis, not a result" bucket.
 
 ### The chemistry is unlikely to be an edge on its own
 
 That cost argument also cuts against the project. A signal's value tends to decay with the cost
-of reproducing it, and the cost here is low: Vina is free and has been available since 2010,
-RDKit, the PDB, AlphaFold DB, PubChem and Open Targets are all free, and this pipeline was
-assembled in days with agent assistance. If a ΔG is cheaply computable by anyone, it is
-reasonable to assume it is largely in the price already.
+of reproducing it, and the cost here is low: Vina is free and has been available since 2010, RDKit, the PDB, 
+AlphaFold DB, PubChem and Open Targets are all free; the pipeline was built by orchestrating a coding agent. 
+If a ΔG is cheaply computable by anyone, it is reasonable to assume it is largely in the price already.
 
-So the edge, if there is one, is not in the chemistry. It would be in producing a
-**better-calibrated estimate of P(success)** than the one implied by the market, and trading the
-difference:
+So the edge, if there is one, is not purely chemistry. It would be in producing a **better-calibrated estimate 
+of P(success)** than the one implied by the market, and trading the difference. 
 
-> edge = our P(success) − the market's implied P(success)
+The chemistry is one input to that estimate. Incorporating more meaningful signal should improve the estimate 
+(especially any signal underused by a meaningful share of the market), but its job is to add incremental information, 
+not to necessarily carry the argument
 
-The chemistry is one input to that estimate. Its job is to add incremental information, not to
-carry the argument.
+> The assumption most likely to be fatal is not "can we compute the chemistry," but "does the chemistry 
+> carry information the market does not already have," which is less tested. 
 
 ### Why a weak signal might still be usable
 
 By Grinold's fundamental law, `IR ≈ IC × √breadth`: a weak but genuine signal applied to many
-decisions can be worth more than a strong one applied to few. A commoditized input does not need to
-be a good signal — only a slightly informative one produced at scale, which is what the sandbox
-provides. The bar is not a *great* signal but a **good-enough aggregate**: no single input has to be
-strong, only the full set of factors has to make our P(success)/EV estimate more accurate than the
-market-implied one. It also says where to look: specialist coverage concentrates on a few high-profile
+decisions can be worth more than a strong one applied to few. A single input does not need to
+be a *great* signal on its own but **good enough** to meaningfully increase returns over a large enough sample size. 
+
+It also says where to look: specialist coverage often concentrates on a few high-profile
 catalysts, so the **less-covered tail** is where a systematic estimate is most likely to add
-something — a coverage argument, not an insight one. (The illustrative IR arithmetic is in
-[THESIS §4.2](THESIS.md).)
-
-### What this repository does and does not establish
-
-It establishes that the pipeline runs, that its outputs are **reproducible from source**, and that
-its failure modes are visible rather than silent — a precondition for testing the thesis, not
-evidence for it. Both the chemistry and market model are placeholders: docking is now pocket-routed
-(covalent tether → co-crystal → fpocket → blind, per `docking_box.mode`) but the 8-anchor calibration 
-killed the affinity reading (headline above), the PK model is generic, and the market model is uncalibrated
-and rules-based.
-
-The assumption most likely to be fatal is not "can we compute the chemistry," which works, but "does
-the chemistry carry information the market does not already have," which is untested. A baseline of
-phase × indication base rates plus a free genetic-association score is probably a strong prior on its
-own, and the physics must beat it — a cheap experiment that should run before any further physics.
+something — a coverage argument, not an insight one.
 
 ### The wider view
 
 A broader and more speculative hypothesis motivates the longer-term direction: AI tooling may be
 shifting the *outcome distribution* of drug development while pricing stays anchored to historical
-base rates — which would move the most valuable target from *the molecule* to *the trial design* the
-watcher already ingests. It is held as a hypothesis, not a finding. The full argument — the pre-readout
+base rates, which would move the most valuable target from *the molecule* to *the trial design* the
+watcher already ingests. It is held as a hypothesis, not a finding. The full argument (the pre-readout
 case, what a credible backtest would require, where it is weakest, and the order its assumptions
-could be falsified — is in **[THESIS §5–6](THESIS.md)**.
+could be falsified) is in **[THESIS §5–6](THESIS.md)**.
 
 ---
 
@@ -235,8 +220,8 @@ Each has its own README with full detail.
 The simulation is a real pipeline rather than a stub: fetch the target structure
 (UniProt → experimental PDB or mmCIF, else AlphaFold), fetch the ligand (PubChem → SMILES →
 RDKit 3D), dock with AutoDock Vina across a fixed seed set for a mean ΔG ± sd, then solve a
-PK/PD model in closed form (Bateman) for tissue exposure (Cmax/AUC). The docking ΔG is reported
-as a geometric engagement classification, not a calibrated affinity (issue #4).
+PK/PD model in closed form (Bateman) for tissue exposure (Cmax/AUC). The reported 
+docking ΔG (diagnostic) is a geometric engagement classification (not a calibrated affinity).
 
 The workload is the reason a sandbox is used rather than a fixed container. It has to
 `pip install` a heavy and fragile scientific stack (RDKit, Meeko, OpenBabel, Vina), pull
@@ -246,20 +231,16 @@ would have to anticipate each failure; a session can respond to one. That adapta
 what makes per-event chemistry cheap enough to run at scale. One isolated session per
 trial event also keeps runs independently retryable and separately auditable.
 
-The tradeoff is that an agent will also fix things it was not asked to fix — including
+The tradeoff is that an agent will also fix things it was not asked to fix, including
 the science. That is not hypothetical: it has happened twice here, and it is why the
 result contract carries a `code_patched` field. See
 [the result contract](trial-impact-service/README.md#the-result-contract-and-why-it-has-estimator--code_patched-fields).
 
 ### On the label
 
-The framing above assumes each event arrives with a **classification** (endpoint met /
-missed) that the physics estimate sits *alongside*. Today that label is supplied by
-per-trial enrichment (`watchlist.json`), **not** derived automatically —
-ClinicalTrials.gov does not expose met/missed in machine-readable form. An LLM classifier
-over the CT.gov results section and the sponsor's press release is the intended path and
-is tracked under [Next steps](#next-steps); it does not exist yet. The physics half of the
-pipeline is the part that is built.
+The met/missed label each estimate sits alongside is today supplied manually via watchlist.json 
+(CT.gov has no machine-readable met/missed); an LLM classifier is the intended but unbuilt path ([Next steps](#next-steps)). 
+Only the physics half is built. 
 
 ---
 
@@ -277,15 +258,15 @@ different ΔG).
 | **Approved** (Lumakras, 2021) | KRAS × sotorasib | 6OIM · covalent-tethered (Cys A:12) | experimental-site (reproducible pose) ‡ | **−7.202 ± 0.187** | drug-likeness · covalent | AMGN ↑ · REGN/NVS ↓ *(illustrative)* |
 | **Approved** (Kalydeco, 2012) | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) ‡ | −7.404 ± 0.007 | clean | VRTX ↑ · CRSP/BLUE ↓ *(illustrative)* |
 
-Both are **approved** drugs, chosen because the answer is known — a **backtest against ground truth,
-not a forecast**, carrying no tradeable signal. Read the columns as: engagement + exposure = the
-product (confirmatory, not net-new); ΔG = a docking-objective diagnostic, not an affinity and not
-comparable across rows (issue #4); `Model call` = the rules-based placeholder. **‡ Engagement is
-*geometry, not strength*** — the ligand docked into the experimentally-resolved site with a
-reproducible multi-seed pose (sd ≤ 0.75); no Kd or occupancy is surfaced. The ΔGs are cognate/holo
-(partly circular) and the covalent KRAS score is Vina's reversible function (a pocket-correct lower
-bound, [issue #2](#known-issues)); `code_patched: false` confirms the numbers came from
-`simulation.py` unpatched. Routing is class-based, not drug-based, so a net-new drug in either class
+Both are **approved** drugs, chosen because the answer is already known — this is a backtest against 
+ground truth, not a forecast, and carries no tradeable signal. Read the columns as: engagement + exposure 
+= the product (confirmatory, not net-new); ΔG = a docking-objective diagnostic; `Model call` = the rules-based 
+placeholder. **‡ Engagement is *geometry, not strength*** — the ligand docked into the experimentally-resolved 
+site with a reproducible multi-seed pose (sd ≤ 0.75); no Kd or occupancy is surfaced. 
+
+The ΔGs are cognate/holo (partly circular) and the covalent KRAS score is Vina's reversible function 
+(a pocket-correct lower bound, [issue #2](#known-issues)); `code_patched: false` confirms the numbers came 
+from `simulation.py` unpatched. Routing is class-based, not drug-based, so a net-new drug in either class
 routes itself the same way.
 
 The **analysis view** (`GET /analysis`,
@@ -297,8 +278,15 @@ drill-down with the 3D pose, PK/PD exposure curve, and a reasoning trace for eac
 
 ## Chemistry & biophysical scope
 
-The physics has a domain of validity, and most of biopharma sits outside it. This is
-what the pipeline models today, what it models badly, and what it cannot touch at all.
+The physics has a domain of validity, and most of biopharma sits outside it. 
+
+The *binding* half is defensible today for a reversible small molecule against a small globular protein 
+with an experimental structure, and — via pocket-aware routing — for covalent small molecules against 
+a curated class (a reversible-scored lower bound); everything else degrades to fpocket/blind, and biologics 
+are out of scope. The *pharmacology* half is weaker (generic PK, no bioavailability term → order-of-magnitude 
+exposure), and occupancy is not reported at all. The surviving claim is *geometric engagement*.
+
+This is what the pipeline models today, what it models badly, and what it cannot touch at all.
 **✅ supported · ◑ runs but degrades · ○ out of scope, needs a different method.**
 
 ### Drug modality
@@ -343,38 +331,6 @@ what the pipeline models today, what it models badly, and what it cannot touch a
 Genuine per-drug pharmacology needs enrichment overrides (`fu`, `Vd`, `CL` per drug — the
 same mechanism as `endpoint_outcome`) or a structure→PK model.
 
-### Trial phase — a preclinical / discovery-stage instrument
-
-The pipeline answers *does the molecule engage its target at a plausible exposure?* — a
-**preclinical / discovery-stage** question. Engagement is an entry criterion proven before Phase 1,
-so at any trial the docking is **confirmatory of an already-public fact**, not new information; the
-system runs on clinical events only because ClinicalTrials.gov is the available event feed, so phase
-governs *information timing*, not what the chemistry computes (a later-phase run is a retrospective
-known-readout benchmark). The *hypothesised* payoff is to build toward Phase 1 — first-in-human,
-least public data, and what it validates is chemistry-grounded (human PK, tolerability, occupancy),
-so those quantities *might* be estimable from structure before the readout, unlike the disease
-biology Phase 2/3 tests. That is a hypothesis, not a result — the reproducible pose is the first
-tested primitive the predictive pieces consume ([Next steps](#next-steps)), and the rest is
-unbuilt.
-
-**The practical upshot.** The *binding* half is defensible today for a reversible small molecule
-against a small globular protein with an experimental structure, and — via pocket-aware routing — for
-covalent small molecules against a curated class (a reversible-scored lower bound); everything else
-degrades to fpocket/blind, and biologics are out of scope. The *pharmacology* half is weaker (generic
-PK, no bioavailability term → order-of-magnitude exposure), and occupancy is not reported at all. The
-surviving claim is *geometric engagement*.
-
-### What it would take to be edge-generating — improve on the market's estimate, don't re-derive the knowns
-
-Edge does not require secret data. It comes from making our estimate of P(success)/EV **more accurate
-than the market-implied one** — either by (i) resolving more certainty on a quantity that is genuinely
-*uncertain* (even when its raw inputs are public), or (ii) computing something not yet published, or
-published but **not already priced in**. What earns nothing is re-deriving a fact the market already
-has and weights correctly: engagement fails on that count — it is known going into Phase 1, public,
-and routinely published alongside potency and structures, so re-computing it moves no probability.
-The gains therefore live in the quantities a trial is actually **testing** — still uncertain at the
-readout — most of which need new chemistry or data the current build lacks (honest that any early
-edge would be thin):
 
 | What the trial actually tests (unknown going in) | What it would take to compute it | Chemistry-computable? | Edge realism |
 |---|---|---|---|
