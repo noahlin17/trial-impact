@@ -165,7 +165,7 @@ of P(success)** than the one implied by the market, and trading the difference.
 
 The chemistry is one input to that estimate. Incorporating more meaningful signal should improve the estimate 
 (especially any signal underused by a meaningful share of the market), but its job is to add incremental information, 
-not to necessarily carry the argument
+not necessarily to carry the argument.
 
 > The assumption most likely to be fatal is not "can we compute the chemistry," but "does the chemistry 
 > carry information the market does not already have," which is less tested. 
