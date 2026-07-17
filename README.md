@@ -1,7 +1,7 @@
 # Trial Impact
 
-**A structure-based engagement pipeline built to test one question: can cheap, computational chemistry 
-help price a clinical trial's stock-moving readout before it occurs (and where it can't, say so).**
+**A structure-based engagement pipeline built to test one question: can *cheap, computational chemistry* 
+help price a clinical trial's stock-moving readout before it occurs (*and where it can't, say so*).**
 
 Given a clinical-trial event, the service routes the drug and its target to the right experimental
 structure and binding pocket, docks the ligand (AutoDock Vina) into that pocket, and reports whether
@@ -11,20 +11,38 @@ tissue exposure (Cmax/AUC).
 
 Its central premise was pre-registered and tested rather than assumed, and it split cleanly. The
 **low-lift** methods here proved **sufficient to reproduce binding geometry**: redock a native ligand
-and the pose comes back (5/7 within 2 Å) — a real, if early, result to build directly on. They were
-**not** sufficient to get *binding strength* on the cheap; **affinity is governed by the free energy of
-binding (ΔG)**. We never expected the raw AutoDock Vina score to *be* ΔG (literature is clear it's a
-fast, size-correlated heuristic, not a free-energy method). The bet we actually tested was that a **MM-GBSA rescore on top of the Vina pose** could recover binding strength. Checked against measured
-affinities two ways (cross-target and within-target), it **failed to recover ΔG** even where the setup
-favors it (consistent with the inconsistency / system-dependence the MM-GBSA literature warns about). That is a verdict on the
-*low-lift estimator*, not on affinity itself:
-recovering ΔG cleanly *likely* needs materially more compute (such as relative free-energy perturbation —
-the within-target series we used (Tyk2) is in fact a standard FEP benchmark), but that hypothesis 
-is untested here. The geometry win is the foundation to build on. Real impact needs it pushed 
-prospectively (novel ligands, blind/cross-docking) and paired with heavier affinity methods that 
-would have to earn the claim on the same pre-registered terms.
+and the pose comes back (5/7 within 2 Å). They were **not** sufficient to get *binding strength* on the 
+cheap, and **affinity is governed by the free energy of binding (ΔG)**. We never expected the raw 
+AutoDock Vina score to *be* ΔG (literature is clear it's a fast, size-correlated heuristic, not a 
+free-energy method). 
 
-## Headline results — the low-lift pipeline reproduces binding *geometry*, but does not recover binding *strength* on the cheap
+> For a molecule already in Phase 1, the target is well-studied and an experimental structure almost always 
+> already exists, and because engagement is public preclinical information, the docking geometry surfaces 
+> **nothing un-priced**. The chemistry is **confirmatory, not predictive** of the trial's real unknowns. 
+> The genuinely predictive axes a full P(success) would combine are largely independent of docking
+> (target-validation / genetics, structure-derived PK), or like calibrated affinity, would start from a fetched
+> experimental complex rather than our Vina run.
+
+The core hypothesis we tested was whether a **MM-GBSA rescore on top of the Vina pose** could recover 
+binding strength. Checked against measured affinities two ways (cross-target and within-target), 
+it **failed to recover ΔG** (*consistent with the inconsistency / system-dependence MM-GBSA literature 
+warns about*) even where the setup favors it. That is a verdict on the *low-lift estimator*, not on affinity 
+itself: recovering ΔG cleanly *likely* needs materially more compute (such as relative free-energy perturbation 
+— the within-target series we used (Tyk2) is in fact a standard FEP benchmark), but that hypothesis is untested 
+here. Real impact needs the geometry result pushed prospectively (novel ligands, blind/cross-docking) and paired 
+with heavier affinity methods that would have to earn the claim on the same pre-registered terms.
+
+> **Why test these cheap methods at all: the literature's verdict on low-lift structure-based scoring is 
+> unreliable and strongly system-dependent, not guaranteed to fail.** We tested Vina and a single-snapshot MM-GBSA
+> rescore because they are the two lowest-lift rungs of the ladder, and we could deepen our rigor by demonstrating
+> the cheapest methods fall short before invoking anything heavier. Specifically, MM-GBSA works on some target classes
+> and not others, so whether these systems fell in the working regime was an empirical question, not one to assume away.
+> We also aimed the test at MM-GBSA's *most* favorable regime (a congeneric, same-target series), so its failure there
+> is a **sharp result rather than an expected one**. Testing Vina and MM-GBSA converted a general literature caveat
+> into a measured negative on our own panels (cross-target ρ = −0.24; within-target Tyk2 ρ = −0.54), which is the
+> difference between hand-waving and evidence. 
+
+## Headline results — the low-lift pipeline reproduces binding *geometry* but does not recover binding *strength* on the cheap
 
 I tested the affinity premise on **8 approved drugs with real, measured affinities** (ChEMBL Ki/Kd,
 pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a CPU MM-GBSA:
@@ -41,71 +59,41 @@ pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a C
   molecules score "best" while being weaker binders).
 - **A physics-based MM-GBSA rescore does not rescue it** — same ρ, still size-confounded ([`validation/`](trial-impact-service/validation/README.md), reproduce with `make validate`).
 
-The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md) — native-ligand
-**self-docking** into the native holo pocket, so a geometry/tool-reproduction control, not a prospective test —
+The complementary [pose-fidelity control](trial-impact-service/validation/pose_fidelity/README.md) (native-ligand
+**self-docking** into the native holo pocket: a geometry/tool-reproduction control, not a prospective test)
 redocked **5/7 native ligands within 2 Å (71%), median top-pose RMSD 0.71 Å**. This clears the first of
-its two pre-registered criteria (redock success ≥ 60%) but **not the second**: inter-seed agreement does
-*not* separate correct from incorrect poses (4GIH is a confidently-converged *wrong* pose — 0.04 Å seed
+its two pre-registered criteria (redock success ≥ 60%) but **not the second**. Inter-seed agreement does
+*not* separate correct from incorrect poses (4GIH is a confidently-converged *wrong* pose: 0.04 Å seed
 spread, yet 7.17 Å off), so the multi-seed spread is a reproducibility diagnostic, **not** a validated
-confidence signal — a geometry control only.
+confidence signal.
 
 **The discriminating affinity test is the within-target one.** The 8-anchor panel above is the *expected*
 regime failure: raw docking scores are not calibrated across different receptors, and here a narrow
-affinity range (pKd 7.4–10.1) sits against a wide size range, so size dominates almost by construction —
-useful confirmation of the long-known confound, but not a demanding test. The sharper test holds target,
-scaffold, and pocket fixed — the regime where structure-based scoring is *supposed* to work. That is the
+affinity range (pKd 7.4–10.1) sits against a wide size range, so size dominates almost by construction
+(confirmation of the long-known confound but not a demanding test). The sharper test holds target,
+scaffold, and pocket fixed: the regime where structure-based scoring is *supposed* to work. That is the
 second [pre-registered control](trial-impact-service/validation/PREREGISTRATION.md), [Experiment A
-(congeneric ranking)](trial-impact-service/validation/congeneric/README.md), and it is **negative too**:
-on the 13-ligand Tyk2 series, cheap single-snapshot MM-GBSA gives ρ = −0.54 (95% CI [−0.89, +0.07])
+(congeneric ranking)](trial-impact-service/validation/congeneric/README.md), and it is **negative too**.
+On the 13-ligand Tyk2 series, cheap single-snapshot MM-GBSA gives ρ = −0.54 (95% CI [−0.89, +0.07])
 versus measured affinity, failing to beat the size baseline or raw Vina even within-target. The A+C
 thresholds were fixed before scores were computed: **two affinity negatives — one cross-target (expected),
 one in-regime (the meaningful one)** — and a geometry control that passes only its redock-success
-criterion, with no claim that pose fidelity rescues affinity.
+criterion.
 
-**Read this as directional, not decisive.** At n = 8 the 95% CIs are wide and span zero (Vina ρ
-[−0.83, +0.62]), so this does not *prove* Vina is uninformative — it shows **no evidence** of affinity
-ranking on this set, exactly as the long-known size confound predicts. A powered refutation would need
-a far larger, structurally diverse anchor set; what is defensible today is the negative *direction*
-and the discipline of not shipping a strength claim the data cannot support.
+***Can* claim** ✅ reproducible pocket routing (covalent-tether → co-crystal → fpocket → blind tiers, 
+recorded in `docking_box.mode`); directional PK/PD exposure; and an auditable, self-falsifying validation 
+of its own scoring.
+***Cannot* claim** ❌ absolute affinity / Kd; target occupancy; that docking ranks cross-target
+potency; or a validated market prediction (the market/stock layer further down is an **illustrative,
+un-backtested downstream demo**, not a result). 
 
-So the pipeline makes only the claim the method can back — **geometric target engagement** (did the
-molecule dock into the experimentally-resolved site with a reproducible multi-seed pose) — and
-deliberately **not** an absolute Kd, occupancy, or binding-strength number.
-
-**What it *can* claim** ✅ reproducible pocket routing (covalent-tether → co-crystal → fpocket → blind
-tiers, recorded in `docking_box.mode`); a reproducible docked pose; directional PK/PD exposure; and an
-auditable, self-falsifying validation of its own scoring.
-**What it *cannot* claim** ❌ absolute affinity / Kd; target occupancy; that docking ranks cross-target
-potency; or a validated market prediction — the market/stock layer further down is an **illustrative,
-un-backtested downstream demo**, not a result.
-
-Scientifically, this is a **preclinical / discovery-stage engagement instrument**: target engagement
-is established *before* the clinic (an entry criterion for Phase 1), so by the time a molecule has a
-trial the chemistry is **confirmatory, not predictive** of the trial's real unknowns. It runs on
-clinical events only because ClinicalTrials.gov is the available event feed. Because engagement is
-public preclinical information, the pipeline as-is surfaces **nothing un-priced** — a later-phase run
-is an explicit **retrospective known-readout re-simulation**.
-
-This is deliberately a **first pass**: for a molecule already in Phase 1, the docking is *expected* to
-pass — engagement is a proven entry criterion, so "does it bind" is essentially a given and carries no
-un-priced information. So docking earns its place not as a signal but as the **first tested primitive** —
-a reproducible pocket route + docked pose — that the genuinely predictive pieces build on (calibrated
-affinity, structure-derived human PK, target-validation / genetics, a calibrated P(success)), and as the
-honest tool-validation control (the pose-fidelity test above). Why an event's *phase* is only an information-timing distinction,
-why Phase 1 is the *hypothesised* tier to build toward, and what net-new data an edge would actually
-require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stage-instrument) and
-[What it would take to be edge-generating](#what-it-would-take-to-be-edge-generating--improve-on-the-markets-estimate-dont-re-derive-the-knowns).
-
-> **North Star.** Take a Phase 1 trial's design plus *all* public information and produce a model
+> **North Star.** Take a Phase 1 trial's design plus public information and produce a model
 > estimate of a quantity the trial is *testing but has not yet read out* (human PK, tolerability / MTD,
-> human target occupancy). It is useful only if it improves on the market's *own* estimate — the bar is
-> *price, not publication*, since re-deriving a disclosed value the market already weights correctly adds
+> human target occupancy, etc.). It is useful only if it improves on the market's *own* estimate — the bar
+> is *price, not publication*, since re-deriving a disclosed value the market already weights correctly adds
 > nothing. **None of this is built today**. The full statement — why the output is a probabilistic prior
 > that still needs a point-in-time backtest, and why it generalises to later phases only in *form*
 > (Phase 2/3 test disease biology the chemistry does not model) — is in [THESIS §4](THESIS.md).
-
-> **Not investment advice.** Output is an automated research signal for informational
-> purposes only; a disclaimer is attached to each assessment.
 
 ---
 
@@ -114,8 +102,8 @@ require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stag
 ![Pipeline architecture](docs/architecture.png)
 
 A trial event is routed to the right structure and pocket, docked, and classified as *geometric
-engagement*; a PK/PD solve adds exposure. Each estimator runs head-to-head against a size-only
-baseline it must beat — and the validation suite (with the bottom-left panel showing the cross-target
+engagement*. A PK/PD solve adds exposure. Each estimator runs head-to-head against a size-only
+baseline it must beat. The validation suite (with the bottom-left panel showing the cross-target
 test) tests the affinity premise across two ranking regimes and finds no evidence of affinity ranking,
 with a complementary pose-geometry control. The market layer is an illustrative downstream demo.
 
@@ -124,16 +112,15 @@ with a complementary pose-geometry control. The market layer is an illustrative 
 ## Demo — the dashboards
 
 Served locally from the two committed result artifacts (`results/sim_*.json`) into the real Flask
-app — no re-dock. Both dashboards surface engagement, not affinity — ΔG is shown only as a labelled diagnostic.
+app — no re-dock. Both dashboards surface engagement, not affinity (ΔG as a labelled diagnostic).
 
 **`/status`** — one row per trial: the geometric engagement classification, the docking ΔG
 diagnostic, and the (illustrative) price calls.
 
 ![Status dashboard](docs/dashboard-status.png)
 
-**`/analysis`** — the corpus view leads with the geometric-engagement chart; ΔG is labelled a
-*docking-objective diagnostic — not an affinity, not comparable across molecules/targets*; the charts
-are engagement-count and PoS, not Kd/occupancy; occupancy is shown only when a calibrated Kd exists
+**`/analysis`** — the corpus view leads with the geometric-engagement chart; the charts are 
+engagement-count and PoS, not Kd/occupancy; occupancy is shown only when a calibrated Kd exists
 (the docking estimator reports none).
 
 ![Analysis dashboard](docs/dashboard-analysis.png)
@@ -145,7 +132,7 @@ are engagement-count and PoS, not Kd/occupancy; occupancy is shown only when a c
 > **Read this section as motivation, not as a result.** The market/stock layer is an
 > illustrative downstream demo: a rules-based engine on a small hand-curated watchlist, **not
 > backtested against realized price moves**. It exists to show what a validated engagement signal
-> *could* eventually feed. The defensible, tested core of the project is the biophysics validation above.
+> *could* eventually feed. The tested core of the project is the biophysics (in)validation.
 
 The goal is **predictive intelligence in the window between a trial's design becoming public and
 its readout** — using computational chemistry (and, over time, the other structure-derived axes
@@ -158,7 +145,12 @@ value is in the estimate formed *ahead* of the event.
 
 The reason to attempt it now is cost. Structure-based chemistry per trial has historically
 required a computational chemist. An agent sandbox does it per event, in minutes, for roughly
-the cost of the API calls.
+the cost of the API calls. Worth being precise about what AI cheapened here, mostly the building and 
+running of the pipeline. An agent, not a specialist, wired the toolchain and validation harness together
+— which lowers the marginal cost of applying chemistry at breadth without making any single calculation 
+more accurate. On the science, AI structure prediction (AlphaFold) eases the geometry rung, but the 
+affinity rung we stalled on is not yet solved by it — ML scorers/potentials (gnina, ANI/MACE) are a 
+plausible lighter-lift alternative to FEP, but untested here (the same "hypothesis, not a result" bucket).
 
 ### The chemistry is unlikely to be an edge on its own
 
