@@ -16,9 +16,8 @@ readout — alerts to Slack/email while surfacing everything on a dashboard.
 > (Phase 1: human safety/PK/dose; Phase 2/3: efficacy, statistics, safety at scale) is orthogonal to
 > what the pipeline computes. It runs on clinical events only because ClinicalTrials.gov is the event
 > feed; phase governs only *information timing* (Phase 1 outcome not yet public vs Phase 2/3 public →
-> a **retrospective known-readout re-simulation**), never what the chemistry can compute. See the root
-> [README](../README.md#trial-phase--a-preclinical--discovery-stage-instrument) and
-> [THESIS.md §3.3](../THESIS.md).
+> a **retrospective known-readout re-simulation**), never what the chemistry can compute. The full
+> phase framing is in [THESIS.md §3.3](../THESIS.md).
 
 ---
 
@@ -292,7 +291,7 @@ addressed; ○ = documented, future work.)
   reconstructs its occupancy curve. Exposure (Cmax, AUC) is Kd-independent and is retained. This
   is why the market model below has **no occupancy term** any more.
 - **`druglikeness_flag` is a drug-likeness heuristic, and is no longer priced** ✅ —
-  [issue #3](../README.md#known-issues), fixed. It is `≥2 Lipinski Rule-of-5 violations`
+  It is `≥2 Lipinski Rule-of-5 violations`
   (`mw>500, logp>5, hbd>5, hba>10`). Ro5 predicts **oral absorption and permeability**; it
   says nothing about safety. Sotorasib trips it on MW 560.6 + logP 5.30 — and sotorasib is
   an **approved, orally dosed drug** — so pricing it as a safety event was a category error.
@@ -302,7 +301,7 @@ addressed; ○ = documented, future work.)
   not priced* and contributes `0.0` to the delta). A real safety signal would need a
   structural-alert model (PAINS / Brenk) or a tox QSAR — deliberately **not** faked here.
 - **ΔG was consumed as an absolute Kd — resolved by re-scoping docking to geometric engagement** ✅ —
-  [issue #4](../README.md#known-issues). The code used to convert the Vina score to an absolute
+  The code used to convert the Vina score to an absolute
   `Kd = exp(ΔG/RT)` and branch on hard thresholds (`Kd ≤ 100 nM`, `ΔG ≤ −9.0`). An 8-anchor
   calibration through this exact pipeline showed the raw score does **not** rank measured affinity
   (Spearman `ρ(−ΔG, pKd) = −0.24`) and instead tracks ligand size (`ρ(−ΔG, heavy-atoms) = +0.45`);
@@ -390,7 +389,7 @@ addressed; ○ = documented, future work.)
   (`/api/prediction/{acc}`) with a newest-first version probe as backup; the 3D viewer
   chains `v6 → v5 → v4` for the same reason.
 - **Docking box is routed to the pocket, with a disclosed fallback ladder** ◑ —
-  [issue #2](../README.md#known-issues). The blind, centroid-centered box (which covered only
+  The blind, centroid-centered box (which covered only
   ~26% of CFTR and, once a receptor exceeded the 40 Å cap, silently searched a central *slab*)
   is **no longer the default**. `app/binding_site.select_binding_site` routes every run through
   an explicit ladder and records the tier in `docking_box.mode`:
@@ -445,8 +444,8 @@ addressed; ○ = documented, future work.)
   (ΔG −8.42 / −8.59 / −8.59 for sotorasib–KRAS). Now pinned to a fixed seed *set* (42, 43, 44)
   and reported as mean ± sd (below). Reproducible numbers are a precondition for the result
   contract meaning anything.
-- **Reported precision now reflects seed variability** ✅ — [issue #11](../README.md#known-issues),
-  core retired. Pinning a single seed made runs reproducible but concealed the sampling variance
+- **Reported precision now reflects seed variability** ✅ — the former single-seed precision problem
+  is retired. Pinning a single seed made runs reproducible but concealed the sampling variance
   and still reported ΔG to three decimals. `run_vina(seed=…)` now docks across a **deterministic
   seed set** (`_derive_seeds` → 42, 43, 44; the *set* is fixed, so runs stay bit-reproducible),
   and `dock_replicates` → `summarize_dg` returns mean ΔG, sample sd and n. The result carries
@@ -495,8 +494,7 @@ addressed; ○ = documented, future work.)
   **preclinical / discovery-stage** question (target engagement is established before the clinic;
   Phase 2/3 test efficacy and statistics the physics does not model), so there is nothing to
   weight. Phase governs only *information timing*: a Phase 2/3 run is a **retrospective known-readout
-  re-simulation** — a pipeline benchmark, not a tradeable signal. See
-  [the preclinical / discovery-stage scope](../README.md#trial-phase--a-preclinical--discovery-stage-instrument).
+  re-simulation** — a pipeline benchmark, not a tradeable signal.
 - **Naive competitor read-through** ○ — competitors are assumed to move opposite the
   sponsor, one magnitude bucket softer. Real read-through depends on mechanism /
   target overlap and modality, not just "is a competitor."
@@ -539,8 +537,8 @@ addressed; ○ = documented, future work.)
   `/analysis` shows a comparison only once **more than one** estimator has completed for a trial.
 
 ### Security & operations
-- **Webhook signature verification fails closed** ✅ — [issue #8](../README.md#known-issues),
-  fixed. `/webhook/trial-update` now rejects *every* request with `503` when
+- **Webhook signature verification fails closed** ✅ — fixed. `/webhook/trial-update` now rejects
+  *every* request with `503` when
   `WATCHER_SHARED_SECRET` is unset, so a forgotten secret yields a **dark** endpoint, never
   an open, billable one — an unauthenticated caller can no longer spend a real Devin session.
   With the secret set, a missing or bad signature is `401`. `create_app` still logs a loud

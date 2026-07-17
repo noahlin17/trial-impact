@@ -9,14 +9,13 @@ the result as **geometric engagement**, and solve a directional PK/PD exposure (
 
 **What it reads out** — a geometric `binding_engagement` label (did the ligand dock into the
 experimentally-resolved site with a *reproducible* multi-seed pose), a docking-objective ΔG that is a
-**QC/diagnostic only** (not an affinity, not comparable across molecules or targets —
-[issue #4](../README.md#known-issues)), and exposure. No Kd, no occupancy, no binding-strength
-number.
+**QC/diagnostic only** (not an affinity and not comparable across molecules or targets), and
+exposure. No Kd, no occupancy, no binding-strength number.
 
 **Why it breaks moving forward, and why the ΔG carries no real provenance** — the ΔG magnitudes
 below are **not measurements you can trust or trace**: (1) they depend on whichever structure the
-router resolves from **live** PDBe/RCSB at run time (not pinned point-in-time —
-[issue #10](../README.md#known-issues)), so they are not point-in-time reproducible; and (2) even a
+router resolves from **live** PDBe/RCSB at run time (not pinned point-in-time), so they are not
+point-in-time reproducible; and (2) even a
 stable number is not an affinity — cross-target Vina and CPU MM-GBSA both failed to rank affinity
 (they track ligand size), the covalent KRAS score is a reversible lower bound, and both rows are
 cognate (self-pocket) docking. So the ΔG is an illustrative pipeline output, not a provenance-grade
@@ -95,8 +94,8 @@ CFTR). **Remaining caveats, documented not fixed:** cognate/holo redocking is pa
 circular (redocking a drug into its own bound pocket inflates apparent accuracy); fpocket
 is geometric, not biological (on 6O2P its top pocket sat ~79 Å from the real ivacaftor
 site — which is exactly why it is a low-priority *fallback*); and the Tier-D blind box
-still fires for any target with no co-crystal and no fpocket. This is
-[issue #2](../README.md#known-issues).
+still fires for any target with no co-crystal and no fpocket. This remains a disclosed
+last-resort fallback.
 
 ## Docking is three seeds, reported as mean ± sd
 
@@ -115,7 +114,7 @@ with seed count (3× the docking time).
 
 **The ΔG is a docking-objective *diagnostic*, not an affinity — it is not comparable across
 molecules or targets, and no Kd or occupancy is derived from it.** An 8-anchor calibration through
-this exact pipeline ([issue #4](../README.md#known-issues)) showed the raw Vina score does not rank
+this exact pipeline showed the raw Vina score does not rank
 measured affinity (Spearman `ρ(−ΔG, pKd) = −0.24`) and instead tracks ligand size/contact area
 (`ρ(−ΔG, heavy-atoms) = +0.45`). So the docking result is demoted to a **geometric `binding_engagement`** claim: `experimental-site` means the ligand docked into an
 *experimentally-resolved* site (a curated holo / covalent-tethered residue) with a *reproducible*
@@ -135,7 +134,7 @@ no longer priced** — ≥2 Ro5 violations, which predicts oral absorption, not 
 sotorasib because sotorasib is a big lipophilic oncology molecule; sotorasib is also an approved
 drug — so charging it as a safety event was a category error. The −0.15 penalty is **removed**;
 the flag (renamed from `tox_flag`) is surfaced as informational provenance only and contributes
-`0.0` to the PoS delta. This is [issue #3](../README.md#known-issues), **fixed**.
+`0.0` to the PoS delta; it is informational only.
 
 ## † How to read the two ΔGs (pocket-resolved, but cognate and reversible-scored)
 
@@ -159,8 +158,7 @@ Reproduce the box geometry against the committed code:
 cd ../trial-impact-service && python verify_docking_box.py
 ```
 
-See [open issue #2](../README.md#known-issues) and the covalent entry in the service
-README's scope table.
+See the covalent entry in the service README's scope table.
 
 ## The previous CFTR pin (9MXL) was the wrong structure
 
