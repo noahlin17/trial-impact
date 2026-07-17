@@ -382,13 +382,6 @@ Success = a probability that's well-calibrated and beats a cheap base-rate basel
 vs risk-adjusted NPV). The edge is the difference between our estimate and the market's, not how confident we are — and it 
 pays off through breadth: a small edge across hundreds of under-covered small/mid-cap trials a year beats a big edge on a handful.
 
-**4 · Recover the market's implied P(success), price the divergence.** The edge is our P − implied P, not the level of the call.
-- **Implied PoS two ways**: options around the catalyst (the straddle / implied move prices the event's jump), or fundamentals
-  (market cap vs risk-adjusted NPV — solve for the PoS that clears it).
-- **Trade the divergence in convex options**, sized by (fractional) Kelly, net of bid/ask, borrow, and slippage.
-- **The edge is breadth, not brilliance.** By IR ≈ IC × √breadth, a modest signal applied 200–400×/yr beats a strong one applied ~15×
-  — so the play is coverage of the neglected SMID-cap tail. Needs real sponsor→ticker entity resolution and honest slippage assumptions.
-
 > Each phase tests a different unknown with different known inputs, so each gets its own feature set and model. Phase 1 (safety /
 > tolerability / MTD / PK) leans on ADMET/tox and exposure; the efficacy signals above (genetics, precedent, expression) matter most
 > at the Phase 2/3 transitions, where target validity is on the line.
