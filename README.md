@@ -93,6 +93,15 @@ un-backtested downstream demo**, not a result).
 > human target occupancy, etc.) to derive a P(success) more accurately than the market's own estimate.
 > More detail below and in [THESIS §4](THESIS.md).
 
+> **The premise (the framing we began with).** By Phase 1 a sponsor already holds measured science we
+> can't beat, and runs the trial only because its own read clears an expected-value bar. So we never set
+> out to out-science the sponsor — the question, from the start, was whether the *residual* uncertainty
+> in the **publicly disclosed** science can be turned into a probability of success **better-calibrated
+> than the market's** (lower Brier / log-loss over realized outcomes). That is only measurable in
+> aggregate, so breadth is a prerequisite for *detecting* edge, not just amplifying it; and the bar is
+> the market, never the sponsor. Whether such an edge exists is the open question everything here — the
+> chemistry included, checked first *because* it was the cheapest rung — is built to answer.
+
 > *None of this is built today*: the statement above is the goal, not a result. The bar is deliberately
 > price, not publication. Re-deriving a value the market already weights correctly adds nothing, so the only
 > useful output is one that beats the market's own implied estimate, which still requires a point-in-time

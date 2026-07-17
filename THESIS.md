@@ -16,6 +16,25 @@ validation, market microstructure and portfolio construction are drawn from publ
 literature and standard results, not from direct experience. Where I am reasoning from
 evidence, from first principles, or simply guessing, I have tried to say so.
 
+**The premise we began with.** This project started from a single conviction about *where* an edge
+could even exist. By the time a drug reaches Phase 1, its sponsor already holds measured science —
+crystal structures, biophysical affinities, animal PK and tox — that no cheap recomputation of ours
+can beat, and they run the trial only because their own read of it clears an expected-value bar
+(`P* ≤ P_science < 1`, with the threshold `P*` set by the asset's payoff). So the goal was never to
+out-science the sponsor. It was to test whether the *residual* uncertainty in the **publicly disclosed**
+science — never certainty, only "good enough to justify the cost" — can be priced into a probability of
+success that is **better-calibrated than the market's**.
+
+That is the whole investigation, and its bar is deliberately narrow:
+`E[(P_you − y)²] < E[(P_market − y)²]` over realized outcomes `y ∈ {0,1}`. Two things follow. Edge is
+not measurable on any single trial — true P is never observed, only a 0/1 outcome — so it is a
+population-level calibration claim, which makes **breadth a prerequisite for *detecting* skill, not just
+amplifying it** (§4.2). And the bar is the *market*, never the sponsor: our P&L never touches the
+sponsor's private estimate, so beating it is not an objective — though *disagreeing* with the sponsor is
+itself a signal. Everything downstream — the chemistry, the harness, the backtest — serves this one
+question. The chemistry in §2–§3 is what happens when you take the premise seriously and check the
+cheapest rung first; it failed, which is information, not a detour.
+
 **Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
 The central falsifiable claim this project tests — *does a **low-lift** docking score rank binding
 strength?* — was tested from two angles: an 8-drug cross-target panel and a 13-ligand within-target
