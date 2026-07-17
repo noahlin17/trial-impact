@@ -94,7 +94,7 @@
         <td>
           {% if e.sim_result and e.sim_result.binding_affinity_kcal_mol is not none %}
             {{ e.sim_result.binding_affinity_kcal_mol }} kcal/mol
-            <div class="muted" title="Vina's docking objective score: a QC/diagnostic only. Not an affinity, and not comparable across different molecules or targets (issue #4).">docking objective · not an affinity</div>
+            <div class="muted" title="Vina's docking objective score: a QC/diagnostic only. Not an affinity, and not comparable across different molecules or targets.">docking objective · not an affinity</div>
           {% else %}<span class="muted">—</span>{% endif %}
         </td>
         <td>

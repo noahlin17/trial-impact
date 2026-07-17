@@ -61,7 +61,7 @@ def pos_delta(event: dict[str, Any], sim: dict[str, Any] | None) -> float:
 
     The clinical readout dominates; the simulation only *corroborates* it. Docking is a
     **geometric engagement** check, not a binding-strength signal — the Vina score
-    ranks by size/contact, not affinity (issue #4) — so no ΔG/Kd magnitude or occupancy
+    ranks by size/contact, not affinity — so no ΔG/Kd magnitude or occupancy
     is priced. A run that docks the molecule into the experimentally-resolved target
     site with a reproducible pose adds a small, capped corroboration to a positive
     readout; nothing else moves the call. The signal is scaled by the simulation's
@@ -79,7 +79,7 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
     ``pos_delta`` is exactly ``breakdown["final"]``, so the headline number and the
     trace shown on the analysis dashboard can never disagree. The drug-likeness flag
     is carried for display but contributes 0.0 — it is not a priced term. Binding is
-    represented by a single geometric ``engagement_modifier`` (issue #4): there is no
+    represented by a single geometric ``engagement_modifier``: there is no
     separate binding-strength or occupancy term any more.
     """
     outcome = (event.get("endpoint_outcome") or "unknown").lower()
@@ -106,7 +106,7 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
     engagement = sim.get("binding_engagement")
 
     # Docking is a GEOMETRIC engagement corroborator, not a binding-strength signal.
-    # The Vina score ranks by ligand size/contact area, not affinity (issue #4: an
+    # The Vina score ranks by ligand size/contact area, not affinity (an
     # 8-anchor calibration found Spearman ρ(−ΔG, pKd) = −0.24 vs ρ(−ΔG, size) = +0.45), so a
     # ΔG/Kd magnitude and a Kd-derived occupancy are NOT priced. The only thing docking
     # can honestly add is confirming the molecule docks into the experimentally-resolved
@@ -118,7 +118,7 @@ def pos_breakdown(event: dict[str, Any], sim: dict[str, Any] | None) -> dict[str
     # Apply modifiers by *meaning*, not by mirroring the readout sign.
     #   - Geometric engagement corroboration only strengthens a WIN; docking into the
     #     right pocket doesn't rescue a missed clinical endpoint, so it is dropped for a
-    #     miss. It is also small and capped (issue #4): docking cannot claim strength.
+    #     miss. It is also small and capped: docking cannot claim strength.
     #   - The drug-likeness flag (≥2 Lipinski violations) is *not priced*: it predicts
     #     oral absorption, not toxicity, and fires on approved drugs (sotorasib). It was
     #     previously charged -0.15 as if a safety finding had occurred; that conflated a
@@ -273,7 +273,7 @@ def _sponsor_rationale(event: dict[str, Any], sim: dict[str, Any] | None, delta:
             dg_txt = f"{dg}" if sd is None else f"{dg}±{sd} (n={n})"
             parts.append(
                 f"Docking score ΔG {dg_txt} kcal/mol (relative, size-confounded — "
-                f"not an affinity; issue #4)."
+                f"not an affinity)."
             )
         if engagement is not None:
             parts.append(f"Target engagement: {engagement} (geometry, not strength).")

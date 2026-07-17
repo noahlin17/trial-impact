@@ -79,7 +79,7 @@ class SimResult:
     binding_affinity_sd_kcal_mol: float | None = None
     replicates: int | None = None
     # A Vina score is a RELATIVE, size-confounded docking score, not a calibrated
-    # affinity (see issue #4 / ``classify_engagement``). We therefore no longer surface
+    # affinity (see ``classify_engagement``). We therefore no longer surface
     # an absolute Kd as a headline: ``kd_nM`` stays ``None`` for the docking estimator
     # and the uncalibrated exp(ΔG/RT) value is kept, clearly labelled, in provenance.
     kd_nM: float | None = None
@@ -459,7 +459,7 @@ _VINA_SEED = 42
 # Number of seeds docked per run. A single pinned seed is reproducible but its ΔG still
 # lands somewhere in the sampler's run-to-run spread, so reporting it to three decimals
 # claims a precision the method does not have. Docking a small fixed set of seeds lets
-# the pipeline report a mean ± sd instead of one draw (see issue #11). The seeds are
+# the pipeline report a mean ± sd instead of one draw. The seeds are
 # derived deterministically from _VINA_SEED, so the *set* — and therefore the mean — is
 # still reproducible from source.
 _VINA_REPLICATES = 3
@@ -534,7 +534,7 @@ def kd_from_dg(dg_kcal_mol: float) -> float:
     ΔG = R·T·ln(Kd)  ⇒  Kd = exp(ΔG / (R·T)).  (Molar → nM via ×1e9.)
 
     This identity only yields a real Kd if ``dg`` is a calibrated binding free energy.
-    A Vina score is not: it ranks by size/contact area, not affinity (issue #4 — an
+    A Vina score is not: it ranks by size/contact area, not affinity (an
     8-anchor calibration found Spearman ρ(−ΔG, pKd) = −0.24 but ρ(−ΔG, heavy-atoms) = +0.45). So
     the result of this function is a *transparency* value kept in provenance and
     labelled uncalibrated; it is never surfaced as a headline Kd or priced by the
@@ -563,7 +563,7 @@ def classify_engagement(
     This is a **geometric** statement — did the ligand dock into a real, resolved
     binding site with a reproducible pose — and deliberately *not* a binding-strength
     or affinity claim, because the Vina score ranks by size/contact rather than
-    affinity (issue #4). Returns ``(code, human_note)``.
+    affinity. Returns ``(code, human_note)``.
     """
     if dg is None:
         return "failed", "docking did not produce a pose"
@@ -670,7 +670,7 @@ def pkpd_curve(sim_result: dict[str, Any], t_end: float = 48.0, n: int = 97):
     the same Bateman model. Returns ``None`` when a required field is missing.
     """
     prov = sim_result.get("provenance") or {}
-    kd = sim_result.get("kd_nM")  # None for the docking estimator (issue #4)
+    kd = sim_result.get("kd_nM")  # None for the docking estimator
     dose = sim_result.get("dose_mg")
     mw = (prov.get("descriptors") or {}).get("mw")
     if not dose or not mw:
@@ -814,14 +814,14 @@ def run_simulation(
             result.provenance["vina_seeds"] = dock["seeds"]
             result.provenance["dg_replicates"] = dock["energies"]
             # The Vina score is a RELATIVE, size-confounded docking score, not a
-            # calibrated affinity (issue #4). Keep the uncalibrated exp(ΔG/RT) value in
+            # calibrated affinity. Keep the uncalibrated exp(ΔG/RT) value in
             # provenance for transparency, but never surface it as an affinity, drive
             # occupancy with it, or price it in the market model.
             result.kd_nM = None
             result.provenance["vina_pseudo_kd_nM"] = round(kd_from_dg(dg), 3)
             result.provenance["vina_pseudo_kd_note"] = (
                 "exp(ΔG/RT) of the Vina score; NOT a measured or calibrated affinity — "
-                "Vina ranks by size/contact, not Kd (issue #4). Do not read as "
+                "Vina ranks by size/contact, not Kd. Do not read as "
                 "binding strength."
             )
             result.binding_engagement, engagement_note = classify_engagement(

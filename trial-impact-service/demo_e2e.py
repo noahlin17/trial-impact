@@ -54,7 +54,7 @@ EVENT = {
 }
 
 # What the (faked) Devin simulation session "returns". The Vina score is a relative,
-# size-confounded docking score, not an affinity (issue #4): no absolute Kd and no
+# size-confounded docking score, not an affinity: no absolute Kd and no
 # Kd-derived occupancy are surfaced; the uncalibrated exp(ΔG/RT) is kept in provenance
 # and engagement is a geometric claim. An AlphaFold model is a predicted structure, so
 # this run is not on an experimentally-resolved site.
@@ -78,7 +78,7 @@ SIM_RESULT = {
         "pdb_id": "AF-Q9FAKE1-F1",
         "smiles": "CC(=O)Nc1ccc(cc1)S(=O)(=O)N",
         "vina_pseudo_kd_nM": round(kd_from_dg(DELTA_G), 2),
-        "vina_pseudo_kd_note": "exp(ΔG/RT) of the Vina score; NOT an affinity (issue #4).",
+        "vina_pseudo_kd_note": "exp(ΔG/RT) of the Vina score; NOT an affinity.",
     },
 }
 

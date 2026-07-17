@@ -113,7 +113,7 @@ reactive cysteine; otherwise it uses a curated or auto-discovered drug-bound co-
 box, then fpocket, then the blind centroid box — recording the tier in
 `docking_box.mode`. It docks with AutoDock Vina across a fixed seed set for the mean ΔG
 (kcal/mol) ± sd. That ΔG is a **relative, size-confounded docking score, NOT a
-calibrated affinity** (issue #4), so it is reported as a geometric `binding_engagement`
+calibrated affinity**, so it is reported as a geometric `binding_engagement`
 classification (did the ligand dock into an experimentally-resolved site with a
 reproducible pose) — no absolute Kd or Kd-derived occupancy is emitted. A 1-compartment
 PK/PD model (Bateman) still gives Cmax/AUC exposure. The docked pose is NOT returned —

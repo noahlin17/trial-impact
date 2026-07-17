@@ -47,7 +47,7 @@
   <div class="cards" id="cards"></div>
 
   <h2>Physics → price relationships</h2>
-  <p class="legend">Each point is one run (hover for drug/target). Red = drug-likeness flag (≥2 Lipinski violations; informational, not a safety signal). The validated readout is the <strong>geometric engagement</strong> classification; docking ΔG is only a <strong>docking-objective diagnostic</strong> (issue #4) — not an affinity, not comparable across molecules/targets, not converted to Kd, and it does not drive occupancy.</p>
+  <p class="legend">Each point is one run (hover for drug/target). Red = drug-likeness flag (≥2 Lipinski violations; informational, not a safety signal). The tested readout is the <strong>geometric engagement</strong> classification; docking ΔG is only a <strong>docking-objective diagnostic</strong> — not an affinity, not comparable across molecules/targets, not converted to Kd, and it does not drive occupancy.</p>
   <div class="charts">
     <div class="chart"><h3>Geometric engagement (run count)</h3><div id="c_engagement"></div></div>
     <div class="chart"><h3>Docking ΔG (diagnostic) vs PoS delta</h3><div id="c_dg_pos"></div></div>
@@ -195,7 +195,7 @@
             <div class="legend" style="margin-top:.4rem">UniProt ${prov.uniprot ?? "—"} · SMILES <code style="font-size:.7rem">${(prov.smiles ?? "").slice(0, 42)}${(prov.smiles ?? "").length > 42 ? "…" : ""}</code></div>
           </div>
           <div>
-            <div class="legend">PK/PD exposure (Bateman model): tissue concentration over 48 h. Occupancy is shown only when a calibrated Kd exists — the docking estimator reports none (issue #4).</div>
+            <div class="legend">PK/PD exposure (Bateman model): tissue concentration over 48 h. Occupancy is shown only when a calibrated Kd exists — the docking estimator reports none.</div>
             <div id="detail-pkpd" style="height:260px"></div>
           </div>
           <div>

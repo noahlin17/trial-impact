@@ -162,7 +162,7 @@ class LigandEfficiencyBaseline:
             dg = min(hi, max(lo, -_LE_KCAL_PER_HEAVY_ATOM * heavy_atoms))
             result.binding_affinity_kcal_mol = round(dg, 3)
             # Like the docking estimator, this ΔG is not a calibrated affinity (it is an
-            # explicit size proxy), so no headline Kd is surfaced (issue #4).
+            # explicit size proxy), so no headline Kd is surfaced.
             result.kd_nM = None
             result.provenance["vina_pseudo_kd_nM"] = round(kd_from_dg(dg), 3)
             result.provenance["vina_pseudo_kd_note"] = (
@@ -177,7 +177,7 @@ class LigandEfficiencyBaseline:
             )
 
             # Exposure (cmax/auc) is Kd-independent; occupancy needs a Kd and is not
-            # reported (matches the docking estimator under issue #4).
+            # reported (matches the docking estimator's semantics).
             pkpd = run_pkpd(dose_mg=dose_mg, mol_weight=desc["mw"], tissue=tissue)
             result.cmax_ng_ml = round(pkpd["cmax_ng_ml"], 3)
             result.auc_ng_h_ml = round(pkpd["auc_ng_h_ml"], 3)

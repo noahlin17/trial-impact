@@ -60,7 +60,7 @@ drug engages its target, computed from the protein structure and the ligand chem
 rather than from the sponsor's description of the result. The output is a
 geometric target-engagement classification plus a docking ΔG *diagnostic* and PK/PD-derived
 exposure — note that the ΔG is *not* turned into an absolute Kd or occupancy, because it cannot
-support that claim (§3.4, issue #4). This has three consequences:
+support that claim (§3.4). This has three consequences:
 
 - it can be scored against realized outcomes, so its value can be measured rather than
   argued;
@@ -231,7 +231,7 @@ An earlier form of the pipeline turned the docking ΔG into an absolute Kd (`Kd 
 free-Cmax/Kd occupancy, then checked those against literature potency — and implied that *neither*
 of the two approved drugs in this repo engages its target, a clear failure. **That whole check is
 now moot, because the pipeline no longer produces any absolute quantity to check.** Once the docking
-claim was demoted to geometric engagement (issue #4), there is no docked Kd, no occupancy, and no
+claim was demoted to geometric engagement, there is no docked Kd, no occupancy, and no
 binding-strength number — the ΔG that remains is a docking-objective diagnostic, explicitly not an
 affinity and not comparable across molecules or targets. So a per-drug "does the model recover the
 known potency?" comparison is not a meaningful test of the current build; it can only test a claim

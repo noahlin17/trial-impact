@@ -30,7 +30,7 @@ def corpus_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
 
     dgs, deltas = [], []
     druglike = 0
-    engaged = 0  # runs that docked into an experimentally-resolved site (issue #4)
+    engaged = 0  # runs that docked into an experimentally-resolved site
     by_sponsor: dict[str, list[float]] = {}
     by_target: dict[str, list[float]] = {}
     for e in completed:

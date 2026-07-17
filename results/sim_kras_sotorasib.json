@@ -60,7 +60,7 @@
         -7.072
       ],
       "vina_pseudo_kd_nM": 8416.875,
-      "vina_pseudo_kd_note": "exp(\u0394G/RT) of the Vina score; NOT a measured or calibrated affinity \u2014 Vina ranks by size/contact, not Kd (issue #4). Do not read as binding strength.",
+      "vina_pseudo_kd_note": "exp(\u0394G/RT) of the Vina score; NOT a measured or calibrated affinity \u2014 Vina ranks by size/contact, not Kd. Do not read as binding strength.",
       "engagement_note": "docked into an experimentally-resolved binding site with a reproducible multi-seed pose (geometric engagement, not affinity)"
     },
     "docking_box": {
@@ -98,7 +98,7 @@
       "role": "sponsor",
       "direction": "up",
       "magnitude": "strong",
-      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking score \u0394G -7.202\u00b10.187 (n=3) kcal/mol (relative, size-confounded \u2014 not an affinity; issue #4). Target engagement: experimental-site (geometry, not strength). Drug-likeness flag (\u22652 Lipinski violations) \u2014 informational, predicts oral absorption, not toxicity; not priced into the call. PoS delta +0.50."
+      "rationale": "Trial NCT-REAL-0001 endpoint met. Docking score \u0394G -7.202\u00b10.187 (n=3) kcal/mol (relative, size-confounded \u2014 not an affinity). Target engagement: experimental-site (geometry, not strength). Drug-likeness flag (\u22652 Lipinski violations) \u2014 informational, predicts oral absorption, not toxicity; not priced into the call. PoS delta +0.50."
     },
     {
       "ticker": "REGN",
