@@ -64,7 +64,7 @@ box(1, y1, 17, h1, "1 · Trial event",
 box(21, y1, 18, h1, "2 · Structure route",
     ["UniProt / PDB lookup;", "covalent-tether →", "co-crystal → fpocket", "→ blind (tier logged)"])
 box(42, y1, 17, h1, "3 · Docking",
-    ["AutoDock Vina,", "multi-seed poses;", "pose persisted", "(ΔG ± sd)"])
+    ["AutoDock Vina,", "multi-seed poses", "scored → only the", "scalar ΔG returned (±sd)"])
 box(62, y1, 17, h1, "4 · Engagement",
     ["geometric class:", "experimental-site /", "pocket / blind", "— NOT a Kd"], ec=GREEN)
 box(82, y1, 17, h1, "5 · PK/PD",
