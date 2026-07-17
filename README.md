@@ -1,27 +1,26 @@
 # Trial Impact
 
-**A structure-based engagement pipeline built to test one question honestly: can cheap, structural
-chemistry price something a clinical trial is testing but hasn't read out yet — and, where it can't,
-say so.**
+**A structure-based engagement pipeline built to test one question: can cheap, computational chemistry 
+help price a clinical trial's stock-moving readout before it occurs (and where it can't, say so).**
 
 Given a clinical-trial event, the service routes the drug and its target to the right experimental
 structure and binding pocket, docks the ligand (AutoDock Vina) into that pocket, and reports whether
-the molecule makes a **reproducible, geometrically sound engagement** — computed from the structure
-and the chemistry, not from the sponsor's description of the result. A closed-form PK/PD solve adds
+the molecule makes a **reproducible, geometrically sound engagement** (computed from the structure
+and the chemistry, not from the sponsor's description of the result). A closed-form PK/PD solve adds
 tissue exposure (Cmax/AUC).
 
 Its central premise was pre-registered and tested rather than assumed, and it split cleanly. The
-**low-lift** methods here proved **sufficient to reproduce binding geometry** — redock a native ligand
-and the pose comes back (5/7 within 2 Å): a real, if early, result to build directly on. They were
+**low-lift** methods here proved **sufficient to reproduce binding geometry**: redock a native ligand
+and the pose comes back (5/7 within 2 Å) — a real, if early, result to build directly on. They were
 **not** sufficient to get *binding strength* on the cheap: affinity is governed by the free energy of
-binding (ΔG), and a fast single-snapshot docking/rescore is a poor stand-in for it — checked against
-measured affinities two ways, cross-target and within-target, it **failed to recover ΔG** even where
+binding (ΔG), and a fast single-snapshot docking/rescore is a poor stand-in for it. Checked against
+measured affinities two ways (cross-target and within-target), it **failed to recover ΔG** even where
 the setup favors it. That is a verdict on the *low-lift estimator*, not on affinity itself:
-recovering ΔG cleanly likely needs materially more compute — full-GPU ensemble MM-GBSA or FEP — but
-that is a **hypothesis, not a result**, and untested here. So the pipeline ships only what it can stand
-behind today, **geometry, not affinity**, and treats the geometry win as the **foundation to build
-on**: real impact needs it pushed prospectively (novel ligands, blind/cross-docking) and paired with
-heavier affinity methods that would have to earn the claim on the same pre-registered terms.
+recovering ΔG cleanly *likely* needs materially more compute (such as relative free-energy perturbation —
+the within-target series we used (Tyk2) is in fact a standard FEP benchmark) but that hypothesis 
+is untested here. The geometry win is the foundation to build on. Real impact needs it pushed 
+prospectively (novel ligands, blind/cross-docking) and paired with heavier affinity methods that 
+would have to earn the claim on the same pre-registered terms.
 
 ## Headline results — the low-lift pipeline reproduces binding *geometry*, but does not recover binding *strength* on the cheap
 
@@ -46,8 +45,7 @@ redocked **5/7 native ligands within 2 Å (71%), median top-pose RMSD 0.71 Å**.
 its two pre-registered criteria (redock success ≥ 60%) but **not the second**: inter-seed agreement does
 *not* separate correct from incorrect poses (4GIH is a confidently-converged *wrong* pose — 0.04 Å seed
 spread, yet 7.17 Å off), so the multi-seed spread is a reproducibility diagnostic, **not** a validated
-confidence signal. It supports the geometric pose-reproduction claim only; it says nothing about affinity
-or binding strength.
+confidence signal — a geometry control only.
 
 **The discriminating affinity test is the within-target one.** The 8-anchor panel above is the *expected*
 regime failure: raw docking scores are not calibrated across different receptors, and here a narrow
@@ -98,10 +96,9 @@ require are set out in [Trial phase](#trial-phase--a-preclinical--discovery-stag
 > estimate of a quantity the trial is *testing but has not yet read out* (human PK, tolerability / MTD,
 > human target occupancy). It is useful only if it improves on the market's *own* estimate — the bar is
 > *price, not publication*, since re-deriving a disclosed value the market already weights correctly adds
-> nothing. **None of this is built today**; the current output is confirmatory geometric engagement. The
-> full statement — why the output is a probabilistic prior that still needs a point-in-time backtest, and
-> why it generalises to later phases only in *form* (Phase 2/3 test disease biology the chemistry does not
-> model) — is in [THESIS §4](THESIS.md).
+> nothing. **None of this is built today**. The full statement — why the output is a probabilistic prior
+> that still needs a point-in-time backtest, and why it generalises to later phases only in *form*
+> (Phase 2/3 test disease biology the chemistry does not model) — is in [THESIS §4](THESIS.md).
 
 > **Not investment advice.** Output is an automated research signal for informational
 > purposes only; a disclaimer is attached to each assessment.
@@ -123,9 +120,7 @@ with a complementary pose-geometry control. The market layer is an illustrative 
 ## Demo — the dashboards
 
 Served locally from the two committed result artifacts (`results/sim_*.json`) into the real Flask
-app — no re-dock. Both surfaces report the honest claim only: a **geometric engagement**
-classification as the readout, with the docking ΔG kept as a **QC/diagnostic labelled "not an
-affinity"** — never an absolute affinity or occupancy.
+app — no re-dock. Both dashboards surface engagement, not affinity — ΔG is shown only as a labelled diagnostic.
 
 **`/status`** — one row per trial: the geometric engagement classification, the docking ΔG
 diagnostic, and the (illustrative) price calls.
@@ -146,8 +141,7 @@ are engagement-count and PoS, not Kd/occupancy; occupancy is shown only when a c
 > **Read this section as motivation, not as a result.** The market/stock layer is an
 > illustrative downstream demo: a rules-based engine on a small hand-curated watchlist, **not
 > backtested against realized price moves**. It exists to show what a validated engagement signal
-> *could* eventually feed; nothing here is a tradeable claim. The defensible, tested core of the
-> project is the biophysics validation above.
+> *could* eventually feed. The defensible, tested core of the project is the biophysics validation above.
 
 The goal is **predictive intelligence in the window between a trial's design becoming public and
 its readout** — using computational chemistry (and, over time, the other structure-derived axes
@@ -196,9 +190,9 @@ something — a coverage argument, not an insight one. (The illustrative IR arit
 It establishes that the pipeline runs, that its outputs are **reproducible from source**, and that
 its failure modes are visible rather than silent — a precondition for testing the thesis, not
 evidence for it. Both the chemistry and market model are placeholders: docking is now pocket-routed
-(covalent tether → co-crystal → fpocket → blind, per `docking_box.mode`) but reports only *geometric
-engagement* (the 8-anchor calibration killed the affinity reading, headline above), the PK model is
-generic, and the market model is uncalibrated and rules-based. The current numbers are not tradeable.
+(covalent tether → co-crystal → fpocket → blind, per `docking_box.mode`) but the 8-anchor calibration 
+killed the affinity reading (headline above), the PK model is generic, and the market model is uncalibrated
+and rules-based.
 
 The assumption most likely to be fatal is not "can we compute the chemistry," which works, but "does
 the chemistry carry information the market does not already have," which is untested. A baseline of
