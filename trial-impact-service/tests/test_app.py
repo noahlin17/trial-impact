@@ -50,7 +50,7 @@ STRONG_WIN = {
 RICH_SIM = {
     "target": "KRAS", "drug": "sotorasib", "tissue": "tumor", "dose_mg": 960.0,
     # Current (@3) schema: the Vina score is not an affinity, so no headline Kd and no
-    # Kd-derived occupancy; engagement is the geometric claim (issue #4).
+    # Kd-derived occupancy; engagement is the geometric claim.
     "binding_affinity_kcal_mol": -8.585, "kd_nM": None,
     "cmax_ng_ml": 19259.45, "auc_ng_h_ml": 143963.8,
     "target_occupancy_pct": None, "binding_engagement": "experimental-site",
@@ -177,7 +177,7 @@ def test_webhook_rejects_bad_signature(ctx):
 
 
 def test_webhook_fails_closed_without_secret(tmp_path):
-    """With no shared secret the endpoint fails *closed* (issue #8).
+    """With no shared secret the endpoint fails *closed*.
 
     A signed request that would be accepted under a configured secret must be rejected
     (503) when WATCHER_SHARED_SECRET is unset, rather than silently accepting unsigned
@@ -351,7 +351,7 @@ def test_extract_ignores_prompt_echo_and_takes_last_result():
 
 
 def test_druglikeness_flag_does_not_change_the_delta():
-    """The drug-likeness flag is informational, not a priced safety term (issue #3).
+    """The drug-likeness flag is informational, not a priced safety term.
 
     A ≥2-Lipinski-violation flag predicts oral absorption, not toxicity, and fires on
     approved drugs (sotorasib), so it must move the PoS delta by exactly nothing — for
@@ -374,7 +374,7 @@ def test_druglikeness_flag_does_not_change_the_delta():
 def test_met_trial_breakdown_numbers():
     """Pin the met-trial arithmetic: docking is a small geometric corroborator only.
 
-    Binding *strength* and occupancy are no longer priced (issue #4). RICH_SIM docked
+    Binding *strength* and occupancy are no longer priced. RICH_SIM docked
     into an experimentally-resolved site, so engagement adds a small, capped +0.05 to a
     win; drug-likeness is not priced. base .5 + engagement .05 -> subtotal .55; the
     confidence scale 0.95 gives .5225."""
@@ -432,7 +432,7 @@ def test_pkpd_curve_shape():
     from app.simulation import pkpd_curve
 
     # The @3 docking result carries no Kd, so the exposure curve is present but the
-    # occupancy trace is empty (issue #4).
+    # occupancy trace is empty.
     c = pkpd_curve(RICH_SIM)
     assert set(c) == {"t_h", "conc_ng_ml", "occupancy_pct"}
     assert len(c["t_h"]) == 97
@@ -485,7 +485,7 @@ def test_pkpd_curve_honours_stored_fu():
 
 
 def test_occupancy_is_no_longer_priced():
-    """Occupancy must not move the market call any more (issue #4).
+    """Occupancy must not move the market call any more.
 
     Occupancy was C_free/(C_free+Kd) driven by an uncalibrated Vina-derived Kd, so it
     encoded a binding-strength claim the docking score cannot support. The pricing now
@@ -506,7 +506,7 @@ def test_occupancy_is_no_longer_priced():
     assert no_engage["engagement_modifier"] == 0.0
 
 
-# --- issue #4: docking is geometric engagement, not calibrated affinity ------ #
+# --- docking is geometric engagement, not calibrated affinity ---------------- #
 def test_classify_engagement_geometry_not_strength():
     """The docking run's honest claim is geometric (did it dock into a real, resolved
     site with a reproducible pose) — never a binding-strength/affinity claim."""
@@ -532,7 +532,7 @@ def test_classify_engagement_geometry_not_strength():
 
 
 def test_docking_result_exposes_no_absolute_kd_or_occupancy():
-    """A Vina score is size-confounded, not an affinity (issue #4): the docking result
+    """A Vina score is size-confounded, not an affinity: the docking result
     must not surface an absolute Kd or a Kd-derived occupancy, but must keep the
     uncalibrated exp(ΔG/RT) value clearly labelled in provenance."""
     from app.simulation import SimResult, kd_from_dg
@@ -554,7 +554,7 @@ def test_docking_result_exposes_no_absolute_kd_or_occupancy():
     assert new["estimator"] == "vina-docking-pkpd@3"
     # exp(ΔG/RT) survives only as a clearly-labelled transparency value.
     assert new["provenance"]["vina_pseudo_kd_nM"] == round(kd_from_dg(-7.202), 3)
-    assert "issue #4" in new["provenance"]["vina_pseudo_kd_note"]
+    assert "NOT a measured or calibrated affinity" in new["provenance"]["vina_pseudo_kd_note"]
     # exposure (Cmax/AUC) is Kd-independent and is retained.
     assert new["cmax_ng_ml"] > 0 and new["auc_ng_h_ml"] > 0
 
@@ -901,7 +901,7 @@ def test_docking_box_is_blind_and_spans_only_docked_atoms(tmp_path):
     used only when no curated/discovered co-crystal and no fpocket pocket is available
     (see ``app.binding_site``). It now spans only ``ATOM`` records — matching what the
     receptor prep actually docks — so it no longer stretches onto the co-crystal ligand,
-    waters, or ions (which are ``HETATM`` and are stripped before docking; issue #9).
+    waters, or ions (which are ``HETATM`` and are stripped before docking).
     """
     pytest.importorskip("numpy")
     from app.simulation import compute_docking_box
@@ -1179,7 +1179,7 @@ def test_select_binding_site_unsupported_warhead_warns_and_falls_back(tmp_path, 
 
 
 def test_covalent_tether_prep_failure_stays_on_curated_structure(tmp_path, monkeypatch):
-    """A tether-prep failure must NOT re-resolve a different structure (issue #10).
+    """A tether-prep failure must NOT re-resolve a different structure.
 
     The non-determinism we hit was: a curated covalent target (KRAS→6OIM) found its
     reactive Cys, then Meeko tether prep failed in that environment, and the router
@@ -1225,7 +1225,7 @@ def test_covalent_tether_prep_failure_stays_on_curated_structure(tmp_path, monke
 
 def test_curated_route_structure_failure_marks_degradation(tmp_path, monkeypatch):
     """A *structure-level* curated failure that falls through to a different PDB must be
-    queryable in provenance, not just a warning string (issue #10, 'fail loud')."""
+    queryable in provenance, not just a warning string ('fail loud')."""
     pytest.importorskip("rdkit")
     pytest.importorskip("numpy")
     import app.binding_site as bs

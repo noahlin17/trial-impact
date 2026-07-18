@@ -35,7 +35,7 @@ import tempfile
 
 from app.simulation import compute_docking_box, fetch_structure, resolve_uniprot
 
-# The two targets behind the published results (see results/README.md).
+# The two targets behind the published results.
 TARGETS = {
     "KRAS": "sotorasib",
     "CFTR": "ivacaftor",

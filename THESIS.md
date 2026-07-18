@@ -16,10 +16,33 @@ validation, market microstructure and portfolio construction are drawn from publ
 literature and standard results, not from direct experience. Where I am reasoning from
 evidence, from first principles, or simply guessing, I have tried to say so.
 
+**The premise we began with.** This project started from a single conviction about *where* an edge
+could even exist. By the time a drug reaches Phase 1, its sponsor already holds measured science —
+crystal structures, biophysical affinities, animal PK and tox — that no cheap recomputation of ours
+can beat, and they run the trial only because their own read of it clears an expected-value bar
+(`P* ≤ P_science < 1`, with the threshold `P*` set by the asset's payoff). So the goal was never to
+out-science the sponsor. It was to test whether the *residual* uncertainty in the **publicly disclosed**
+science — never certainty, only "good enough to justify the cost" — can be priced into a probability of
+success that is **better-calibrated than the market's**.
+
+That is the whole investigation, and its bar is deliberately narrow:
+`E[(P_you − y)²] < E[(P_market − y)²]` over realized outcomes `y ∈ {0,1}`. Two things follow. Edge is
+not measurable on any single trial — true P is never observed, only a 0/1 outcome — so it is a
+population-level calibration claim, which makes **breadth a prerequisite for *detecting* skill, not just
+amplifying it** (§4.2). And the bar is the *market*, never the sponsor: our P&L never touches the
+sponsor's private estimate, so beating it is not an objective — though *disagreeing* with the sponsor is
+itself a signal. Everything downstream — the chemistry, the harness, the backtest — serves this one
+question. The chemistry in §2–§3 is what happens when you take the premise seriously and check the
+cheapest rung first; it failed, which is information, not a detour.
+
 **Headline empirical result (§3.4, and [`trial-impact-service/validation/`](trial-impact-service/validation/README.md)).**
-The central falsifiable claim this project tests — *does the docking score rank binding strength?* —
-was tested from two angles: an 8-drug cross-target panel and a 13-ligand within-target Tyk2 series.
-Both were negative. The cross-target panel is the *expected* regime failure — raw docking scores are
+The central falsifiable claim this project tests — *does a **low-lift** docking score rank binding
+strength?* — was tested from two angles: an 8-drug cross-target panel and a 13-ligand within-target
+Tyk2 series. Both were negative: the cheap score did not recover measured affinity. Raw Vina being a
+crude, size-correlated heuristic was the *expected* prior, not the surprise — a fast docking objective
+is not a free-energy method; the bet actually under test was that a **cheap single-snapshot MM-GBSA
+rescore** on top of the Vina pose could recover binding strength, and that is the hypothesis that failed.
+The cross-target panel is the *expected* regime failure — raw docking scores are
 not calibrated across different receptors, and a narrow affinity range against a wide size range lets
 size dominate almost by construction: Spearman ρ(−ΔG Vina, pKd) = −0.24 (it tracks ligand size,
 ρ ≈ +0.45), and a CPU MM-GBSA rescore did not improve on it (ρ = −0.24, still size-tracking); at n = 8
@@ -34,8 +57,14 @@ pre-registered criteria: inter-seed agreement does *not* separate correct from i
 seed spread is a reproducibility diagnostic, not a validated confidence signal. The A+C thresholds were
 fixed in the [pre-registration](trial-impact-service/validation/PREREGISTRATION.md) before scores were
 computed. Together, the two ranking negatives — one cross-target (expected), one in-regime (the
-discriminating one) — and a geometry control that passes only its redock-success criterion define the
-boundary; pose fidelity does not rescue affinity.
+discriminating one) — and a geometry result that clears its redock-success criterion define the
+boundary: the low-lift methods are **sufficient to reproduce geometry** (a real first step to build
+on) but **not to recover ΔG cheaply**. That is a verdict on the cheap estimator, not on affinity —
+recovering ΔG plausibly needs a materially heavier, *different-class* method: relative FEP is the
+literature-supported candidate for a congeneric series like this Tyk2 set (itself a standard FEP
+benchmark), whereas simply spending more compute on the same class (ensemble/multi-snapshot MM-GBSA) is
+not a reliable fix. Either way that is a **hypothesis, not a result**, and untested here. Pose fidelity
+does not rescue affinity.
 
 ---
 
@@ -50,7 +79,7 @@ drug engages its target, computed from the protein structure and the ligand chem
 rather than from the sponsor's description of the result. The output is a
 geometric target-engagement classification plus a docking ΔG *diagnostic* and PK/PD-derived
 exposure — note that the ΔG is *not* turned into an absolute Kd or occupancy, because it cannot
-support that claim (§3.4, issue #4). This has three consequences:
+support that claim (§3.4). This has three consequences:
 
 - it can be scored against realized outcomes, so its value can be measured rather than
   argued;
@@ -75,6 +104,13 @@ PubChem and Open Targets are all free; and the pipeline in this repository was a
 days with agent assistance. If a ΔG for a given trial is cheaply computable by anyone, it is
 reasonable to assume it is largely in the price already — though "cheap to compute" is not the same
 as "priced in," a distinction §4 returns to.
+
+There is a second, sharper reason. By the time a molecule reaches Phase 1 its sponsor has not merely
+*computed* its binding but *measured* it — co-crystal structures, biophysical affinities, animal PK and
+tox — so a single-snapshot docking score is redundant to private data that is strictly better, not just
+cheaper. Conditioning on "reached Phase 1" also pre-selects molecules that all look good on binding,
+which compresses the between-candidate variance in any chemistry feature toward zero; the outcome
+variance that remains lives in target validity and human translation, not in whether the ligand binds.
 
 So I do not think the docking is where an edge would come from. Candidates that seem more
 durable to me, in rough order of how much I believe them:
@@ -156,8 +192,8 @@ efficacy rather than to safety or pharmacokinetics. Lack of efficacy is frequent
 statement about the target rather than about the molecule: a compound can bind well, engage
 its target, and still fail because modulating that target does not alter the disease.
 
-Docking does not address that question. It addresses whether the molecule binds — and my
-assumption is that the market is not usually wrong about *that*. So a pre-readout model built
+Docking does not address that question. It speaks, at most, to whether the molecule engages the
+target — and my assumption is that the market is not usually wrong about *that*. So a pre-readout model built
 on binding affinity alone would be answering the less decisive half of the question.
 
 The literature I am aware of (e.g. Nelson et al., *Nature Genetics*, 2015, and subsequent
@@ -197,7 +233,7 @@ is simply an explicit **retrospective known-readout re-simulation** — a benchm
 not a trade.
 
 **This is a first pass, not a dead end.** Engagement is confirmatory today, but it is the **first
-validated primitive** — a reproducible pocket route and docked pose — that every genuinely predictive
+tested primitive** — a reproducible pocket route and docked pose — that every genuinely predictive
 downstream piece consumes. The pieces that would actually address the *tested* unknowns (and so could
 generate edge) are set out in §4 (and the README's *What it would take to be edge-generating* table).
 Phase 1 is the *hypothesised* tier to build toward — a guess to test, not a result — because it is
@@ -221,7 +257,7 @@ An earlier form of the pipeline turned the docking ΔG into an absolute Kd (`Kd 
 free-Cmax/Kd occupancy, then checked those against literature potency — and implied that *neither*
 of the two approved drugs in this repo engages its target, a clear failure. **That whole check is
 now moot, because the pipeline no longer produces any absolute quantity to check.** Once the docking
-claim was demoted to geometric engagement (issue #4), there is no docked Kd, no occupancy, and no
+claim was demoted to geometric engagement, there is no docked Kd, no occupancy, and no
 binding-strength number — the ΔG that remains is a docking-objective diagnostic, explicitly not an
 affinity and not comparable across molecules or targets. So a per-drug "does the model recover the
 known potency?" comparison is not a meaningful test of the current build; it can only test a claim
@@ -234,8 +270,8 @@ showed **no evidence that Vina ranks affinity** across these anchors (mostly ATP
 while `ρ(−ΔG, heavy-atom count) = +0.45` (the score tracks ligand size, not Kd), and
 ligand-efficiency normalization did not rescue it (`ρ ≈ −0.02`). At n = 8 the CIs span zero, so this
 is directional rather than definitive, but it is enough to withhold a strength claim. `exp()` is monotonic, so the invalid
-transform was not the root cause; the docking/scoring layer itself cannot supply affinity
-information. The free-drug (`fu`) occupancy machinery remains in the pipeline for any future
+transform was not the root cause; the current docking/scoring layer did not provide evidence of
+usable affinity information in this small panel. The free-drug (`fu`) occupancy machinery remains in the pipeline for any future
 estimator that produces a real Kd, but the docking path leaves occupancy `None`.
 
 This is the clearest reason to treat the chemistry and the market model here as placeholders.
@@ -278,8 +314,8 @@ produce an encouraging and false result. Four problems seem material:
 
 **North Star.** Intake a Phase 1 trial's design plus *all* public information — structure, target,
 indication, planned dose, and any published in-vitro, PK, or prior computational results — and
-estimate a quantity the trial is *testing but has not yet read out* (human PK, tolerability, human
-occupancy) *before* it is published. The estimate only counts if it makes our probability **more
+estimate a quantity the trial is *testing but has not yet read out* (human PK, tolerability, MTD,
+human occupancy) *before* it is published. The estimate only counts if it makes our probability **more
 accurate than the one already in the price**: recreating a disclosed in-vitro potency, a reported PK
 value, or a prior docking result adds nothing (those are public and, as a rule, already priced), so
 the bar is *price, not publication* — the harder and more valuable case is resolving genuine
@@ -360,6 +396,10 @@ The implication is that a weak but genuine edge applied to many decisions can be
 than a strong edge applied to few. That is the argument for why a commoditized input might
 still be useful: it does not need to be a good signal, it needs to be a slightly informative
 one that can be produced at scale. Scale is what the agent sandbox provides.
+
+Breadth is necessary twice over: a single binary readout cannot score a probability, so calibration
+(§4.4) is only measurable across many events — breadth is what lets you *detect* skill at all, not
+merely amplify it once found.
 
 Two caveats keep this from reading as a free lunch. The law assumes **independent** decisions,
 and biotech catalysts are not: outcomes cluster by mechanism, indication and macro regime, so

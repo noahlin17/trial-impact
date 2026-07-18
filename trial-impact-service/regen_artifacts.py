@@ -6,7 +6,7 @@ Two modes:
 * ``--replay`` (default): rebuild each committed ``results/sim_*.json`` under the
   current estimator semantics **without re-docking**. The docking ΔG / pose / box /
   structure are unchanged (they came from the real pinned-seed Vina run); only the
-  *post-docking* transform is re-applied — which is exactly what issue #4 changed
+  *post-docking* transform is re-applied — which is exactly what the estimator re-scope changed
   (a Vina score is a relative, size-confounded docking score, so no absolute Kd and no
   Kd-derived occupancy are surfaced; engagement is a geometric classification). This
   avoids re-running Vina (and the structure-routing non-determinism that comes with it)
@@ -118,7 +118,7 @@ def _run_event(app, trial: dict) -> dict:
 
 
 def replay_at_current_semantics(old_sim: dict) -> dict:
-    """Rebuild a committed sim_result under the current (issue #4) semantics.
+    """Rebuild a committed sim_result under the current estimator semantics.
 
     The docking outputs (ΔG, sd, replicates, seeds, pose box, structure) are copied
     verbatim — NO re-docking. Only the post-docking transform is re-applied: the Vina
@@ -135,11 +135,11 @@ def replay_at_current_semantics(old_sim: dict) -> dict:
     prov["vina_pseudo_kd_nM"] = round(kd_from_dg(dg), 3)
     prov["vina_pseudo_kd_note"] = (
         "exp(ΔG/RT) of the Vina score; NOT a measured or calibrated affinity — "
-        "Vina ranks by size/contact, not Kd (issue #4). Do not read as binding strength."
+        "Vina ranks by size/contact, not Kd. Do not read as binding strength."
     )
     engagement, note = classify_engagement(mode, dg, sd)
     prov["engagement_note"] = note
-    # Occupancy/free-drug machinery is gone under issue #4; drop its provenance.
+    # Occupancy/free-drug machinery is dormant for docking; drop its provenance.
     prov.pop("fu", None)
     prov.pop("fu_source", None)
     sim["provenance"] = prov

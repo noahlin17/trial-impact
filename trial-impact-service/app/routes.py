@@ -59,7 +59,7 @@ def webhook_trial_update() -> Any:
     # Fail closed: with no shared secret there is no way to authenticate the caller,
     # and every accepted event spends a Devin session, so an unset secret must refuse
     # traffic rather than accept it. (The old behaviour skipped verification when the
-    # secret was empty, which left the endpoint open to anyone — see issue #8.)
+    # secret was empty, which left the endpoint open to anyone.)
     if not cfg.watcher_shared_secret:
         return jsonify(
             {"error": "webhook disabled: WATCHER_SHARED_SECRET is not configured"}

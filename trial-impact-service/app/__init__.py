@@ -56,7 +56,7 @@ def create_app(config: Config | None = None, **overrides: Any) -> Flask:
     # a caller, and each accepted event spends a Devin session, so /webhook/trial-update
     # rejects *every* request (503) until WATCHER_SHARED_SECRET is set. Warn loudly at
     # startup so a misconfigured deployment is obvious (a dark endpoint) rather than
-    # silently open to anyone — the failure the old fail-open default risked (issue #8).
+    # silently open to anyone — the failure the old fail-open default risked.
     if not cfg.signature_required:
         logging.getLogger(__name__).warning(
             "WATCHER_SHARED_SECRET is not set: /webhook/trial-update is DISABLED and "

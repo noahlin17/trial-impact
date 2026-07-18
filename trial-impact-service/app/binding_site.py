@@ -450,7 +450,7 @@ def select_binding_site(
     entry = resolve_target_class(target)
     # When a *curated* route fails at the structure level and we fall through to a
     # different structure, this records what we intended so the degradation is queryable
-    # in provenance (``curated_route_degraded``), not just a warning string (issue #10).
+    # in provenance (``curated_route_degraded``), not just a warning string.
     intended_route: str | None = None
 
     # Tier A/covalent — curated covalent class + a tetherable warhead. Once the curated
@@ -459,7 +459,7 @@ def select_binding_site(
     # through to a different PDB. A failure in the tether *preparation* (e.g. Meeko absent
     # in a given environment) degrades to reversible scoring in the **same** reactive-
     # residue box — so a toolchain hiccup can change the pose method but never silently
-    # swap the structure and its ΔG provenance (the non-determinism behind issue #10).
+    # swap the structure and its ΔG provenance (the source of run-to-run drift).
     if covalent and entry and entry.covalent:
         tether = covalent_tether(mol)
         if tether is None:
