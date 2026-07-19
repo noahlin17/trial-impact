@@ -5,7 +5,7 @@ webhook it doesn't have. It polls the CT.gov **API v2** for a configured watchli
 of trials, diffs each record against the last-seen state, and — when something
 material changes (results posted, overall-status change, phase change) — emits an
 **HMAC-signed** `POST /webhook/trial-update` to the [trial-impact
-service](../devin-remediation-bot).
+service](../trial-impact-service).
 
 ```
 CT.gov API v2 ──poll──▶ diff vs SQLite state ──change?──▶ signed POST /webhook/trial-update
