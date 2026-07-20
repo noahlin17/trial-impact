@@ -33,7 +33,7 @@ currently computing — and therefore not pricing?
 By the time a trial is registered, the sponsor holds internal ground truth on the exact question the trial tests — target engagement, 
 tolerated exposure — and has likely already run some version of this computation (docking, FEP, MM-GBSA) as part of their 
 own diligence; that ground truth is unbeatable. What they disclose, though, is the raw material — structure, SMILES, target, 
-protocol — not their derived read on it. The market inherits that gap: it sees the same raw inputs we do, but has no access to 
+protocol — not their derived read on it. The market inherits that gap: it sees the same raw inputs we do but has no access to 
 the sponsor's internal derivative, so it falls back to coarse heuristics (phase × indication base rates, analyst priors, sponsor framing) 
 — not from laziness, but because the informative number was never released. If we recompute that missing derivative ourselves from 
 public raw inputs, we're not competing with the sponsor — we're closing a disclosure gap the market leaves open, not one it's 
@@ -47,12 +47,14 @@ this kind of chemistry has never been tried.
 > The assumption most likely to be fatal is not obviously the chemistry's technical feasibility — it's whether the chemistry,
 > if it works, would carry information the market doesn't already have. 
 
-The goal is now to compute `P_you` from disclosed science via granular biophysics, and check whether it is better-calibrated than 
-`P_market` over realized outcomes — `E[(P_you − y)²] < E[(P_market − y)²]`. If so, we trade the gap. That is where the money is,
-if it is anywhere.
+The goal is now to compute `P_you` from disclosed science via granular biophysics, and check whether it is 
+better-calibrated than `P_market` over realized outcomes — `E[(P_you − y)²] < E[(P_market − y)²]`. If so, we trade 
+the gap. That is where the money is, if it is anywhere.
 
-The reason to attempt it now is cost. Structure-based chemistry per trial has historically required a computational chemist. 
-An agent sandbox does it per event, in minutes, for roughly the cost of the API calls. 
+The reason to attempt it now is cost. Structure-based chemistry per trial has historically required a 
+computational chemist's time — not just to execute the docking, but to prep the structure and judge whether the result is trustworthy. 
+An agent sandbox does it per event, in minutes, for roughly the cost of the API calls — cheap execution makes systematic coverage 
+of the long tail possible in principle.
 
 > That cost argument also cuts against the project. A signal's value tends to decay with the cost of reproducing it, and the cost here
 > is low: Vina is free and has been available since 2010, RDKit, the PDB, AlphaFold DB, PubChem and Open Targets are all free.
