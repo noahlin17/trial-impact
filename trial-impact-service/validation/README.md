@@ -11,8 +11,8 @@ claim.
 
 Eight approved drugs with real, citable ChEMBL affinities (`anchors.json`), spanning
 pKd 7.36–10.09, all reversible, drug-like, single-pocket binders in one well-behaved
-docking regime (ATP-competitive kinase hinge binders + one clean soluble-enzyme
-inhibitor — matching the oncology domain). Each is docked through the **production
+docking regime (ATP-competitive kinase hinge binders across ABL1/EGFR/VEGFR2, plus one 
+soluble-enzyme inhibitor, rivaroxaban/FXa). Each is docked through the **production
 pipeline** (so the pose and ΔG are on our scale), then rescored with a single-snapshot
 MM-GBSA. We ask: does either score rank the measured affinity, or just ligand size?
 
@@ -28,8 +28,8 @@ MM-GBSA. We ask: does either score rank the measured affinity, or just ligand si
 correlations are non-positive with CIs spanning zero, and both scores track ligand
 **size** (ρ ≈ +0.4). The tell: the two largest ligands (nilotinib, lapatinib) score
 most "favorably" in both methods yet are among the *weaker* anchors, while dasatinib —
-the tightest binder — lands mid-pack. MM-GBSA does **not** beat Vina, and neither beats
-"just count the atoms."
+the tightest binder — lands well off the top in both. MM-GBSA does **not** beat Vina, 
+and neither beats "just count the atoms."
 
 ## Why (and the correct scope)
 
@@ -45,6 +45,14 @@ Consequently the pipeline makes **no absolute-affinity or binding-strength claim
 docked pose is used only as a *geometric engagement* signal (does the ligand dock into
 the experimentally-known pocket with a reproducible pose), which is what these methods
 can honestly support.
+
+**One anchor is a known outlier worth flagging directly.** Imatinib's MM-GBSA score (−3.68 kcal/mol) 
+sits roughly an order of magnitude weaker than every other anchor in the panel (−21.7 to −54.7), 
+on a well-characterized drug with no obvious reason for the setup to fail this badly. 
+We haven't isolated the cause — likely a pose or protonation-state issue specific to that run — and haven't 
+re-run it, so it should be read as an unresolved anomaly, not a confirmed data point. This doesn't change 
+the conclusion (the independent 13-ligand Tyk2 result reaches the same negative finding without it), 
+but the 8-anchor ρ above is not fully independent of this single score.
 
 ## Reproduce
 

@@ -16,9 +16,11 @@ Pipeline
 3. **Fetch the ligand** — PubChem PUG-REST name→SMILES, then RDKit 3D embedding.
 4. **Prepare receptor + ligand** to PDBQT (Meeko for the ligand, OpenBabel for the
    receptor).
-5. **Dock** with AutoDock Vina → best binding free energy ΔG (kcal/mol); derive the
-   dissociation constant ``Kd`` from ΔG = RT·ln(Kd). Only the scalar ΔG comes back —
-   the pose is too large for the result contract (see the README).
+5. **Dock with AutoDock Vina** → best binding free energy ΔG (kcal/mol).
+    The uncalibrated exp(ΔG/RT) value is kept in provenance for transparency but is not
+    surfaced as a calibrated Kd — an 8-anchor validation found the raw score does not rank
+    measured affinity (see `kd_from_dg`). Only the scalar ΔG comes back — the pose is too
+    large for the result contract (see the README).
 6. **PK/PD** — a first-order-absorption one-compartment model solved in **closed form**
    (Bateman), coupled to a receptor-occupancy model driven by the docked ``Kd`` →
    ``cmax``, ``auc``, ``target_occupancy_pct``. No ODE solver (and so no SciPy) needed.
@@ -26,8 +28,9 @@ Pipeline
 The heavy dependencies (``rdkit``, ``meeko``, ``vina``, ``numpy``,
 ``openbabel``) are imported **lazily inside the functions that need them** so this
 module imports cleanly in the web service and the test suite, which never run the
-physics — they fake Devin. Those deps live in ``requirements-sim.txt`` and are
-installed by Devin, not by the Flask service.
+physics — they fake Devin. Those deps are installed by Devin via the canonical `conda-sim.lock.yml`
+environment (see the service README) — `requirements-sim.txt` is a pip-only fallback that
+lacks ProDy/fpocket and cannot run the covalent/pocket routes.
 """
 
 from __future__ import annotations

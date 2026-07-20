@@ -7,17 +7,10 @@ that runs a real **biophysical simulation** (protein–ligand docking + PK/PD),
 scores the result with a transparent market model, and — on a market-moving
 readout — alerts to Slack/email while surfacing everything on a dashboard.
 
-> **Not investment advice.** Output is an automated research signal for
-> informational purposes only. A disclaimer is attached to every assessment.
+Scope: a preclinical / Phase 1 engagement instrument. The full framing is in [THESIS.md](../THESIS.md).
 
-> **Scope — a preclinical / discovery-stage engagement instrument.** The physics answers whether a
-> molecule *engages its target* — a molecular property established *preclinically*, before Phase 1,
-> so at any trial the docking result is **confirmatory, not new**. What a trial actually tests
-> (Phase 1: human safety/PK/dose; Phase 2/3: efficacy, statistics, safety at scale) is orthogonal to
-> what the pipeline computes. It runs on clinical events only because ClinicalTrials.gov is the event
-> feed; phase governs only *information timing* (Phase 1 outcome not yet public vs Phase 2/3 public →
-> a **retrospective known-readout re-simulation**), never what the chemistry can compute. The full
-> phase framing is in [THESIS.md §3.3](../THESIS.md).
+> **Not investment advice.** Output is an automated research signal for informational purposes only,
+> built on an illustrative, un-backtested market model. A disclaimer is attached to every assessment.
 
 ---
 
@@ -34,7 +27,7 @@ ClinicalTrials.gov API v2 ──poll──▶  ctgov-watcher (../ctgov-watcher)
 │                 → build sim prompt → Devin: POST /sessions ──────────────┼─▶ Devin session
 │                 → SQLite: insert event (queued)                          │   runs app/simulation.py
 │  RECONCILE POST /poll                                                    │   (docking + PK/PD)
-│     GET Devin session → extract SIM_RESULT_JSON ◀────────────────────────┼── ΔG, Kd, occupancy
+│     GET Devin session → extract SIM_RESULT_JSON ◀────────────────────────┼── ΔG (diagnostic), engagement
 │     → market_model.assess → price calls + commentary                     │
 │     → SQLite update → Slack/email alert (once) on market-movers          │
 │  OBSERVE   GET /status  → dashboard + JSON                               │
@@ -47,8 +40,8 @@ The pipeline has four stages, each isolated into its own module:
 |-------|----------|--------|----------------|
 | **Trigger** | `POST /webhook/trial-update` | `app/routes.py`, `app/signing.py` | Verify the signed webhook, resolve tickers, spawn a Devin simulation session, persist the event. |
 | **Orchestrate** | — | `app/devin_client.py`, `app/prompts.py`, `app/simulation.py` | Tell Devin to run the docking + PK/PD pipeline; parse the structured result back. |
-| **Observe** | `GET /status` · `GET /analysis` | `app/routes.py`, `app/stats.py`, `app/analysis.py` | Read model: every event, its sim result, tickers, price calls and aggregates (`/status`); plus a corpus view to *learn from* the runs — physics→price relationships and a per-run drill-down (`/analysis`). |
 | **Reconcile** | `POST /poll` | `app/routes.py`, `app/market_model.py`, `app/alerts.py` | Poll in-flight sessions, score completed sims, and alert once on market-movers. |
+| **Observe** | `GET /status` · `GET /analysis` | `app/routes.py`, `app/stats.py`, `app/analysis.py` | Read model: every event, its sim result, tickers, price calls and aggregates (`/status`); plus a corpus view to *learn from* the runs — physics→price relationships and a per-run drill-down (`/analysis`). |
 
 ### Why Devin runs the simulation
 
@@ -58,11 +51,11 @@ structure (UniProt → experimental PDB or mmCIF, else AlphaFold), fetch the lig
 binding free energy ΔG reported as mean ± sd (the scalar only — the pose is *not* returned; see
 Limitations), then solve the PK/PD model in **closed form**
 (Bateman) for tissue exposure (Cmax/AUC). The ΔG is reported as a geometric target-engagement
-classification, **not** a calibrated affinity — no absolute Kd or occupancy. That needs a full sandbox that
-can build a heavy native scientific
-stack (the canonical conda-lock `trialsim` env — see Simulation environment), pull structures, and iterate on failures — exactly what a Devin session is.
-One session per event keeps runs isolated, independently retryable, and observable
-(the same design the pipeline uses throughout).
+classification, **not** a calibrated affinity — no absolute Kd or occupancy. Running this pipeline 
+needs a full sandbox that can build a heavy native scientific stack (the canonical conda-lock 
+`trialsim` env — see Simulation environment), pull structures, and iterate on failures — exactly 
+what a Devin session is. One session per event keeps runs isolated, independently retryable, 
+and observable (the same design the pipeline uses throughout).
 
 `app/simulation.py` is the canonical, CLI-runnable pipeline. Devin **clones a pinned
 commit** (`SIM_REPO_URL` @ `SIM_REPO_COMMIT`), builds the canonical conda-lock `trialsim`
@@ -85,6 +78,11 @@ result contract, reproducibility, corpus — is model-agnostic. Two ship today:
 | `vina-docking-pkpd@3` | The real structure-based docking + PK/PD pipeline (the default). Bumped `@1→@2` when pocket-aware routing changed the ΔG numbers, then `@2→@3` when result semantics changed (no Kd, no Kd-derived occupancy, a geometric `binding_engagement` classification). |
 | `ligand-efficiency-baseline@2` | A deliberately naive, **structure-free control**: ΔG ≈ 0.3 kcal/mol × heavy-atom count, run through the same PK/PD model. Not a physical model — a floor the docking must beat to justify its cost. Reported at low confidence and flagged in `warnings`; `binding_engagement` is `no-structure`. Bumped `@1→@2` with the semantics change. |
 
+This baseline isn't a strawman: it's capturing the same confound (ligand size) that the 8-anchor 
+validation found dominates both Vina and MM-GBSA (ρ ≈ +0.4–0.45 vs. heavy-atom count) — so a real 
+estimator has to add signal beyond size to clear it, which is a meaningfully harder bar than 
+"beat a naive baseline" usually implies.
+
 The **comparison is the product**, not any single model's number: `/analysis` shows an
 estimator head-to-head for any trial scored by more than one estimator (and
 `compare_estimators.py` runs a trial through several at once). Two estimators agreeing
@@ -106,12 +104,11 @@ cases bit us: PubChem renamed the SMILES property (`CanonicalSMILES` →
 now fixed natively — see Limitations). Both times the run "succeeded" with plausible values,
 and both times the committed code could not have produced them.
 
-So the contract makes divergence *loud*: the session must set `code_patched: true` and
-`patch_summary` if it modified the script, and a patched run is surfaced on `/status`
-as **not reproducible from source**. Because the run is now pinned to `SIM_REPO_COMMIT`,
-that self-report is also **independently verifiable** — a reviewer can diff the session
-against the exact commit — rather than trusted on the agent's word. A plausible number
-is not a correct number, and a number you cannot regenerate is not a result.
+So the contract makes divergence *loud*: the session must set `code_patched: true` and 
+`patch_summary` if it modified the script. Because the run is pinned to `SIM_REPO_COMMIT`, 
+this isn't just a self-report to trust — a reviewer can diff the session's actual code against 
+the exact pinned commit, so even an unreported patch is independently detectable, not just an 
+honestly-flagged one.
 
 ---
 
@@ -120,6 +117,7 @@ is not a correct number, and a number you cannot regenerate is not a result.
 ```
 app/
   __init__.py       # application factory — wires config + db + devin + alerter + tickers
+  binding_site.py   # pocket-aware routing: covalent-tethered → curated/discovered holo → fpocket → blind
   config.py         # 12-factor config from environment variables
   db.py             # SQLite data-access layer (single `trial_events` table, no ORM)
   signing.py        # HMAC-SHA256 sign/verify (shared with the watcher)
@@ -259,55 +257,12 @@ right caveats. **Nothing here is investment advice.** (✅ = addressed; ◑ = pa
 addressed; ○ = documented, future work.)
 
 ### Scope & chemistry
-- **The "high-accuracy universe" is routed by chemistry/target class, not drug name** ◑ —
-  `app/binding_site.select_binding_site` classifies each run and boxes it accordingly, with no
-  per-drug branching, so **net-new drugs route themselves**. The universe we now dock *more
-  accurately than the old blind box* is: (a) **reversible** drugs with any experimental
-  co-crystal — curated per target class or auto-discovered by RCSB graph-relaxed chemical search
-  (ranked by which structure best resolves the pocket: sharpest method, then best resolution,
-  then a deterministic id tiebreak) — boxed on the real bound ligand; and (b) **covalent** drugs
-  whose warhead is a tetherable
-  Michael acceptor **and** whose target is a curated covalent class (KRAS G12C, EGFR, BTK),
-  tethered to the geometrically-detected reactive cysteine. Everything else degrades to fpocket
-  then the blind centroid box and **says which tier it took** in `docking_box.mode`. The routing
-  ladder, the covalent lower-bound caveat, and the fallback limitations are detailed under the
-  **Docking box** and **Covalent binders** entries below. A key structural constraint: a covalent
-  co-crystal ligand is the *reacted adduct*, so its chemical identity ≠ the free drug's — covalent
-  targets therefore key off the curated class + structure-derived reactive residue, not ligand
-  matching.
 - **Small molecules only** ○ — the docking path models small-molecule drugs;
   biologics/antibodies can't be docked and are out of scope.
 - **Docking is fast & approximate** ○ — AutoDock Vina is an empirical scoring
   function, not a rigorous binding free-energy method; ΔG here is retained as a
   diagnostic, not a measured affinity. See [`validation/README.md`](validation/README.md)
   for the calibration result.
-- **Free-drug occupancy machinery is now dormant for docking** ◑ —
-  `_pkpd_series` can evaluate `occ = C_free / (C_free + Kd)` with `C_free = fu · C` (only
-  **unbound** drug engages a target), and `resolve_fu(drug, fu_hint)` resolves `fu` from an
-  explicit hint > a small curated plasma-protein-binding table > unknown (`fu = 1.0` with a
-  warning). But the docking estimator does not emit a calibrated Kd, so it now reports
-  **`target_occupancy_pct = None`** and never enters the occupancy branch. The machinery is kept
-  intact for any future estimator that produces a calibrated Kd; a legacy artifact that *does*
-  carry a stored Kd still reconstructs its occupancy curve. Exposure (Cmax, AUC) is Kd-independent
-  and is retained. This is why the market model below has **no occupancy term** any more.
-- **`druglikeness_flag` is a drug-likeness heuristic, and is no longer priced** ✅ —
-  It is `≥2 Lipinski Rule-of-5 violations`
-  (`mw>500, logp>5, hbd>5, hba>10`). Ro5 predicts **oral absorption and permeability**; it
-  says nothing about safety. Sotorasib trips it on MW 560.6 + logP 5.30 — and sotorasib is
-  an **approved, orally dosed drug** — so pricing it as a safety event was a category error.
-  The market model previously charged **−0.15 PoS as if it were a safety finding**; that
-  penalty is **removed**. The flag is renamed `tox_flag → druglikeness_flag` and surfaced as
-  informational provenance only (it appears in the reasoning trace labelled *informational,
-  not priced* and contributes `0.0` to the delta). A real safety signal would need a
-  structural-alert model (PAINS / Brenk) or a tox QSAR — deliberately **not** faked here.
-- **ΔG was consumed as an absolute Kd — resolved by re-scoping docking to geometric engagement** ✅ —
-  The docking estimator no longer emits an absolute Kd or Kd-derived occupancy (both `None`); it
-  keeps the score as clearly-labelled provenance and classifies reproducible geometric engagement.
-  See [`validation/README.md`](validation/README.md) for the calibration result.
-- **A physics rescorer (MM-GBSA) is not shipped as a strength estimator** ✅ —
-  single-snapshot MM-GBSA remains a validation path rather than a production estimator. See
-  [`validation/README.md`](validation/README.md) for the calibration result; regenerate with
-  `make validate`.
 - **Generic PK constants** ○ — `ka`, `Vd`, `CL` are fixed physiological placeholders
   and `Kp` is order-of-magnitude, not drug-specific. There is also **no bioavailability
   term** (`F` is implicitly 1), which flatters oral exposure, and `cmax_ng_ml` is a
@@ -317,24 +272,6 @@ addressed; ○ = documented, future work.)
   pkCSM) is only ~±80%. The pragmatic path is per-drug **enrichment overrides**
   (same mechanism as `endpoint_outcome`); mechanistic `Kp` (Rodgers–Rowland) needs
   pKa + fu on top of the logP we already compute.
-- **Covalent binders are tethered to the right pocket, but still scored reversibly** ◑ —
-  a flagged covalent warhead (RDKit SMARTS) against a **curated covalent target class**
-  (KRAS G12C, EGFR, BTK) is now routed through a covalent-tethered box. `app/binding_site.py`
-  finds the class's reactive cysteine **geometrically** — the Cys Sγ within ~2.5 Å of the bound
-  ligand in the curated holo structure, *not* a hardcoded residue number — Meeko tethers the
-  warhead to it (`mk_prepare_ligand --tether_smarts`), and Vina docks in a tight box centered on
-  that residue (`docking_box.mode: "covalent-tethered (curated holo)"`, with the reactive residue
-  and warhead in provenance). This fixes the **pocket** (decisive for KRAS's cryptic switch-II
-  site) and seeds a covalent-geometry pose.
-  **What it is NOT:** the Vina score is still the **reversible** scoring function — no covalent
-  bond enthalpy is added — so this is a pocket-correct, geometry-tethered *lower bound*, not true
-  reactive scoring. The Python `vina` bindings cannot consume Meeko's flexible-residue covalent
-  output (they reject its `BEGIN_RES`/`END_RES` records and expect a `TORSDOF` line, which the
-  prep strips/adds), so full reactive/flexible-residue docking needs AutoDock-GPU — not on the
-  conda channels, deferred. Only **Michael-acceptor/acrylamide** warheads are tetherable today;
-  other detected warheads and non-curated targets fall back to reversible docking **with a
-  warning**. `covalent_flag` is still not read by the market model, so KRAS's understated ΔG is
-  not compensated downstream.
 - **Single structure, rigid receptor** ○ — one experimental (or AlphaFold) structure
   per target, no ensemble or flexible-side-chain docking. Vina supports both
   (ensemble = dock the ranked PDBe structure list; flex = split rigid/flex PDBQT);
@@ -421,116 +358,47 @@ addressed; ○ = documented, future work.)
   (gzip + base64 takes ~8 KB of PDB to ~2.4 KB) or, better, give the session a real
   side channel — write the pose to object storage and return a URL, keeping the line
   small and fixed-size no matter what the physics produces.
-- **Docking runs were non-deterministic** ✅ — `run_vina` passed `seed=0`, which Vina
-  interprets as *"choose a random seed"*, so repeat runs of the same drug/target drifted
-  (ΔG −8.42 / −8.59 / −8.59 for sotorasib–KRAS). Now pinned to a fixed seed *set* (42, 43, 44)
-  and reported as mean ± sd (below). Reproducible numbers are a precondition for the result
-  contract meaning anything.
-- **Reported precision now reflects seed variability** ✅ — the former single-seed precision problem
-  is retired. Pinning a single seed made runs reproducible but concealed the sampling variance
-  and still reported ΔG to three decimals. `run_vina(seed=…)` now docks across a **deterministic
-  seed set** (`_derive_seeds` → 42, 43, 44; the *set* is fixed, so runs stay bit-reproducible),
-  and `dock_replicates` → `summarize_dg` returns mean ΔG, sample sd and n. The result carries
-  `binding_affinity_kcal_mol` (mean), `binding_affinity_sd_kcal_mol` and `replicates`; **no
-  absolute Kd is derived** from the mean ΔG any more; the sd feeds `_dg_noise_penalty`
-  (0.5·sd, capped at 0.2) into `confidence` **and** gates the `binding_engagement` classification
-  (an experimentally-resolved site with sd ≤ 0.75 is a *reproducible* `experimental-site`), so
-  docking noise propagates into the PoS delta and the engagement label instead of being hidden. The observed spread here is small (0.010 / 0.052 kcal/mol).
-  **Caveats:** this measures **sampling noise only** — not model bias, box placement, or
-  scoring-function error, which dominate and re-seeding cannot see; the cost is linear in seed
-  count (3× the docking time); and `cmax_ng_ml` remains a **tissue** concentration (`Kp`-scaled),
-  not plasma Cmax, with AUC over 0–48 h. The structure-free baseline does **not** get replicate
-  semantics — it is deterministic, so its sd is `None`.
+- **Docking runs were non-deterministic, and single-seed precision was overstated** ✅
+  — `run_vina` passed `seed=0`, which Vina interprets as *"choose a random seed"*, so repeat
+  runs of the same drug/target drifted (ΔG −8.42 / −8.59 / −8.59 for sotorasib–KRAS). Pinning a
+  single seed fixed reproducibility but concealed sampling variance while still reporting ΔG to
+  three decimals. `run_vina(seed=…)` now docks across a **deterministic seed set** (`_derive_seeds`
+  → 42, 43, 44 — the set is fixed, so runs stay bit-reproducible), and `dock_replicates` → `summarize_dg`
+  returns mean ΔG, sample sd and n. **No absolute Kd is derived** from the mean ΔG; the sd feeds
+  `_dg_noise_penalty` (0.5·sd, capped at 0.2) into `confidence` and gates the `binding_engagement`
+  classification (an experimentally-resolved site with sd ≤ 0.75 is a *reproducible* experimental-site),
+  so docking noise propagates into the PoS delta and the engagement label instead of being hidden.
+  The observed spread here is small (0.010 / 0.052 kcal/mol).
+  **Caveats**: this measures **sampling noise only** — not model bias, box placement, or scoring-function error,
+  which dominate and re-seeding cannot see; cost is linear in seed count (3× docking time). The
+  structure-free baseline does **not** get replicate semantics — it's deterministic, so its sd is `None`.
 
 ### Market model
-- **Uncalibrated, hand-tuned** ○ — deterministic and fully inspectable: the PoS
-  delta is built additively (`pos_breakdown`) and the headline number derives from
-  that breakdown, so they can never disagree. But the weights (0.5 / 0.2 / 0.15…)
-  and thresholds are magic numbers. The real fix is **backtesting** against
-  historical biotech readouts and actual next-day price moves to fit them.
-- **Docking is priced only as a capped geometric corroborator** ✅ — the market model
-  no longer has an affinity-strength term or an occupancy term. Because the Vina score cannot
-  rank affinity, `pos_breakdown` prices only a small, capped **+0.05** bonus when
-  `binding_engagement == "experimental-site"` (the ligand docked into an experimentally-resolved
-  site with a reproducible pose), and applies it **only to a positive readout** — docking can
-  never rescue a missed endpoint, and the no-readout gate still yields no call. It never reads
-  `kd_nM`, raw-ΔG thresholds, or occupancy. This replaces the former `binding_modifier` /
-  `occupancy_modifier` terms with a single `engagement_modifier`.
-- **Missed-trial asymmetry** ✅ — fixed. Modifiers are now applied by meaning
-  (efficacy corroboration only strengthens a win) rather than mirrored by the readout
-  sign, which previously let the drug-likeness flag reduce the downside of a *failed*
-  trial. The met-trial path is unchanged. (The flag itself is now unpriced —
-  so it can no longer move any call regardless of sign.)
-- **Spurious alerts on `unknown` outcomes** ✅ — fixed, and this one was live on the
-  *common* path. Every term in `pos_breakdown` is a modifier on a clinical readout, but
-  they were applied even when there was no readout: an `unknown` outcome (base `0.0`)
-  plus a (then-priced) drug-likeness flag scored `-0.15 × 0.95 = -0.1425`, which clears
-  the `0.10` market-moving threshold and emits a **"down" call on a trial that has reported
-  nothing** — a directional signal derived purely from the drug's Lipinski violations.
-  (That flag is now unpriced entirely, so this path is doubly closed.)
-  And `unknown` is the *default* for every trial the watchlist has not enriched, so this
-  was the majority path in production, not an edge case. The modifiers are now gated on
-  `has_readout`, so no readout means no call. Both published runs are `met`, so their
-  numbers are byte-identical — a regression test asserts exactly that.
-- **No phase weighting — by design** — the chemistry answers one phase-invariant,
-  **preclinical / discovery-stage** question (target engagement is established before the clinic;
-  Phase 2/3 test efficacy and statistics the physics does not model), so there is nothing to
-  weight. Phase governs only *information timing*: a Phase 2/3 run is a **retrospective known-readout
-  re-simulation** — a pipeline benchmark, not a tradeable signal.
-- **Naive competitor read-through** ○ — competitors are assumed to move opposite the
-  sponsor, one magnitude bucket softer. Real read-through depends on mechanism /
-  target overlap and modality, not just "is a competitor."
-- **Sponsor→ticker resolution is a hand-maintained 6-entry file** ○ — `tickers.json` maps six
-  sponsors (amgen, regeneron, vertex, moderna, biogen, lilly) to a ticker plus a **hardcoded
-  competitor list**. Any claim about pointing the watcher at a therapeutic area, or building a
-  corpus across the trial universe, runs straight into this file. Real resolution is an
-  **entity-resolution problem**, not a lookup: CT.gov sponsor strings are messy and
-  inconsistent, sponsors are frequently subsidiaries of a listed parent, **many are private or
-  pre-IPO** (no ticker — and therefore no trade), and licensed or partnered assets sit with a
-  different economic owner than the sponsor. The competitor map is worse, because "who is a
-  competitor" is a modelling judgment rather than a fact. **Fix:** an entity-resolution step
-  (sponsor string → legal entity → listed parent → ticker) with explicit handling for private
-  sponsors, and competitors derived from target/mechanism overlap rather than hardcoded.
-  **Until then the system runs on a watchlist, not a universe** — the demo is honest, the
-  scaling claim is not yet earned.
-- **`endpoint_outcome` not auto-derived** ○ — met/missed is supplied via enrichment
-  (`watchlist.json`), not parsed from CT.gov. An LLM classifier over the results
-  section / press releases would close the loop.
+- **Uncalibrated, hand-tuned** ○ — the PoS delta is deterministic and additive (`pos_breakdown`), so the
+  headline number can never disagree with its own breakdown, but the weights and thresholds are magic
+  numbers. Needs backtesting against historical biotech readouts and actual next-day price moves to fit them.
+- **No phase weighting — by design** — the chemistry answers one phase-invariant, preclinical/discovery-stage
+  question, so there's nothing to weight; a Phase 2/3 run is a retrospective pipeline benchmark, not a
+  tradeable signal.
+- **Naive competitor read-through** ○ — competitors are assumed to move opposite the sponsor, one magnitude
+  bucket softer. Real read-through depends on mechanism/target overlap and modality, not just "is a competitor."
+- **`endpoint_outcome` not auto-derived** ○ — met/missed comes from manual enrichment (`watchlist.json`),
+  not parsed from CT.gov. An LLM classifier over the results section / press releases would close the loop.
 
 ### Architecture & operations
-> The harness/estimator split and the pinned-commit checkout (former issues #5/#6) are
-> **done** — see [Estimators](#estimators-one-interface-many-models-vina-is-not-the-architecture)
-> for how they work. The residual open caveats they introduced are below.
-
 - **The shipped second estimator is a control, not a rival model** ○ —
-  `ligand-efficiency-baseline@2` is a heavy-atom size proxy (ΔG ≈ 0.3 kcal/mol × atom),
-  deliberately naive: a floor for docking to beat, **not** a validated affinity method (its ΔG
-  is low-confidence and flagged in `warnings`). So two estimators agreeing is **not** evidence
-  the physics is right — a real head-to-head still needs a second *physical* estimator
-  (co-folding / FEP / QSAR), and `docking_box` remains a Vina-specific field on the shared
-  contract until one exists.
-- **Pinning buys reproducibility, not validity** ○ — `SIM_REPO_COMMIT` makes a run
-  reproducible-from-source and `code_patched` verifiable, but does nothing for the scientific
-  caveats above (docking box, PK constants, cognate circularity all stand; ΔG-as-absolute and
-  occupancy are now resolved by the #4 re-scope), and is
-  distinct from **structure** pinning — the resolved `pdb_id` is still chosen at run time.
-- **One Devin session per estimator** ○ — a head-to-head launches an independent real session
-  per estimator, so cost and failure modes scale with the count and arms can fail independently;
-  `/analysis` shows a comparison only once **more than one** estimator has completed for a trial.
+  `ligand-efficiency-baseline@2` is deliberately naive (a heavy-atom size proxy), not a validated affinity method.
+  Two estimators agreeing is not evidence the physics is right — a real head-to-head still needs a second physical
+  estimator (co-folding / FEP / QSAR).
+- **Pinning buys reproducibility, not validity** ○ — `SIM_REPO_COMMIT` makes a run reproducible and `code_patched`
+  verifiable but does nothing for the scientific caveats above, and is distinct from **structure** pinning
+  — the resolved `pdb_id` is still chosen at run time.
+- **One Devin session per estimator** ○ — a head-to-head launches an independent real session per estimator,
+  so cost and failure modes scale with the count.
 
 ### Security & operations
-- **Webhook signature verification fails closed** ✅ — fixed. `/webhook/trial-update` now rejects
-  *every* request with `503` when
-  `WATCHER_SHARED_SECRET` is unset, so a forgotten secret yields a **dark** endpoint, never
-  an open, billable one — an unauthenticated caller can no longer spend a real Devin session.
-  With the secret set, a missing or bad signature is `401`. `create_app` still logs a loud
-  startup warning when the secret is absent so the disabled state is obvious. (Local/demo
-  runs sign with the same secret via `WATCHER_SHARED_SECRET`, as the quick-start shows.)
-- **No retries or timeouts on hung sessions** ○ — a Devin session that goes `blocked` or
-  hangs is left for a human; `blocked` is deliberately non-terminal so `/poll` can pick it
-  up again, but nothing escalates it.
-- **SQLite, single process** ○ — fine for a prototype, wrong for concurrent writers.
-  Postgres is the obvious swap; the repository interface is already narrow enough for it.
+- **No retries or timeouts on hung sessions** ○ — a `blocked` or hung session is left for a human; nothing escalates it.
+- **SQLite, single process** ○ — fine for a prototype, wrong for concurrent writers; Postgres is the obvious swap.
 
 ---
 
