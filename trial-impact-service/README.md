@@ -7,7 +7,7 @@ that runs a real **biophysical simulation** (protein–ligand docking + PK/PD),
 scores the result with a transparent market model, and — on a market-moving
 readout — alerts to Slack/email while surfacing everything on a dashboard.
 
-Scope: a preclinical / Phase 1 engagement instrument. The full framing is in [THESIS.md](../THESIS.md).
+Scope: a preclinical / Phase 1 engagement instrument. 
 
 > **Not investment advice.** Output is an automated research signal for informational purposes only,
 > built on an illustrative, un-backtested market model. A disclaimer is attached to every assessment.
