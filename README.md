@@ -269,7 +269,9 @@ so the ΔG is not point-in-time reproducible.
 | **Approved** (Kalydeco, 2012) | CFTR × ivacaftor | 6O2P · holo-ligand (VX7) | experimental-site (reproducible pose) | −7.404 ± 0.007 | clean | VRTX ↑ · CRSP/BLUE ↓ *(illustrative)* |
 
 Both are **approved** drugs, chosen because the answer is already known — this is a backtest against 
-ground truth, not a forecast, and carries no tradeable signal. Read the table as: engagement = the geometric 
+ground truth, not a forecast, and carries no tradeable signal. 
+
+Read the table as: engagement = the geometric 
 product, not strength — the ligand docked into the experimentally-resolved site with a reproducible multi-seed 
 pose (sd ≤ 0.75) and no Kd or occupancy are surfaced; ΔG = a docking-objective diagnostic, not affinity; Model call 
 = the rules-based placeholder. (PK/PD exposure — Cmax/AUC — is computed per run but shown in the drill-down and 
