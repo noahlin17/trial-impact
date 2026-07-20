@@ -39,10 +39,8 @@ the sponsor's internal derivative, so it falls back to coarse heuristics (phase 
 public raw inputs, we're not competing with the sponsor — we're closing a disclosure gap the market leaves open, not one it's 
 structurally barred from closing.
 
-> The assumption most likely to be fatal was never "can we generate a docked pose" — that part works. It's now sharper than
-> "can we compute the chemistry" broadly: cheap methods cannot recover binding strength (tested and negative, see Headline
-> results below), and whether any signal we compute — chemistry or otherwise — carries information the market doesn't already
-> have remains untested.
+> The assumption most likely to be fatal is not obviously the chemistry's technical feasibility — it's whether the chemistry,
+> if it works, would carry information the market doesn't already have. 
 
 The goal is now to compute `P_you` from disclosed science via granular biophysics, and check whether it is better-calibrated than 
 `P_market` over realized outcomes — `E[(P_you − y)²] < E[(P_market − y)²]`. If so, we trade the gap. That is where the money is,
