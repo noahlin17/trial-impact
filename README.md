@@ -53,7 +53,7 @@ the gap. That is where the money is, if it is anywhere.
 
 The reason to attempt it now is cost. Structure-based chemistry per trial has historically required a 
 computational chemist's time — not just to execute the docking, but to prep the structure and judge whether the result is trustworthy. 
-An agent sandbox does it per event, in minutes, for roughly the cost of the API calls — cheap execution makes systematic coverage 
+An agent sandbox does it per event, in minutes, for roughly the cost of the API calls — which makes systematic coverage 
 of the long tail possible in principle.
 
 > That cost argument also cuts against the project. A signal's value tends to decay with the cost of reproducing it, and the cost here
