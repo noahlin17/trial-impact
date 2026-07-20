@@ -6,7 +6,7 @@ help price a clinical trial's stock-moving readout before it occurs (*and where 
 ## Motivation & (unvalidated) market thesis
 
 A rational sponsor advances a compound only when it clears an internal bar for expected value — informally, 
-`P_science · V > C`. In practice sponsors don't compute this as a scalar; the decision is made by checking 
+`P_science · V > C`. In practice, sponsors don't compute this as a scalar; the decision is made by checking 
 whether the compound clears a set of pre-specified thresholds (a target product profile: minimum-acceptable 
 efficacy, safety, PK) combined with qualitative portfolio judgment. But the effect is the same as a threshold rule: 
 only compounds whose internal, unobserved likelihood of success is judged "good enough" get funded into a trial. 
