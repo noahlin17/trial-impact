@@ -50,7 +50,7 @@ The reason to attempt it now is cost. Structure-based chemistry per trial has hi
 An agent sandbox does it per event, in minutes, for roughly the cost of the API calls. 
 
 > That cost argument also cuts against the project. A signal's value tends to decay with the cost of reproducing it, and the cost here
-> is low: Vina is free and has been available since 2010, RDKit, the PDB, AlphaFold DB, PubChem and Open Targets are all free;
+> is low: Vina is free and has been available since 2010, RDKit, the PDB, AlphaFold DB, PubChem and Open Targets are all free.
 > If this gap is increasingly easier to close, it is reasonable to assume it will be priced in. So the edge, if there is one, is
 > **not purely chemistry**. It would be in producing an **overall better-calibrated estimate of P(success)** than the one implied by
 > the market, and trading the difference. The chemistry is one input to that estimate. Incorporating more meaningful signal should
