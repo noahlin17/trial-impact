@@ -11,8 +11,8 @@ claim.
 
 Eight approved drugs with real, citable ChEMBL affinities (`anchors.json`), spanning
 pKd 7.36–10.09, all reversible, drug-like, single-pocket binders in one well-behaved
-docking regime (ATP-competitive kinase hinge binders + one clean soluble-enzyme
-inhibitor — matching the oncology domain). Each is docked through the **production
+docking regime (ATP-competitive kinase hinge binders across ABL1/EGFR/VEGFR2, plus one 
+soluble-enzyme inhibitor, rivaroxaban/FXa). Each is docked through the **production
 pipeline** (so the pose and ΔG are on our scale), then rescored with a single-snapshot
 MM-GBSA. We ask: does either score rank the measured affinity, or just ligand size?
 
