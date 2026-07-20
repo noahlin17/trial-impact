@@ -38,7 +38,9 @@ with the cheap single-snapshot MM-GBSA protocol. Spearman ρ vs measured pAffini
 
 **NEGATIVE (pre-registered bar NOT met).** MM-GBSA ρ = −0.54 (target ≥ +0.5), its CI includes 0, 
 and it performs worse than both the size baseline and raw Vina — not merely failing to beat them, 
-but landing on the opposite side of zero from a useful signal. Even in the favorable congeneric regime, 
+but landing on the opposite side of zero from a useful signal. Criteria 1–3 already decisively fail, 
+so the pre-registered seed/pose-sensitivity check (criterion 4) was not run — it cannot change a 
+verdict that three independent thresholds have already missed. Even in the favorable congeneric regime, 
 the cheap single-snapshot rigid-receptor protocol (one pose, no entropy, no ensemble, single
 protonation) does not recover relative affinity ordering; raw Vina is essentially flat
 (ρ ≈ 0), consistent with the ~constant ligand size across the series (21–25 atoms, vs. a 2.53-log 
