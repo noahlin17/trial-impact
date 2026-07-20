@@ -236,10 +236,10 @@ as a geometric classification derived from pocket-routing tier and pose reproduc
 The workload is the reason a sandbox is used rather than a fixed container. It has to
 `pip install` a heavy and fragile scientific stack (RDKit, Meeko, OpenBabel, Vina), pull
 structures from four upstream APIs, and recover when any of them fails — which they do,
-in ways that are not predictable in advance (see the API-rot section below). A container
-would have to anticipate each failure; a session can respond to one. That adaptability is
-what makes per-event chemistry cheap enough to run at scale. One isolated session per
-trial event also keeps runs independently retryable and separately auditable.
+in ways that are not predictable in advance. A container would have to anticipate each failure; 
+a session can respond to one. That adaptability is what makes per-event chemistry cheap enough 
+to run at scale. One isolated session per trial event also keeps runs independently retryable and 
+separately auditable.
 
 The tradeoff is that an agent will also fix things it was not asked to fix — including
 the science. That is not hypothetical: it has happened twice here, and it is why the
