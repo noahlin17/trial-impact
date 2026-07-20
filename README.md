@@ -250,7 +250,7 @@ result contract carries a `code_patched` field. See
 
 ### On the label
 
-The met/missed label each estimate sits alongside is today supplied manually via watchlist.json 
+The met/missed label each estimate sits alongside is today supplied manually via `watchlist.json` 
 (CT.gov has no machine-readable met/missed); an LLM classifier is the intended but unbuilt path ([Next steps](#next-steps)). 
 Only the physics half is built. 
 
