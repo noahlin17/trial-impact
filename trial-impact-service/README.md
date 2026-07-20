@@ -368,7 +368,7 @@ addressed; ○ = documented, future work.)
   `_dg_noise_penalty` (0.5·sd, capped at 0.2) into `confidence` and gates the `binding_engagement`
   classification (an experimentally-resolved site with sd ≤ 0.75 is a *reproducible* experimental-site),
   so docking noise propagates into the PoS delta and the engagement label instead of being hidden.
-  The observed spread here is small (0.010 / 0.052 kcal/mol).
+  The observed spread here is small (0.187 / 0.007 kcal/mol for the KRAS / CFTR published runs).
   **Caveats**: this measures **sampling noise only** — not model bias, box placement, or scoring-function error,
   which dominate and re-seeding cannot see; cost is linear in seed count (3× docking time). The
   structure-free baseline does **not** get replicate semantics — it's deterministic, so its sd is `None`.
