@@ -39,6 +39,11 @@ the sponsor's internal derivative, so it falls back to coarse heuristics (phase 
 public raw inputs, we're not competing with the sponsor — we're closing a disclosure gap the market leaves open, not one it's 
 structurally barred from closing.
 
+This is consistent with what public evidence about specialist biotech funds suggests: deep scientific diligence 
+at PhD/MD level is concentrated on a small number of high-conviction, heavily-covered names, not applied 
+systematically across the long tail of small/mid-cap Phase 1 trials — a coverage gap, not a claim that 
+this kind of chemistry has never been tried.
+
 > The assumption most likely to be fatal is not obviously the chemistry's technical feasibility — it's whether the chemistry,
 > if it works, would carry information the market doesn't already have. 
 
