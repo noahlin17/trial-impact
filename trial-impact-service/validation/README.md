@@ -28,8 +28,8 @@ MM-GBSA. We ask: does either score rank the measured affinity, or just ligand si
 correlations are non-positive with CIs spanning zero, and both scores track ligand
 **size** (ρ ≈ +0.4). The tell: the two largest ligands (nilotinib, lapatinib) score
 most "favorably" in both methods yet are among the *weaker* anchors, while dasatinib —
-the tightest binder — lands mid-pack. MM-GBSA does **not** beat Vina, and neither beats
-"just count the atoms."
+the tightest binder — lands well off the top in both. MM-GBSA does **not** beat Vina, 
+and neither beats "just count the atoms."
 
 ## Why (and the correct scope)
 
@@ -40,6 +40,13 @@ smaller than its size range, size drowns out the affinity signal. The
 [congeneric same-target test](congeneric/README.md) has now also been run: cheap
 single-snapshot MM-GBSA on 13 Tyk2 ligands was negative (ρ = −0.54, 95% CI [−0.89, +0.07]).
 More expensive sampling (**explicit-solvent MM-GBSA ensembles / FEP**) remains untested.
+
+**One anchor is a known outlier worth flagging directly.** Imatinib's MM-GBSA score (−3.68 kcal/mol) 
+sits roughly an order of magnitude weaker than every other anchor in the panel (−21.7 to −54.7), 
+on a well-characterized drug with no obvious reason for the setup to fail this badly. 
+We haven't isolated the cause — likely a pose or protonation-state issue specific to that run — and haven't 
+re-run it, so it should be read as an unresolved anomaly, not a confirmed data point. The aggregate ρ 
+above is not fully independent of this single score.
 
 Consequently the pipeline makes **no absolute-affinity or binding-strength claim**. The
 docked pose is used only as a *geometric engagement* signal (does the ligand dock into
