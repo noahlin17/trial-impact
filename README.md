@@ -59,12 +59,11 @@ An agent sandbox does it per event, in minutes, for roughly the cost of the API 
 
 ### The wider view
 
-A broader and more speculative hypothesis motivates the longer-term direction: AI tooling may be
-shifting the *outcome distribution* of drug development while pricing stays anchored to historical
-base rates, which would move the most valuable target from *the molecule* to *the trial design* the
-watcher already ingests. It is held as a hypothesis, not a finding. 
-
-This logic is developed in full in [THESIS](THESIS.md).
+**A broader and more speculative hypothesis** — an early-stage generalist technology VC's read of AI x biology: 
+the outcome *distribution* of drug development is shifting (protein structure prediction, patient selection, 
+biomarker stratification, adaptive design) while pricing stays anchored to historical base rates. If AI-enhanced 
+trials have genuinely different odds and the market doesn't separate them from conventional ones, that gap is the opportunity 
+— and the durable position isn't any single edge but the **infrastructure that keeps producing them as old ones compress**.
 
 ## Testing AutoDock Vina and MM-GBSA
 
@@ -384,7 +383,6 @@ cd trial-impact-service && pip install -r requirements-dev.txt && ruff check . &
 
 The real open work, in order - each stage gates the next. Core caution: calibrating a pricing model on a biased signal just 
 launders the bias (see step 2), so honest data comes before clever features, and cheap baselines before more science. 
-Full argument in [THESIS.md](THESIS.md). 
 
 **1 · Add the signals the chemistry can't see.** Drugs mostly fail because the target is wrong, not because the molecule 
 doesn't bind. The cheapest, strongest public signal is human genetics: genetically-supported targets succeed ~2× as often 
