@@ -278,7 +278,7 @@ This is the clearest reason to treat the chemistry and the market model here as 
 It also reorders the issue list: in the reactive system this is a documented scope limit, because
 a known clinical readout carries the call and docking is only a geometric corroborator. In a
 predictive system there is no readout to fall back on, so recovering a real *strength* signal
-(gnina CNN rescoring / MM-GBSA / FEP — §future work) becomes blocking.
+(gnina CNN rescoring / MM-GBSA / FEP — future work) becomes blocking.
 
 The obvious next candidate, a single-snapshot **MM-GBSA rescore** of the docked poses (which adds
 the electrostatics and desolvation terms Vina omits), was subsequently built CPU-only and evaluated

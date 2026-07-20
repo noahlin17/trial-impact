@@ -43,7 +43,7 @@ browser hits the same temp SQLite DB. Key gotchas:
 
 ## Assertions that distinguish working from broken
 1. `/analysis` head-to-head shows ONE trial with TWO rows (both estimator ids), differing
-   ΔG/Kd/occ/confidence/PoS, and a header ΔG/PoS spread = max−min.
+   ΔG/engagement/confidence/PoS, and a header ΔG/PoS spread = max−min.
 2. A single-estimator trial is EXCLUDED from head-to-head but STILL appears in the Runs table
    (proves the `<2 distinct estimators` rule, not a missing row).
 3. Regression: `/status` renders all events; both arms of the two-estimator trial coexist as
@@ -56,7 +56,7 @@ run's route + structure + numbers render, and that a **net-new in-scope drug rou
   *events*; the nested `event["sim_result"]` is exactly what the fake Devin should replay. Feed each
   via a `ScriptedDevin(sim_result)` (working on poll 1, finished on poll 2) into one combined temp
   DB, then `app.run(port=8899)`. This renders the real published numbers with zero docking cost.
-- **Where the route shows up in the UI:** `/status` shows occupancy + a structure card per run
+- **Where the route shows up in the UI:** `/status` shows engagement + a structure card per run
   (`pdb_id (source) · ΔG`); `/analysis` Runs table shows `ΔG±sd` + `Structure` (pdb_id). The
   `docking_box.mode` / `reactive_residue` / `tether` / `co_crystal_ligand` are NOT in a template —
   read them from **`/analysis.json`** (open in-browser + `ctrl+f`, or curl `/status?format=json`).
@@ -65,7 +65,7 @@ run's route + structure + numbers render, and that a **net-new in-scope drug rou
 - **Run a NEW real docking SIM (proves "expand the universe").** Use the conda-lock env, not the
   pip venv (pip lacks ProDy/fpocket → covalent route can't run):
   `MAMBA_ROOT_PREFIX=<repo>/.tooling/mamba <repo>/.tooling/bin/micromamba run -n trialsim env
-  PYTHONPATH=. python -c "from app.estimators import get_estimator; print(get_estimator('vina-docking-pkpd@2').run(target='EGFR', drug='osimertinib', tissue='tumor', dose_mg=80).to_dict())"`.
+  PYTHONPATH=. python -c "from app.estimators import get_estimator; print(get_estimator('vina-docking-pkpd@3').run(target='EGFR', drug='osimertinib', tissue='tumor', dose_mg=80).to_dict())"`.
   Good in-scope covalent combos (net-new, not the committed drugs): **EGFR × osimertinib/afatinib**
   (Cys797, 4G5J), **BTK × ibrutinib/acalabrutinib** (Cys481, 5P9J). Expect `covalent_flag=True`,
   `mode="covalent-tethered (curated holo)"`, the target's real Cys as `reactive_residue`, a sane

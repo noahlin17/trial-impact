@@ -34,7 +34,7 @@ ClinicalTrials.gov API v2 ──poll──▶  ctgov-watcher (../ctgov-watcher)
 │                 → build sim prompt → Devin: POST /sessions ──────────────┼─▶ Devin session
 │                 → SQLite: insert event (queued)                          │   runs app/simulation.py
 │  RECONCILE POST /poll                                                    │   (docking + PK/PD)
-│     GET Devin session → extract SIM_RESULT_JSON ◀────────────────────────┼── ΔG, Kd, occupancy
+│     GET Devin session → extract SIM_RESULT_JSON ◀────────────────────────┼── ΔG (diagnostic), engagement
 │     → market_model.assess → price calls + commentary                     │
 │     → SQLite update → Slack/email alert (once) on market-movers          │
 │  OBSERVE   GET /status  → dashboard + JSON                               │
@@ -498,7 +498,7 @@ addressed; ○ = documented, future work.)
   section / press releases would close the loop.
 
 ### Architecture & operations
-> The harness/estimator split and the pinned-commit checkout (former issues #5/#6) are
+> The harness/estimator split and the pinned-commit checkout are
 > **done** — see [Estimators](#estimators-one-interface-many-models-vina-is-not-the-architecture)
 > for how they work. The residual open caveats they introduced are below.
 
@@ -512,7 +512,7 @@ addressed; ○ = documented, future work.)
 - **Pinning buys reproducibility, not validity** ○ — `SIM_REPO_COMMIT` makes a run
   reproducible-from-source and `code_patched` verifiable, but does nothing for the scientific
   caveats above (docking box, PK constants, cognate circularity all stand; ΔG-as-absolute and
-  occupancy are now resolved by the #4 re-scope), and is
+  occupancy are now resolved by the geometric-engagement re-scope), and is
   distinct from **structure** pinning — the resolved `pdb_id` is still chosen at run time.
 - **One Devin session per estimator** ○ — a head-to-head launches an independent real session
   per estimator, so cost and failure modes scale with the count and arms can fail independently;

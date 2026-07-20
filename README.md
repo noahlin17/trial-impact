@@ -281,7 +281,7 @@ site with a reproducible multi-seed pose (sd ≤ 0.75); no Kd or occupancy is su
 
 The ΔGs are cognate/holo (partly circular) and the covalent KRAS score is Vina's reversible function 
 (a pocket-correct lower bound; `code_patched: false` confirms the numbers came 
-from `simulation.py` unpatched. Routing is class-based, not drug-based, so a net-new drug in either class
+from `simulation.py` unpatched). Routing is class-based, not drug-based, so a net-new drug in either class
 routes itself the same way.
 
 The **analysis view** (`GET /analysis`,
