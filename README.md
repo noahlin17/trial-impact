@@ -385,7 +385,7 @@ cd trial-impact-service && pip install -r requirements-dev.txt && ruff check . &
 
 ## Next steps
 
-The real open work, in order - each stage gates the next. Core caution: calibrating a pricing model on a biased signal just 
+The real open work, in order. Core caution: calibrating a pricing model on a biased signal just 
 launders the bias (see step 2), so honest data comes before clever features, and cheap baselines before more science. 
 
 **1 · Add the signals the chemistry can't see.** Drugs mostly fail because the target is wrong, not because the molecule 
@@ -405,9 +405,9 @@ Success = a probability that's well-calibrated and beats a cheap base-rate basel
 
 **4 · Compare to the market, trade the gap.** Back out the market's own implied odds (from options around the readout, or valuation 
 vs risk-adjusted NPV). The edge is the difference between our estimate and the market's, not how confident we are — and it 
-pays off through breadth: a small edge across hundreds of under-covered small/mid-cap trials a year beats a big edge on a handful.
+pays off through breadth: a small edge across hundreds of under-covered small/mid-cap trials a year can beat a big edge on a handful.
 
-> Each phase tests a different unknown with different known inputs, so each gets its own feature set and model. Phase 1 (safety /
-> tolerability / MTD / PK) leans on ADMET/tox and exposure; the efficacy signals above (genetics, precedent, expression) are most informative
+> Each phase tests a different unknown with different known inputs so each gets its own feature set and model. Phase 1 (safety /
+> tolerability / MTD / PK) leans on ADMET/tox and exposure; the efficacy signals (genetics, precedent, expression) are most informative
 > about whether a drug will clear the Phase 2/3 efficacy bar — but the goal is still to price that risk before it resolves, consistent
 > with the pre-readout thesis, not to treat Phase 2/3 itself as newly in scope.
