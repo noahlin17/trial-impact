@@ -89,9 +89,11 @@ the molecule makes a **reproducible, geometrically sound engagement** (computed 
 and the chemistry, not from the sponsor's description of the result). A closed-form PK/PD solve adds
 tissue exposure (Cmax/AUC).
 
-The **low-lift** methods here proved **sufficient to reproduce binding geometry**: redock a native ligand
-and the pose comes back (5/7 within 2 Å). **Affinity is governed by the free energy of binding (ΔG)** 
-— and the low-lift methods were **not** sufficient to get it on the cheap.
+The **low-lift** methods here **reproduce binding geometry in the native-holo setting**: redock a native ligand
+and the pose usually comes back (5/7 within 2 Å) — though 2/7 fail, one confidently (4GIH, 7.17 Å off at 0.04 Å
+seed spread), so this clears only the first of the pose-fidelity control's two pre-registered criteria (see the
+Headline results below). **Affinity is governed by the free energy of binding (ΔG)** — and the low-lift methods
+were **not** sufficient to get it on the cheap.
 
 We never expected the raw AutoDock Vina score to be a binding free energy (literature is clear it's a fast, 
 size-correlated heuristic, not a free-energy method). Vina generates the poses MM-GBSA and the engagement classification 
