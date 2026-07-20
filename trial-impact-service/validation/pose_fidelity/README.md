@@ -38,19 +38,19 @@ in-place heavy-atom RMSD to the deposited pose):
 
 **POSITIVE on the geometry criterion — criterion 1 met: 5/7 within 2 Å (71% ≥ the
 60% bar), median 0.71 Å. Criterion 2, seed agreement as a usable confidence signal,
-was NOT met.** When routed to the correct pocket, the
-multi-seed protocol reproduces the crystallographic pose — which is exactly the
-*geometric-engagement* claim the product makes. 4GIH and 1M17 are the honest misses:
-4GIH fails consistently, while 1M17 has a large seed spread and its top pose fails even though
-one alternate seed reaches 1.77 Å. 4GIH is a confidently converged wrong pose: its
-0.04 Å spread is inside the 0.02–0.10 Å range of the correct poses, yet its top pose
+was NOT met.** When routed to the correct pocket, the multi-seed protocol reproduces 
+the crystallographic pose — which is exactly the *geometric-engagement* claim the product makes. 
+4GIH and 1M17 are the honest misses: 4GIH fails consistently across all seeds; 1M17's top-ranked 
+pose misses (5.87 Å), but at least one alternate seed lands within the 2 Å bar (1.77 Å) 
+— a case where the wrong pose was simply ranked first. 4GIH is a confidently converged wrong pose: 
+its 0.04 Å spread is inside the 0.02–0.10 Å range of the correct poses, yet its top pose
 is 7.17 Å wrong. No seed-spread threshold separates correct from incorrect. Vina finds
 a rotated in-pocket mode that scores marginally better (the docked conformer still aligns
 to the crystal at ~1.3 Å, but is displaced in place).
 
-The reported Spearman ρ = +0.89 and mean-spread gap (0.04 Å correct versus 2.07 Å
-incorrect) are driven entirely by the single high-spread 1M17 outlier. They do not
-constitute a usable seed-spread threshold or confidence signal.
+The reported Spearman ρ = +0.89 between seed spread and pose error, and mean-spread gap 
+(0.04 Å correct versus 2.07 Å incorrect) are driven entirely by the single high-spread 
+1M17 outlier. They do not constitute a usable seed-spread threshold or confidence signal.
 
 ## Interpretation
 
