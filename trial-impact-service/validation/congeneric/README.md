@@ -29,19 +29,20 @@ the harness reads, so the fetch is not on the `make` reproduce path.
 All 13 analogs docked into the **same** 4GIH receptor/pocket (fixed prep), then rescored
 with the cheap single-snapshot MM-GBSA protocol. Spearman ρ vs measured pAffinity:
 
-| predictor | ρ vs pAffinity | 95% CI | Kendall τ |
-|---|--:|--:|--:|
-| heavy-atoms (size baseline) | +0.29 | [−0.30, +0.73] | +0.23 |
-| Vina ligand efficiency | −0.29 | [−0.68, +0.33] | −0.15 |
-| Vina (−ΔG) | +0.08 | [−0.54, +0.68] | +0.05 |
-| **MM-GBSA (−ΔG)** | **−0.54** | **[−0.89, +0.07]** | **−0.38** |
+| predictor | ρ vs pAffinity | 95% CI |
+|---|--:|--:|
+| heavy-atoms (size baseline) | +0.29 | [−0.30, +0.73] |
+| Vina ligand efficiency | −0.29 | [−0.68, +0.33] |
+| Vina (−ΔG) | +0.08 | [−0.54, +0.68] |
+| **MM-GBSA (−ΔG)** | **−0.54** | **[−0.89, +0.07]** |
 
-**NEGATIVE (pre-registered bar NOT met).** MM-GBSA ρ = −0.54 (target ≥ +0.5), its CI
-includes 0, and it beats neither the size baseline nor raw Vina — it is in fact *inversely*
-correlated with affinity here. Even in the favorable congeneric regime, the cheap
-single-snapshot rigid-receptor protocol (one pose, no entropy, no ensemble, single
+**NEGATIVE (pre-registered bar NOT met).** MM-GBSA ρ = −0.54 (target ≥ +0.5), its CI includes 0, 
+and it performs worse than both the size baseline and raw Vina — not merely failing to beat them, 
+but landing on the opposite side of zero from a useful signal. Even in the favorable congeneric regime, 
+the cheap single-snapshot rigid-receptor protocol (one pose, no entropy, no ensemble, single
 protonation) does not recover relative affinity ordering; raw Vina is essentially flat
-(ρ ≈ 0), consistent with the ~constant ligand size across the series.
+(ρ ≈ 0), consistent with the ~constant ligand size across the series (21–25 atoms, vs. a 2.53-log 
+affinity span).
 
 This does **not** say MM-GBSA is fundamentally useless — it says *this cheap CPU-only
 variant* is insufficient. Recovering affinity here would need ensemble averaging,
