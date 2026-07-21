@@ -17,7 +17,7 @@ useful fiction for what the threshold-crossing behavior reveals, not a number an
 Two facts make that exploitable:
 
 1. **The threshold-crossing is not certainty.** Clearing "good enough to fund" leaves real residual uncertainty
-   in exactly what the trial exists to resolve — human PK, tolerability, target validity. A funded trial is evidence
+   in exactly what the trial exists to resolve — human PK, tolerability, MTD. A funded trial is evidence
    of sponsor confidence, not proof of success.
 2. **Neither we nor the market observes `P_science` — both infer from the same disclosed subset of it.** The sponsor's
    true belief draws on internal data (failed formulations, unpublished tox signals, whatever didn't make the IND) that
