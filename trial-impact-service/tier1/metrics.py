@@ -70,6 +70,19 @@ def spearman_ic(p: Sequence[float], y: Sequence[float]) -> float:
     return _pearson(_ranks(p), _ranks(y))
 
 
+def incremental_metrics(
+    y: Sequence[int],
+    baseline: Sequence[float],
+    candidate: Sequence[float],
+) -> dict[str, float]:
+    """Return candidate-minus-baseline Brier and Spearman-IC deltas."""
+    return {
+        "delta_brier": brier_score(y, candidate) - brier_score(y, baseline),
+        "delta_ic": spearman_ic(candidate, [float(value) for value in y])
+        - spearman_ic(baseline, [float(value) for value in y]),
+    }
+
+
 def calibration_bins(
     y: Sequence[int], p: Sequence[float], n_bins: int = 10
 ) -> list[dict[str, float]]:

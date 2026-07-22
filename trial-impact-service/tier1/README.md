@@ -18,7 +18,7 @@ anything predictive (see the peer-review bar in the root README's
 | **Corpus outcomes — [`fixtures/corpus.json`](fixtures/corpus.json)** | **SYNTHETIC placeholder — outcomes still require human adjudication** |
 | Genetics scores (`ot_genetic_score`) — [`ingest/opentargets.py`](ingest/opentargets.py) | scriptable current-release Open Targets pull; **not historical as-of data** |
 | Market-implied probability | **not present** — there is no baseline to beat yet |
-| Chemistry feature (docking → probability) | **not wired in** — the point of a future ΔIC test |
+| Chemistry feature — [`chemistry.py`](chemistry.py) | wired as a `Predictor`; ΔIC over base-rate + genetics is measured as a scaffold; fixture values are synthetic |
 
 **No edge is or can be claimed here.** The harness runs end-to-end on synthetic data purely to
 prove the plumbing and enforce the honest-backtest rules. Every number it prints is meaningless
@@ -40,8 +40,9 @@ until a real corpus is built.
 Time-aware split only (random k-fold leaks the future). Judged by **calibration, not accuracy**:
 Brier / log-loss and a reliability curve, plus Spearman IC for ranking value. When a chemistry
 feature is added it enters as just another `Predictor`, and the same report measures whether it adds
-**incremental IC over base-rate + genetics** — the test that decides whether the physics earns its
-place.
+  **incremental IC over base-rate + genetics** — the test that decides whether the physics earns its
+  place. The chemistry line is a scaffold measurement: synthetic-corpus numbers are meaningless,
+  and no edge is claimed.
 
 ```bash
 python -m tier1.run     # runs on the synthetic fixture; stdlib only
@@ -64,5 +65,7 @@ pytest -q tests/test_tier1.py
   decomposition) so the KPI can be measured *against the market*, not in a vacuum.
 - **Sponsor→ticker** — real entity resolution to move from a watchlist to a universe; breadth is
   the whole thesis.
-- **Chemistry feature** — map the docking pipeline's output to a probability contribution so its
-  ΔIC over the baselines can be measured.
+- **Chemistry feature** — produce the real docking output with the pipeline and document its mapping
+  into `docking_engagement` (a geometric-engagement feature, not affinity or occupancy). The
+  predictor is wired and measures ΔIC over the base-rate + genetics prior, but the prior experiments
+  make little-to-no incremental IC the honest expectation on real data.

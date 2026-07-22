@@ -12,7 +12,13 @@ from __future__ import annotations
 from datetime import date
 
 from .baselines import Predictor
-from .metrics import brier_score, calibration_bins, log_loss, spearman_ic
+from .metrics import (
+    brier_score,
+    calibration_bins,
+    incremental_metrics,
+    log_loss,
+    spearman_ic,
+)
 from .schema import LABELLED, TrialRecord
 from .splits import time_aware_split
 
@@ -22,6 +28,7 @@ def evaluate(
     records: list[TrialRecord],
     cutoff: date,
     n_calibration_bins: int = 10,
+    comparisons: list[tuple[str, str]] | None = None,
 ) -> dict[str, object]:
     """Fit each predictor on the pre-cutoff split and score it on the post-cutoff split.
 
@@ -47,9 +54,11 @@ def evaluate(
         return report
 
     preds_out: dict[str, object] = {}
+    predictions: dict[str, list[float]] = {}
     for predictor in predictors:
         predictor.fit(train)
         p = [predictor.predict(r) for r in scored]
+        predictions[predictor.id] = p
         preds_out[predictor.id] = {
             "brier": round(brier_score(labels, p), 4),
             "log_loss": round(log_loss(labels, p), 4),
@@ -57,4 +66,16 @@ def evaluate(
             "calibration": calibration_bins(labels, p, n_calibration_bins),
         }
     report["predictors"] = preds_out
+    if comparisons:
+        report["comparisons"] = {}
+        for baseline_id, candidate_id in comparisons:
+            if baseline_id not in predictions or candidate_id not in predictions:
+                raise ValueError(
+                    f"comparison requires evaluated predictors: {baseline_id}, {candidate_id}"
+                )
+            report["comparisons"][f"{candidate_id} vs {baseline_id}"] = incremental_metrics(
+                labels,
+                predictions[baseline_id],
+                predictions[candidate_id],
+            )
     return report

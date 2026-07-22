@@ -14,8 +14,9 @@ from datetime import date
 import pytest
 
 from tier1.baselines import BaseRateBaseline, GeneticsBaseline
+from tier1.chemistry import ChemistryAugmentedPredictor, ChemistryPredictor
 from tier1.harness import evaluate
-from tier1.metrics import brier_score, calibration_bins, log_loss, spearman_ic
+from tier1.metrics import brier_score, calibration_bins, incremental_metrics, log_loss, spearman_ic
 from tier1.schema import FAILURE, SUCCESS, UNKNOWN, Prediction, TrialRecord, load_corpus
 from tier1.splits import LeakageError, assert_no_leakage, time_aware_split
 
@@ -123,6 +124,51 @@ def test_genetics_baseline_monotonic_and_missing_data_safe():
     assert g.predict(_rec(features={})) == pytest.approx(0.5)
 
 
+def test_chemistry_predictor_is_train_only_monotonic_and_missing_safe():
+    train = [
+        _rec(trial_id="f1", outcome=FAILURE, features={"docking_engagement": 0.1}),
+        _rec(trial_id="f2", outcome=FAILURE, features={"docking_engagement": 0.4}),
+        _rec(trial_id="s1", outcome=SUCCESS, features={"docking_engagement": 0.8}),
+        _rec(trial_id="s2", outcome=SUCCESS, features={"docking_engagement": 0.9}),
+    ]
+    chemistry = ChemistryPredictor()
+    chemistry.fit(train)
+
+    predictions = [
+        chemistry.predict(_rec(features={"docking_engagement": value}))
+        for value in (0.0, 0.1, 0.4, 0.8, 0.9, 1.0)
+    ]
+    assert predictions == sorted(predictions)
+    assert all(0.0 <= probability <= 1.0 for probability in predictions)
+    assert chemistry.predict(_rec(features={})) == pytest.approx(0.5)
+
+    # A high-valued test feature cannot alter a model fitted only on failures.
+    train_only = ChemistryPredictor()
+    train_only.fit([_rec(outcome=FAILURE, features={"docking_engagement": 0.1})])
+    assert train_only.predict(_rec(outcome=SUCCESS, features={"docking_engagement": 0.99})) == 0.0
+
+
+def test_chemistry_augmented_predictor_preserves_prior_when_feature_missing():
+    train = [
+        _rec(trial_id="f1", outcome=FAILURE, features={"docking_engagement": 0.1}),
+        _rec(trial_id="s1", outcome=SUCCESS, features={"docking_engagement": 0.9}),
+    ]
+    augmented = ChemistryAugmentedPredictor()
+    prior = GeneticsBaseline()
+    augmented.fit(train)
+    prior.fit(train)
+
+    missing = _rec(features={})
+    assert augmented.predict(missing) == pytest.approx(prior.predict(missing))
+    assert 0.0 <= augmented.predict(_rec(features={"docking_engagement": 0.9})) <= 1.0
+
+
+def test_incremental_metrics_reports_candidate_minus_baseline():
+    result = incremental_metrics([0, 1], [0.4, 0.6], [0.2, 0.8])
+    assert result["delta_brier"] < 0.0
+    assert result["delta_ic"] == pytest.approx(0.0)
+
+
 # --- metrics --------------------------------------------------------------
 
 def test_brier_and_log_loss_known_values():
@@ -151,10 +197,17 @@ def test_calibration_bins_partition():
 
 def test_evaluate_on_fixture_runs_and_reports():
     records = load_corpus(FIXTURE)
-    report = evaluate([BaseRateBaseline(), GeneticsBaseline()], records, date(2022, 1, 1))
+    report = evaluate(
+        [BaseRateBaseline(), GeneticsBaseline(), ChemistryAugmentedPredictor()],
+        records,
+        date(2022, 1, 1),
+        comparisons=[("base-rate+genetics@1", "base-rate+genetics+chemistry@1")],
+    )
     assert report["n_train"] > 0 and report["n_test"] > 0
     preds = report["predictors"]
     assert "base-rate@1" in preds and "base-rate+genetics@1" in preds
     for m in preds.values():
         assert 0.0 <= m["brier"] <= 1.0
         assert -1.0 <= m["spearman_ic"] <= 1.0
+    comparisons = report["comparisons"]
+    assert "base-rate+genetics+chemistry@1 vs base-rate+genetics@1" in comparisons
