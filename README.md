@@ -128,7 +128,7 @@ same pre-registered terms.
 
 ## Headline results — the low-lift pipeline reproduces binding *geometry* but does not recover binding *strength* on the cheap
 
-I tested the affinity premise on **8 approved drugs with real, measured affinities** (ChEMBL Ki/Kd,
+We tested the affinity premise on **8 approved drugs with real, measured affinities** (ChEMBL Ki/Kd,
 pKd 7.4–10.1), each docked through this exact pipeline, then rescored with a CPU MM-GBSA:
 
 ![Head-to-head: neither Vina nor single-snapshot MM-GBSA recovers measured affinity; both track ligand size](trial-impact-service/validation/results/headtohead.png)
