@@ -1,0 +1,19 @@
+{
+  "data": {
+    "disease": {
+      "id": "MONDO_0007254",
+      "name": "breast cancer",
+      "associatedTargets": {
+        "rows": [
+          {
+            "score": 0.7560462218494006,
+            "target": {
+              "id": "ENSG00000146648",
+              "approvedSymbol": "EGFR"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -14,8 +14,9 @@ anything predictive (see the peer-review bar in the root README's
 | Baselines — [`baselines.py`](baselines.py) (`base-rate@1`, `base-rate+genetics@1`) | real, tested |
 | Calibration/IC metrics — [`metrics.py`](metrics.py) (Brier, log-loss, Spearman IC, reliability bins) | real, tested |
 | Evaluation harness — [`harness.py`](harness.py) | real, tested |
-| **Corpus — [`fixtures/corpus.json`](fixtures/corpus.json)** | **SYNTHETIC placeholder — no scientific meaning** |
-| Genetics scores (`ot_genetic_score`) | placeholder values; **not** real Open Targets pulls |
+| Trial metadata — [`ingest/ctgov.py`](ingest/ctgov.py) | scriptable CT.gov API v2 pull; features/metadata only |
+| **Corpus outcomes — [`fixtures/corpus.json`](fixtures/corpus.json)** | **SYNTHETIC placeholder — outcomes still require human adjudication** |
+| Genetics scores (`ot_genetic_score`) — [`ingest/opentargets.py`](ingest/opentargets.py) | scriptable current-release Open Targets pull; **not historical as-of data** |
 | Market-implied probability | **not present** — there is no baseline to beat yet |
 | Chemistry feature (docking → probability) | **not wired in** — the point of a future ΔIC test |
 
@@ -49,12 +50,16 @@ pytest -q tests/test_tier1.py
 
 ## What real data each piece still needs
 
-- **Corpus** — reconstruct `(trial design, features, outcome, readout_date)` point-in-time over
-  history, with outcomes recovered from press releases / 8-Ks (not registry-only), terminated and
-  withdrawn trials kept in. This is the laborious, high-value part described in the root README's
-  [`Next steps`](../../README.md#next-steps) section.
-- **Genetics** — replace placeholder `ot_genetic_score` with real Open Targets genetic-association
-  scores per target–indication, pulled as of `feature_as_of`.
+- **Trial metadata** — use [`ingest/ctgov.py`](ingest/ctgov.py) to script the registry metadata
+  pull, while keeping `feature_as_of` at the conservative registration date.
+- **Corpus outcomes** — reconstruct `(outcome, readout_date)` point-in-time over history, with
+  outcomes recovered from press releases / 8-Ks (not registry-only), terminated and withdrawn
+  trials kept in. Every CT.gov row remains `unknown` until human adjudication. This is the
+  laborious, high-value part described in the root README's [`Next steps`](../../README.md#next-steps)
+  section.
+- **Genetics** — use [`ingest/opentargets.py`](ingest/opentargets.py) to pull current-release
+  Open Targets genetic-association scores per target–indication. These are not historical
+  as-of snapshots, so a real corpus must flag that approximation rather than hide it.
 - **Market-implied PoS** — recover implied probabilities from the options surface (or an NPV
   decomposition) so the KPI can be measured *against the market*, not in a vacuum.
 - **Sponsor→ticker** — real entity resolution to move from a watchlist to a universe; breadth is
