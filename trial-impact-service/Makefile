@@ -1,4 +1,4 @@
-.PHONY: test lint validate validate-posefidelity validate-congeneric architecture
+.PHONY: test lint validate validate-posefidelity validate-congeneric tier1 architecture
 
 # Run the unit test suite (dev .venv).
 test:
@@ -6,7 +6,13 @@ test:
 
 # Lint the app + tooling scripts.
 lint:
-	ruff check app/ validation/ tools/ regen_artifacts.py demo_e2e.py compare_estimators.py tests/
+	ruff check app/ tier1/ validation/ tools/ regen_artifacts.py demo_e2e.py compare_estimators.py tests/
+
+# Run the Tier-1 backtest harness on the synthetic scaffold corpus (stdlib only). The numbers
+# are meaningless by construction — this proves the plumbing and the leakage rules. See
+# tier1/README.md for the real data each piece still needs.
+tier1:
+	python -m tier1.run
 
 # Regenerate the scoring-validation stats + head-to-head figure from the committed,
 # self-contained validation/results/scores.json (needs numpy + matplotlib; both are in

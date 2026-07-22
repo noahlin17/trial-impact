@@ -34,3 +34,6 @@ test-report.md
 
 # OS / editor
 .DS_Store
+
+# Tier-1 harness generated report (regenerate with `make tier1`)
+trial-impact-service/tier1/fixtures/report.json
